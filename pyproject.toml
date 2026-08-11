@@ -1,0 +1,44 @@
+[build-system]
+requires = ["maturin>=1.14,<2"]
+build-backend = "maturin"
+
+[project]
+name = "nibbler-cif"
+version = "0.1.0"
+description = "Fast, robust CIF parsing and standards-aware mmCIF writing"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Kiarash Jamali" }]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Rust",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+
+[tool.maturin]
+features = ["extension-module"]
+module-name = "nibbler._core"
+python-source = "python"
+
+[tool.pytest.ini_options]
+addopts = ["-ra", "--strict-config", "--strict-markers"]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+src = ["python"]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "N", "PERF", "RUF", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["benchmarks", "nibbler", "tools"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_unused_configs = true

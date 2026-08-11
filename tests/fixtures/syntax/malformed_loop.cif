@@ -1,0 +1,6 @@
+data_malformed_loop
+
+loop_
+_nibbler_bad.id
+_nibbler_bad.value
+1 alpha 2

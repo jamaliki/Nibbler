@@ -1,0 +1,9 @@
+data_missing_values
+
+loop_
+_nibbler_missing.id
+_nibbler_missing.unknown_value
+_nibbler_missing.not_applicable_value
+_nibbler_missing.present_empty_value
+1 ? . ''
+2 . ? ""

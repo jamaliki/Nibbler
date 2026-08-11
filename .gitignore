@@ -1,0 +1,28 @@
+# Native and Python build outputs
+/target/
+/dist/
+*.egg-info/
+*.so
+*.dylib
+*.dll
+
+# Repository-local development environment
+/.mamba/
+/.cache/
+
+# Python caches and test artifacts
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Benchmark output is machine-specific
+/benchmarks/results/
+
+# Editors and operating systems
+.DS_Store
+*.swp
+*~

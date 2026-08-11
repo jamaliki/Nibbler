@@ -1,0 +1,45 @@
+format_version = 1
+
+[[fixture]]
+id = "syntax-minimal"
+file = "syntax/minimal.cif"
+sha256 = "8ecf765e81a538c33e1c4247a7666d10b784504fd6fb884a3e7566f46deae1c3"
+classification = "valid"
+profiles = ["cif"]
+features = ["scalar", "loop", "quoted", "multiline"]
+
+[[fixture]]
+id = "syntax-missing-values"
+file = "syntax/missing_values.cif"
+sha256 = "3f1330e8415ee7d1dfe0ad209e4c1292316af39874f9652fca7002791392abf1"
+classification = "valid"
+profiles = ["cif"]
+features = ["unknown", "not-applicable", "present-empty"]
+
+[[fixture]]
+id = "syntax-malformed-loop"
+file = "syntax/malformed_loop.cif"
+sha256 = "6f083faaba7ea4d576e4a74aa46e79c75c1af8fa537ae1b4c4b6a445038bc119"
+classification = "invalid"
+profiles = ["cif"]
+features = ["incomplete-loop-row"]
+expected_diagnostic = "CIF_LOOP_VALUE_COUNT"
+
+[[fixture]]
+id = "chemistry-ligand-ion-water"
+file = "chemistry/ligand_ion_water.cif"
+sha256 = "5357d5169725d934ae6003a7cced6799fc7c32dc6914028c7be129c9aacc7b32"
+classification = "valid"
+profiles = ["cif", "pdbx"]
+features = [
+  "polymer",
+  "modified-residue",
+  "ligand",
+  "alternate-location",
+  "negative-author-sequence",
+  "ion",
+  "formal-charge",
+  "water",
+  "poly-sequence-scheme",
+  "nonpoly-scheme",
+]

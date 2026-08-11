@@ -1,0 +1,11 @@
+data_minimal
+_entry.id minimal
+
+loop_
+_nibbler_example.id
+_nibbler_example.value
+1 'quoted value'
+2
+;a multiline value
+whose delimiter starts in column one
+;
