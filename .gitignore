@@ -8,6 +8,7 @@
 
 # Repository-local development environment
 /.mamba/
+/.venv/
 /.cache/
 
 # Python caches and test artifacts
