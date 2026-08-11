@@ -3,4 +3,4 @@ maturin==1.14.1
 mypy==2.3.0
 pytest==9.1.1
 ruff==0.16.2
-tomli==2.4.1; python_version < "3.11"
+tomli==2.4.1
