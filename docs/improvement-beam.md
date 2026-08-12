@@ -60,6 +60,7 @@ accidental O(chunks x rows) export pass.
 | remove document eligibility probe | killed | metadata loops repeatedly spawned workers; large files about 8x slower | none |
 | rolling projection column counter | killed | large projection about 10% slower than optimized remainder | none |
 | specialized batch loop scanner | killed | 3j3q up to 4% faster but 6qnr full 5.4% slower | a universal exact scanner with cross-corpus gain |
+| stable-ABI Python wheels | parked | repeated large-PDB runs were about 2-3% slower than interpreter-specific wheels | PyO3 or compiler changes eliminate the measured loss |
 
 ## Remaining beams
 

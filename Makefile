@@ -1,7 +1,9 @@
 DEV_PREFIX := $(CURDIR)/.mamba/nibbler-dev
 RUN := micromamba run -p $(DEV_PREFIX)
 
-.PHONY: bootstrap develop develop-release format lint typecheck test docs check corpus benchmarks pdb-corpus pdb-stress schemas compile-schemas validate-fixtures clean
+.PHONY: bootstrap develop develop-release format lint typecheck test robustness docs check corpus benchmarks pdb-corpus pdb-stress schemas compile-schemas validate-fixtures release-metadata release-artifacts clean
+
+RELEASE_DIR ?= dist
 
 bootstrap:
 	micromamba create -y -p $(DEV_PREFIX) -f environment-dev.yml
@@ -19,6 +21,7 @@ format:
 lint:
 	$(RUN) cargo fmt --all --check
 	$(RUN) cargo clippy --all-targets --no-default-features -- -D warnings
+	$(RUN) cargo clippy --all-targets --features robustness -- -D warnings
 	$(RUN) ruff format --check .
 	$(RUN) ruff check .
 
@@ -28,6 +31,9 @@ typecheck:
 test: develop
 	$(RUN) cargo test --no-default-features
 	$(RUN) pytest
+
+robustness:
+	$(RUN) cargo test --release --features robustness --test robustness
 
 docs:
 	$(RUN) env RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --no-default-features
@@ -53,7 +59,18 @@ compile-schemas: schemas
 validate-fixtures: develop schemas
 	$(RUN) python -m tools.validate_fixtures
 
-check: lint typecheck test docs corpus validate-fixtures
+release-metadata:
+	$(RUN) python -m tools.validate_release --metadata-only
+
+release-artifacts: release-metadata
+	@test ! -e "$(RELEASE_DIR)" || test -z "$$(find "$(RELEASE_DIR)" -mindepth 1 -maxdepth 1 -print -quit)" || (echo "$(RELEASE_DIR) must be empty"; exit 1)
+	mkdir -p "$(RELEASE_DIR)"
+	$(RUN) maturin build --release --locked --compatibility pypi --sdist --features extension-module --out "$(RELEASE_DIR)"
+	$(RUN) twine check --strict "$(RELEASE_DIR)"/*
+	$(RUN) python -m tools.validate_release --dist "$(RELEASE_DIR)" --expected-wheel-count 1
+	$(RUN) python -m tools.qualify_release "$(RELEASE_DIR)"
+
+check: lint typecheck test robustness docs corpus validate-fixtures release-metadata
 	$(MAKE) benchmarks
 
 clean:

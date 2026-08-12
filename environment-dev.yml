@@ -19,3 +19,4 @@ dependencies:
   - pip:
       - pdbe-mmcif-validator==0.1.92
       - modelcif==1.7
+      - twine==7.0.0

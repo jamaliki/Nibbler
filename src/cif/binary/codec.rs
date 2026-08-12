@@ -157,7 +157,7 @@ fn decode_integer_bytes(
     encoding: IntegerEncoding,
 ) -> Result<Decoded<'static>, BinaryCifError> {
     let width = encoding.width();
-    if bytes.len() % width != 0 {
+    if !bytes.len().is_multiple_of(width) {
         return Err(encoding_error(format!(
             "ByteArray length {} is not divisible by element width {width}",
             bytes.len()

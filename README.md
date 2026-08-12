@@ -112,7 +112,9 @@ environment is repository-local.
 ```console
 make bootstrap
 make develop
+make robustness
 make check
+make release-artifacts
 ```
 
 Fetch and benchmark the hash-pinned PDB stress corpus:
@@ -140,6 +142,8 @@ PGO flags are stored in `Cargo.toml`.
 - [Benchmark commands and measurement contract](benchmarks/README.md)
 - [Schema locks and artifacts](schemas/README.md)
 - [Historical performance experiment ledger](docs/improvement-beam.md)
+- [Release process and trusted publishing](docs/releasing.md)
+- [Changelog](CHANGELOG.md)
 
 ## License
 

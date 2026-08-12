@@ -359,10 +359,10 @@ fn starts_ascii_case(text: &str, prefix: &str) -> bool {
         .is_some_and(|candidate| candidate.eq_ignore_ascii_case(prefix))
 }
 
-#[cfg(feature = "fuzzing")]
-/// Exercise only tokenization for `cargo fuzz`.
-pub fn fuzz_lexer(bytes: &[u8]) {
-    let Ok(source) = SourceBuffer::from_bytes("<fuzz>", bytes) else {
+#[cfg(feature = "robustness")]
+/// Exercise only tokenization for parser robustness tests.
+pub fn exercise_lexer(bytes: &[u8]) {
+    let Ok(source) = SourceBuffer::from_bytes("<robustness>", bytes) else {
         return;
     };
     let mut lexer = Lexer::new(source, 64 * 1024 * 1024);

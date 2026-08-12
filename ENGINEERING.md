@@ -112,7 +112,7 @@ overflow, allocation sizes, or destination failures.
   library paths.
 - Direct indexing requires a locally visible bound or checked alternative.
 - `debug_assert!` may document a programmer invariant, never validate input.
-- Tests and fuzz targets may use assertions and setup `expect` calls.
+- Tests may use assertions and setup `expect` calls.
 - Errors carry stable codes and structured context. String matching must not drive
   native control flow.
 
@@ -177,7 +177,7 @@ Performance changes follow a scientific loop:
 3. profile before changing architecture;
 4. implement the smallest credible mechanism;
 5. compare interleaved samples and peak RSS;
-6. run semantic, determinism, and adversarial tests; and
+6. run semantic, determinism, and edge-case tests; and
 7. keep the change only when the representative result is neutral or better.
 
 The unit of success is a usable `CifDocument`, `CifTable`, Arrow table, or semantic
@@ -205,13 +205,21 @@ Tests are organized by invariant rather than implementation detail:
   deterministic scanning, error conversion, and typing contracts.
 - manifest tests pin every fixture by size and SHA-256.
 - interoperability tests qualify outputs with installed external readers/validators.
-- fuzz targets exercise the lexer, parse/write/parse equivalence, and formatter.
+- bounded property tests cover arbitrary bytes, nearby fixture mutations, formatting,
+  text and BinaryCIF round trips, gzip limits, semantic reconstruction, and exact
+  serial/parallel equivalence;
 - the PDB stress corpus exercises small structures, chemistry, multiple models, a
   ribosome, and a multi-million-atom assembly in CIF, gzip, and BinaryCIF.
 
 Every bug fix adds the smallest failing case at the layer that owns the invariant. A
 performance path has a serial or general-path equivalence test. Tests do not depend on
 network access; fetch commands populate ignored caches separately.
+
+Property generation is deterministic on replay and bounded by the `robustness` test
+feature. Keep minimized failures in `tests/robustness.proptest-regressions`; do not add
+a second test workspace or a separate parser implementation. The production parser is
+the grammar owner, and the serial reference differs only by disabling parallel loop
+execution.
 
 ## 9. Required checks
 
@@ -225,9 +233,12 @@ make format             # Rust and Python formatting
 make lint               # rustfmt, Clippy, Ruff
 make typecheck          # strict mypy
 make test               # Rust and Python tests
+make robustness         # bounded properties and regression corpus
 make docs               # rustdoc with warnings denied
 make corpus             # verify pinned local fixtures
 make validate-fixtures  # external fixture qualification
+make release-metadata   # synchronized Cargo/Python/changelog versions
+make release-artifacts  # build, inspect, install, and exercise wheel plus sdist
 make check              # all gates plus benchmark smoke test
 ```
 
@@ -238,6 +249,8 @@ micromamba run -p .mamba/nibbler-dev cargo fmt --all -- --check
 micromamba run -p .mamba/nibbler-dev cargo clippy --all-targets \
   --no-default-features -- -D warnings
 micromamba run -p .mamba/nibbler-dev cargo test --no-default-features
+micromamba run -p .mamba/nibbler-dev cargo test --release \
+  --features robustness --test robustness
 micromamba run -p .mamba/nibbler-dev pytest
 micromamba run -p .mamba/nibbler-dev ruff format --check .
 micromamba run -p .mamba/nibbler-dev ruff check .
@@ -246,6 +259,25 @@ micromamba run -p .mamba/nibbler-dev env RUSTDOCFLAGS=-D warnings \
   cargo doc --no-deps --no-default-features
 micromamba run -p .mamba/nibbler-dev python -m tools.verify_corpus
 ```
+
+Release archives are accepted only after `twine check --strict`, structural inspection,
+and installation from the archive into a fresh virtual environment outside the source
+tree. The installed-package smoke test covers text CIF, gzip, BinaryCIF, schema typing,
+missing states, canonical writing, and Arrow interchange. A source distribution must
+also rebuild successfully through its declared PEP 517 backend. Do not substitute a
+checkout import or an editable install for artifact qualification.
+
+The release workflow builds with `--locked --compatibility pypi`. Wheels are
+interpreter-specific and qualified on their target platform before assembly. Build and
+qualification jobs have read-only repository access and no publication identity. Only
+an exact version tag can reach the protected PyPI environment, and that publish job uses
+trusted publishing rather than a stored token. The release procedure is in
+[docs/releasing.md](docs/releasing.md).
+
+The scheduled PDB regression runs every pinned structure in CIF, BinaryCIF, and gzip.
+It requires equal projections and checks broad hosted-runner throughput and RSS floors
+for large inputs. A changed parser, storage representation, compression backend, Arrow
+builder, or build profile must pass this job before release.
 
 Release benchmarks require `maturin develop --release`. Native PGO wheels are built
 per target and Python ABI with:

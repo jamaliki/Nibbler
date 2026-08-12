@@ -500,3 +500,32 @@ pub fn project_source_with_options(
     parse_source_into(source, options, &mut sink)?;
     sink.finish()
 }
+
+#[cfg(feature = "robustness")]
+/// Project a category with the parallel loop kernel disabled.
+///
+/// This entry point exists only for robustness tests against
+/// [`project_with_options`].
+#[doc(hidden)]
+pub fn project_serial_reference(
+    bytes: &[u8],
+    plan: ProjectionPlan,
+    options: ParseOptions,
+) -> Result<CifTable, ProjectionError> {
+    if bytes.len() > options.limits.source_bytes {
+        return Err(ParseError::new(
+            super::error::ParseErrorCode::ResourceLimit,
+            format!(
+                "source exceeds the configured limit of {} bytes",
+                options.limits.source_bytes
+            ),
+            "<memory>",
+            super::error::SourceSpan::new(0, 0, 1, 1),
+        )
+        .into());
+    }
+    let source = SourceBuffer::from_bytes("<memory>", bytes)?;
+    let mut sink = TableSink::new(source.name(), plan);
+    super::parser::parse_source_into_serial_reference(source, options, &mut sink)?;
+    sink.finish()
+}

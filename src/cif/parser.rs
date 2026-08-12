@@ -158,6 +158,8 @@ struct Parser {
     reached_end: bool,
     limits: Limits,
     counts: Counts,
+    #[cfg(feature = "robustness")]
+    allow_parallel: bool,
 }
 
 impl Parser {
@@ -169,6 +171,26 @@ impl Parser {
             reached_end: false,
             limits,
             counts: Counts::default(),
+            #[cfg(feature = "robustness")]
+            allow_parallel: true,
+        }
+    }
+
+    #[cfg(feature = "robustness")]
+    const fn serial(mut self) -> Self {
+        self.allow_parallel = false;
+        self
+    }
+
+    #[inline(always)]
+    const fn parallel_enabled(&self) -> bool {
+        #[cfg(feature = "robustness")]
+        {
+            self.allow_parallel
+        }
+        #[cfg(not(feature = "robustness"))]
+        {
+            true
         }
     }
 
@@ -400,6 +422,7 @@ impl Parser {
             .filter(|token| token.kind == TokenKind::Value)
             .map(|token| token.span.start);
         if let Some(value_start) = value_start
+            && self.parallel_enabled()
             && let Some(kernel) = sink.loop_kernel()
             && self.parallel_limits_are_unreachable(value_start)
         {
@@ -612,6 +635,54 @@ impl Parser {
         self.source
             .error(code, message, self.source.len(), self.source.len())
     }
+}
+
+#[cfg(feature = "robustness")]
+pub(crate) fn parse_source_into_serial_reference(
+    source: SourceBuffer,
+    options: ParseOptions,
+    sink: &mut impl ParseSink,
+) -> Result<(), ParseError> {
+    if source.len() > options.limits.source_bytes {
+        return Err(source.error(
+            ParseErrorCode::ResourceLimit,
+            format!(
+                "source exceeds the configured limit of {} bytes",
+                options.limits.source_bytes
+            ),
+            0,
+            0,
+        ));
+    }
+    Parser::new(source, options.limits)
+        .serial()
+        .parse_document(sink)
+}
+
+#[cfg(feature = "robustness")]
+/// Parse a document with the parallel loop kernel disabled.
+///
+/// This entry point exists only for robustness tests against [`parse_with_options`].
+#[doc(hidden)]
+pub fn parse_serial_reference(
+    bytes: &[u8],
+    options: ParseOptions,
+) -> Result<CifDocument, ParseError> {
+    if bytes.len() > options.limits.source_bytes {
+        return Err(ParseError::new(
+            ParseErrorCode::ResourceLimit,
+            format!(
+                "source exceeds the configured limit of {} bytes",
+                options.limits.source_bytes
+            ),
+            "<memory>",
+            SourceSpan::new(0, 0, 1, 1),
+        ));
+    }
+    let source = SourceBuffer::from_bytes("<memory>", bytes)?;
+    let mut sink = DocumentSink::new(source.clone());
+    parse_source_into_serial_reference(source, options, &mut sink)?;
+    Ok(sink.finish())
 }
 
 #[derive(Clone, Copy)]

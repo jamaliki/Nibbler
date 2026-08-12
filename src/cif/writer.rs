@@ -135,7 +135,9 @@ fn write_loop(
 ) -> Result<(), WriteError> {
     if cif_loop.column_count() == 0
         || cif_loop.value_count() == 0
-        || cif_loop.value_count() % cif_loop.column_count() != 0
+        || !cif_loop
+            .value_count()
+            .is_multiple_of(cif_loop.column_count())
     {
         return Err(WriteError::new(
             WriteErrorCode::InvalidDocument,

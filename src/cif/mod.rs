@@ -76,6 +76,12 @@ pub use binary::{
 };
 #[cfg(feature = "python")]
 pub(crate) use binary::{is_binary_container, project_binary_named};
-#[cfg(feature = "fuzzing")]
+#[cfg(feature = "robustness")]
 #[doc(hidden)]
-pub use lexer::fuzz_lexer;
+pub use lexer::exercise_lexer;
+#[cfg(feature = "robustness")]
+#[doc(hidden)]
+pub use parser::parse_serial_reference;
+#[cfg(feature = "robustness")]
+#[doc(hidden)]
+pub use projection::project_serial_reference;

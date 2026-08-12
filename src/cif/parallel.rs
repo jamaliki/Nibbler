@@ -10,8 +10,14 @@ use super::parallel_probe::loop_reaches;
 use super::source::SourceBuffer;
 use super::token::{Token, TokenKind};
 
+#[cfg(not(feature = "robustness"))]
 pub(crate) const PARALLEL_LOOP_MIN_BYTES: usize = 8 * 1024 * 1024;
+#[cfg(feature = "robustness")]
+pub(crate) const PARALLEL_LOOP_MIN_BYTES: usize = 1024;
+#[cfg(not(feature = "robustness"))]
 const BYTES_PER_WORKER: usize = 2 * 1024 * 1024;
+#[cfg(feature = "robustness")]
+const BYTES_PER_WORKER: usize = 256;
 const CELLS_PER_SEGMENT: usize = 64 * 1024;
 
 static ACTIVE_WORKERS: AtomicUsize = AtomicUsize::new(0);
