@@ -1,9 +1,8 @@
 //! Deterministic PDBx profile ordering over the shared CIF serializer.
 
-use std::collections::BTreeSet;
-
 use crate::cif::{BlockKind, CifBlock, CifDocument, CifEntry, CifLoop, CifValue};
 
+use super::category::{category_name, item_name};
 use super::{ComponentAtom, ComponentBond, ComponentDefinition, ComponentResolution, PdbxModel};
 
 const CATEGORY_ORDER: &[&str] = &[
@@ -56,16 +55,23 @@ const ATOM_SITE_ORDER: &[&str] = &[
 /// Construct a canonical-order document without duplicating CIF formatting logic.
 #[must_use]
 pub fn canonical_document(model: &PdbxModel) -> CifDocument {
+    canonical_document_ordered(model, CATEGORY_ORDER)
+}
+
+pub(crate) fn canonical_document_ordered(
+    model: &PdbxModel,
+    category_order: &[&str],
+) -> CifDocument {
     let blocks = model
         .source_document()
         .blocks()
         .iter()
-        .map(|block| reorder_block(block, model))
+        .map(|block| reorder_block(block, model, category_order))
         .collect();
     CifDocument::new(blocks)
 }
 
-fn reorder_block(block: &CifBlock, model: &PdbxModel) -> CifBlock {
+fn reorder_block(block: &CifBlock, model: &PdbxModel, category_order: &[&str]) -> CifBlock {
     let mut source_entries = block.entries().to_vec();
     append_resolved_components(&mut source_entries, model);
     let mut entries = source_entries
@@ -73,7 +79,7 @@ fn reorder_block(block: &CifBlock, model: &PdbxModel) -> CifBlock {
         .enumerate()
         .map(|(source_index, entry)| {
             let entry = reorder_columns(entry);
-            (category_rank(&entry), source_index, entry)
+            (category_rank(&entry, category_order), source_index, entry)
         })
         .collect::<Vec<_>>();
     entries.sort_by_key(|(rank, source_index, _)| (*rank, *source_index));
@@ -85,14 +91,12 @@ fn reorder_block(block: &CifBlock, model: &PdbxModel) -> CifBlock {
 }
 
 fn append_resolved_components(entries: &mut Vec<CifEntry>, model: &PdbxModel) {
-    let embedded = source_component_ids(entries);
     let missing = model
         .components()
         .iter()
         .filter(|component| {
             component.resolution() != ComponentResolution::Embedded
                 && component.resolution() != ComponentResolution::Unresolved
-                && !embedded.contains(&component.id().to_ascii_lowercase())
         })
         .collect::<Vec<_>>();
     if missing.is_empty() {
@@ -123,12 +127,12 @@ fn append_resolved_components(entries: &mut Vec<CifEntry>, model: &PdbxModel) {
 
 fn merge_category_rows<T>(
     entries: &mut Vec<CifEntry>,
-    category_name: &str,
+    selected_category: &str,
     records: &[T],
     value: impl Fn(&T, &str) -> CifValue,
 ) -> bool {
     let loop_index = entries.iter().position(|entry| {
-        matches!(entry, CifEntry::Loop(cif_loop) if cif_loop.tags().first().and_then(|tag| category(tag)).is_some_and(|name| name.eq_ignore_ascii_case(category_name)))
+        matches!(entry, CifEntry::Loop(cif_loop) if cif_loop.tags().first().and_then(|tag| category_name(tag)).is_some_and(|name| name.eq_ignore_ascii_case(selected_category)))
     });
     if let Some(index) = loop_index {
         let CifEntry::Loop(cif_loop) = &entries[index] else {
@@ -148,12 +152,12 @@ fn merge_category_rows<T>(
         entries[index] = CifEntry::Loop(CifLoop::new(tags, values));
         return true;
     }
-    merge_scalar_category(entries, category_name, records, value)
+    merge_scalar_category(entries, selected_category, records, value)
 }
 
 fn merge_scalar_category<T>(
     entries: &mut Vec<CifEntry>,
-    category_name: &str,
+    selected_category: &str,
     records: &[T],
     value: impl Fn(&T, &str) -> CifValue,
 ) -> bool {
@@ -162,8 +166,8 @@ fn merge_scalar_category<T>(
         .enumerate()
         .filter_map(|(index, entry)| match entry {
             CifEntry::Item(item)
-                if category(item.tag())
-                    .is_some_and(|name| name.eq_ignore_ascii_case(category_name)) =>
+                if category_name(item.tag())
+                    .is_some_and(|name| name.eq_ignore_ascii_case(selected_category)) =>
             {
                 Some(index)
             }
@@ -193,39 +197,6 @@ fn merge_scalar_category<T>(
     }
     entries.insert(insert_at, CifEntry::Loop(CifLoop::new(tags, values)));
     true
-}
-
-fn source_component_ids(entries: &[CifEntry]) -> BTreeSet<String> {
-    let mut output = BTreeSet::new();
-    for entry in entries {
-        match entry {
-            CifEntry::Item(item) if item.tag().eq_ignore_ascii_case("_chem_comp.id") => {
-                if let Some(value) = item.value().as_text() {
-                    output.insert(value.to_ascii_lowercase());
-                }
-            }
-            CifEntry::Loop(cif_loop) => {
-                let Some(column) = cif_loop
-                    .tags()
-                    .iter()
-                    .position(|tag| tag.eq_ignore_ascii_case("_chem_comp.id"))
-                else {
-                    continue;
-                };
-                for row_index in 0..cif_loop.row_count() {
-                    if let Some(value) = cif_loop
-                        .row(row_index)
-                        .and_then(|row| row.get(column))
-                        .and_then(|value| value.as_text())
-                    {
-                        output.insert(value.to_ascii_lowercase());
-                    }
-                }
-            }
-            CifEntry::Item(_) | CifEntry::Frame(_) => {}
-        }
-    }
-    output
 }
 
 fn component_loop(components: &[&ComponentDefinition]) -> CifEntry {
@@ -339,7 +310,7 @@ fn reorder_columns(entry: &CifEntry) -> CifEntry {
     let CifEntry::Loop(cif_loop) = entry else {
         return entry.clone();
     };
-    if category(cif_loop.tags().first().map_or("", String::as_str)) != Some("atom_site") {
+    if category_name(cif_loop.tags().first().map_or("", String::as_str)) != Some("atom_site") {
         return entry.clone();
     }
     let mut columns = (0..cif_loop.column_count()).collect::<Vec<_>>();
@@ -368,23 +339,15 @@ fn reorder_columns(entry: &CifEntry) -> CifEntry {
     CifEntry::Loop(CifLoop::new(tags, values))
 }
 
-fn category_rank(entry: &CifEntry) -> usize {
+fn category_rank(entry: &CifEntry, category_order: &[&str]) -> usize {
     let tag = match entry {
         CifEntry::Item(item) => item.tag(),
         CifEntry::Loop(cif_loop) => cif_loop.tags().first().map_or("", String::as_str),
-        CifEntry::Frame(_) => return CATEGORY_ORDER.len() + 1,
+        CifEntry::Frame(_) => return category_order.len() + 1,
     };
-    let category = category(tag).unwrap_or("");
-    CATEGORY_ORDER
+    let category = category_name(tag).unwrap_or("");
+    category_order
         .iter()
         .position(|expected| category.eq_ignore_ascii_case(expected))
-        .unwrap_or(CATEGORY_ORDER.len())
-}
-
-fn category(tag: &str) -> Option<&str> {
-    tag.strip_prefix('_')?.split_once('.').map(|(name, _)| name)
-}
-
-fn item_name(tag: &str) -> Option<&str> {
-    tag.strip_prefix('_')?.split_once('.').map(|(_, item)| item)
+        .unwrap_or(category_order.len())
 }

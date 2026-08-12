@@ -4,7 +4,6 @@ mod aggregate;
 mod fields;
 mod mirror;
 mod model;
-mod profile;
 mod provenance;
 mod qa;
 mod source;
@@ -26,12 +25,11 @@ pub use model::{
     Data, ModelGroup, ModelGroupLink, ModelRepresentative, PredictionModel, TargetEntity,
     TargetInstance,
 };
-pub use profile::ModelCifValidationReport;
 pub use provenance::{
     ArchiveMember, AssociatedFile, DataGroupMember, ProtocolStep, Software, SoftwareGroupMember,
 };
 pub use qa::{QaMetric, QaValue, ResidueSite};
-pub use source::{ModelCifError, build_model, build_model_with_registry};
+pub use source::{build_model, build_model_with_registry};
 pub use template::{
     Alignment, AlignmentDetail, AlignmentSequence, Template, TemplateMapping, TemplateSegment,
 };

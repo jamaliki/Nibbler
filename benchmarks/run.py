@@ -20,11 +20,22 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from .baselines import ADAPTERS, BASELINES, ProjectedRows
-from .workloads import WORKLOADS
+from .baselines import ENGINES, ProjectedRows
 
 DEFAULT_FIXTURE = Path("tests/fixtures/chemistry/ligand_ion_water.cif")
 DEFAULT_COLUMNS = ("label_comp_id", "Cartn_x", "Cartn_y", "Cartn_z")
+WORKLOADS = {
+    "full-document": "Parse a complete logical CIF document without projection.",
+    "projected-atom-site": (
+        "Read selected atom_site columns without materializing other data."
+    ),
+    "chemistry-heavy-validation": (
+        "Validate PDBx entity, component, scheme, and atom relationships."
+    ),
+    "canonical-round-trip": (
+        "Parse, write canonically, and reparse without semantic loss."
+    ),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,12 +56,32 @@ class BenchmarkResult:
     correct: bool
 
 
+@dataclass(frozen=True, slots=True)
+class BenchmarkReport:
+    """A complete benchmark run before JSON serialization."""
+
+    workload: str
+    command: str
+    file: str
+    input_sha256: str
+    input_bytes: int
+    decompressed_bytes: int
+    columns: tuple[str, ...]
+    warmups: int
+    samples: int
+    platform: str
+    machine: str
+    python: str
+    cpu_count: int | None
+    results: tuple[BenchmarkResult, ...]
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create the benchmark command-line parser."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--list", action="store_true", help="list the frozen plan")
     parser.add_argument("--file", type=Path, default=DEFAULT_FIXTURE)
-    parser.add_argument("--engine", choices=("all", *ADAPTERS), default="all")
+    parser.add_argument("--engine", choices=("all", *ENGINES), default="all")
     parser.add_argument("--warmups", type=int, default=2)
     parser.add_argument("--samples", type=int, default=10)
     parser.add_argument(
@@ -68,11 +99,12 @@ def build_parser() -> argparse.ArgumentParser:
 def render_plan() -> str:
     """Render the stable human-readable benchmark plan."""
     lines = ["Workloads:"]
-    lines.extend(f"  {workload.name}: {workload.description}" for workload in WORKLOADS)
+    lines.extend(f"  {name}: {description}" for name, description in WORKLOADS.items())
     lines.append("Baselines:")
     lines.extend(
-        f"  {baseline.name} ({baseline.distribution}): {baseline.purpose}"
-        for baseline in BASELINES
+        f"  {name} ({engine.distribution}): {engine.purpose}"
+        for name, engine in ENGINES.items()
+        if name != "nibbler"
     )
     return "\n".join(lines)
 
@@ -89,7 +121,7 @@ def run_worker(
         raise ValueError("warmups must be non-negative and samples must be positive")
     if engine == "nibbler":
         require_release_nibbler()
-    adapter = ADAPTERS[engine]
+    adapter = ENGINES[engine].project
     for _ in range(warmups):
         adapter(file, DEFAULT_COLUMNS)
     durations = []
@@ -104,7 +136,7 @@ def run_worker(
     seconds = median_ns / 1_000_000_000
     return BenchmarkResult(
         engine=engine,
-        version=engine_version(engine),
+        version=importlib.metadata.version(ENGINES[engine].distribution),
         samples_ns=tuple(durations),
         median_ns=median_ns,
         p95_ns=percentile(durations, 0.95),
@@ -153,10 +185,10 @@ def report(
     warmups: int,
     samples: int,
     engines: Sequence[str],
-) -> dict[str, object]:
+) -> BenchmarkReport:
     """Build a machine-readable, correctness-qualified benchmark report."""
     require_release_nibbler()
-    reference_rows = ADAPTERS["nibbler"](file, DEFAULT_COLUMNS)
+    reference_rows = ENGINES["nibbler"].project(file, DEFAULT_COLUMNS)
     expected_digest = semantic_digest(reference_rows)
     results = [
         run_isolated(engine, file, warmups, samples, expected_digest)
@@ -165,22 +197,22 @@ def report(
     if not all(result.correct for result in results):
         mismatches = [result.engine for result in results if not result.correct]
         raise RuntimeError(f"semantic mismatch for engines: {', '.join(mismatches)}")
-    return {
-        "workload": "projected-atom-site",
-        "command": " ".join(sys.argv),
-        "file": str(file),
-        "input_sha256": hashlib.sha256(file.read_bytes()).hexdigest(),
-        "input_bytes": file.stat().st_size,
-        "decompressed_bytes": decompressed_size(file),
-        "columns": list(DEFAULT_COLUMNS),
-        "warmups": warmups,
-        "samples": samples,
-        "platform": platform.platform(),
-        "machine": platform.machine(),
-        "python": platform.python_version(),
-        "cpu_count": os.cpu_count(),
-        "results": [asdict(result) for result in results],
-    }
+    return BenchmarkReport(
+        workload="projected-atom-site",
+        command=" ".join(sys.argv),
+        file=str(file),
+        input_sha256=hashlib.sha256(file.read_bytes()).hexdigest(),
+        input_bytes=file.stat().st_size,
+        decompressed_bytes=decompressed_size(file),
+        columns=DEFAULT_COLUMNS,
+        warmups=warmups,
+        samples=samples,
+        platform=platform.platform(),
+        machine=platform.machine(),
+        python=platform.python_version(),
+        cpu_count=os.cpu_count(),
+        results=tuple(results),
+    )
 
 
 def require_release_nibbler() -> None:
@@ -229,17 +261,6 @@ def peak_rss_bytes() -> int:
     return int(maximum if sys.platform == "darwin" else maximum * 1024)
 
 
-def engine_version(engine: str) -> str:
-    """Return the installed distribution version for one adapter."""
-    distribution = {
-        "nibbler": "nibbler-cif",
-        "gemmi": "gemmi",
-        "biotite": "biotite",
-        "biopython": "biopython",
-    }[engine]
-    return importlib.metadata.version(distribution)
-
-
 def generate_synthetic(file: Path, row_count: int) -> None:
     """Write a deterministic wide atom_site projection workload."""
     if row_count < 1:
@@ -268,7 +289,7 @@ def main() -> int:
     if arguments.list:
         print(render_plan())
         return 0
-    engines = tuple(ADAPTERS) if arguments.engine == "all" else (arguments.engine,)
+    engines = tuple(ENGINES) if arguments.engine == "all" else (arguments.engine,)
     if arguments._worker:
         if len(engines) != 1:
             raise ValueError("a benchmark worker requires exactly one engine")
@@ -288,37 +309,32 @@ def main() -> int:
             output = report(file, arguments.warmups, arguments.samples, engines)
     else:
         output = report(arguments.file, arguments.warmups, arguments.samples, engines)
-    print(json.dumps(output, indent=2) if arguments.as_json else render_results(output))
+    print(
+        json.dumps(asdict(output), indent=2)
+        if arguments.as_json
+        else render_results(output)
+    )
     return 0
 
 
-def render_results(report_values: dict[str, object]) -> str:
+def render_results(report: BenchmarkReport) -> str:
     """Render concise comparable timings after semantic qualification."""
     lines = [
-        f"Workload: {report_values['workload']}",
-        f"Input: {report_values['file']} ({report_values['decompressed_bytes']} bytes)",
+        f"Workload: {report.workload}",
+        f"Input: {report.file} ({report.decompressed_bytes} bytes)",
         "engine       median ms    p95 ms    MB/s    peak RSS MiB    correct",
     ]
-    results = report_values["results"]
-    if not isinstance(results, list):
-        raise TypeError("benchmark report results must be a list")
-    for result in results:
-        if not isinstance(result, dict):
-            raise TypeError("each benchmark result must be a mapping")
-        engine = str(result["engine"])
-        median_ns = int(result["median_ns"])
-        p95_ns = int(result["p95_ns"])
-        throughput = float(result["decompressed_mb_per_second"])
-        peak_rss = int(result["peak_rss_bytes"])
-        correct = bool(result["correct"])
-        lines.append(
-            f"{engine:<12} "
-            f"{median_ns / 1_000_000:>9.3f} "
-            f"{p95_ns / 1_000_000:>9.3f} "
-            f"{throughput:>7.1f} "
-            f"{peak_rss / 1_048_576:>15.1f} "
-            f"{correct!s:>10}"
+    lines.extend(
+        (
+            f"{result.engine:<12} "
+            f"{result.median_ns / 1_000_000:>9.3f} "
+            f"{result.p95_ns / 1_000_000:>9.3f} "
+            f"{result.decompressed_mb_per_second:>7.1f} "
+            f"{result.peak_rss_bytes / 1_048_576:>15.1f} "
+            f"{result.correct!s:>10}"
         )
+        for result in report.results
+    )
     return "\n".join(lines)
 
 

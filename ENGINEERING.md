@@ -1,360 +1,270 @@
-# Nibbler Engineering Standard
+# Nibbler engineering standard
 
-- Status: Draft 0.1
-- Date: 2026-08-11
-- Applies to: Rust core, Python package, tests, benchmarks, generators, and build tooling
+- Status: current
+- Updated: 2026-08-12
+- Applies to: Rust, Python, tests, benchmarks, schema artifacts, and build tooling
 
-This is the implementation and review companion to [DESIGN.md](DESIGN.md). The words
-MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are normative.
+This is the implementation and review standard for [DESIGN.md](DESIGN.md). Correctness,
+performance, and readability are independent release gates; success in one does not
+excuse regression in another.
 
-Nibbler does not trade readability for speed. Correctness, performance, and
-maintainability are independent release gates: passing two does not compensate for
-failing the third.
+## 1. Reviewability
 
-## 1. Reviewability contract
+A reviewer familiar with Rust or Python must be able to determine:
 
-A change is reviewable when a contributor familiar with Rust or Python, but not with
-its author, can determine:
-
-1. which invariant it preserves or introduces;
+1. which invariant a change preserves or introduces;
 2. which bytes, rows, or schema objects it reads and owns;
-3. how errors and missing values propagate;
-4. why any non-obvious optimization is necessary; and
-5. which test would fail if the behavior regressed.
+3. how missing values and failures propagate;
+4. why a non-obvious optimization exists; and
+5. which test or benchmark detects a regression.
 
-If those answers require reconstructing hidden control flow, macro expansion, global
-state, or benchmark folklore, the change is not ready to merge.
+Prefer the smallest implementation that satisfies the measured requirement. Line count
+is useful pressure, not proof of simplicity: explicit invariants and clear ownership are
+worth lines; forwarding layers, duplicate semantics, and speculative abstractions are
+not.
 
-The smallest implementation that meets the measured requirement is preferred. Line
-count alone is not simplicity: duplicated semantics, implicit state, and unnecessary
-abstractions are larger costs than a few explicit lines.
+## 2. Architecture
 
-## 2. Architectural discipline
+### One production path
 
-### 2.1 One production path
+- Text CIF has one lexer and parser.
+- `DocumentSink` and `TableSink` share that grammar owner.
+- Canonical and preserving text output share syntax and value-formatting rules.
+- BinaryCIF converges on the same document and table models.
+- Python wrappers delegate to Rust and must not implement a second parser, validator,
+  chemistry model, or writer.
+- Reference algorithms may exist in tests, never as alternate production paths.
 
-- There MUST be one tokenizer and parser for all production reads.
-- Canonical and preserving output modes MUST share the same value formatter and syntax
-  rules.
-- Python convenience APIs MUST delegate to conventional submodule APIs rather than
-  reimplement behavior.
-- Reference implementations MAY exist in tests for differential testing. They MUST NOT
-  become a second production path.
-- A specialized kernel MAY replace an implementation detail only when it preserves the
-  same contract and wins a representative benchmark.
-
-### 2.2 Dependency direction
-
-The intended dependency direction is:
+The dependency direction is:
 
 ```text
-source -> lexer -> parser -> sinks -> document/tables
-                                  -> diagnostics
+input -> lexer -> parser -> document/table sinks -> document or table
+BinaryCIF codec -------------------------------> document or table
 
-dictionary -> schema validation -> mmCIF/ModelCIF semantics
-document/tables + semantics -> writer -> destination
-Rust public API -> PyO3 adapter -> Python facade
+compiled dictionary -> projection typing and dictionary validation
+document + optional local registry -> PDBx semantics -> ModelCIF semantics
+document or semantic model -> writer -> destination
+
+Rust API -> PyO3 conversion -> typed Python facade
 ```
 
-Lower layers MUST NOT import profile-specific chemistry or Python concerns. Domain
-layers MUST consume parser output through narrow typed interfaces. Cyclic module or
-package dependencies are forbidden.
+Lower layers do not import chemistry, profile, or Python concerns. Side effects are
+confined to input, compression, output, FFI, corpus fetching, and build workflows.
+Parsing, validation, semantic construction, and writing perform no hidden filesystem or
+network access.
 
-Nibbler SHOULD begin as one Rust library crate plus one Python package. A new crate,
-plugin system, service locator, registry, or framework requires evidence that the
-existing structure is causing a concrete problem.
+### Boundaries that earn their place
 
-### 2.3 Functional boundaries
+- `SourceBuffer` owns immutable source text shared by spans.
+- `ParseSink` separates grammar from document retention and projection.
+- `CifDocument` and `CifTable` are the common text/BinaryCIF boundary.
+- compiled dictionaries isolate DDL2 loading from validation and projection.
+- PDBx and ModelCIF types name domain records and protect invariants.
+- the PyO3 layer translates native values and failures once.
 
-- Pure transformations are preferred for schema compilation, category planning,
-  validation, and formatting decisions.
-- I/O, allocation-heavy materialization, compression, and FFI MUST be kept behind
-  narrow boundaries.
-- Values SHOULD be immutable after construction. Mutation used for streaming table
-  assembly MUST remain local to the owning builder.
-- There MUST be no hidden filesystem or network access in parsing, validation, model
-  construction, or writing.
-- Global mutable state is forbidden. Read-only compiled tables MAY be initialized once
-  through a thread-safe standard-library primitive.
+A new trait, generic framework, crate, registry, service layer, or callback system needs
+at least two real implementations or a demonstrated ownership/performance boundary.
 
-## 3. Names and types
+## 3. Names, values, and ownership
 
-### 3.1 Domain language
+Use CIF and PDBx terms precisely: block, frame, category, tag, item, entity,
+`label_asym_id`, `auth_seq_id`, component, and atom site. Do not replace distinct domain
+identifiers with ambiguous names such as `id`, `obj`, or `data` when the distinction
+matters. Include units or representation in names such as `byte_offset`, `row_count`,
+and `source_span`.
 
-Internal names MUST use CIF and PDBx terminology: `data_block`, `category`, `tag`,
-`label_asym_id`, `auth_seq_id`, `entity`, and `component`. Do not shorten distinct
-identifiers to ambiguous names such as `chain`, `residue`, `id`, `obj`, or `data` when
-the distinction matters.
+The themed names `chomp`, `feast`, `sniff`, and `dump` belong only at the Python root.
+Native modules, errors, configuration, and diagnostics use conventional domain names.
 
-Names SHOULD expose units or representation where confusion is possible, for example
-`byte_offset`, `row_count`, `compressed_size`, and `source_span`.
+Unknown (`?`), not applicable (`.`), absent, and present values remain distinct. They
+must not be encoded as empty strings, sentinel numbers, or NaN. Finite numeric values
+and checked conversions are required at trust boundaries. Chemistry resolution carries
+an explicit `ComponentResolution`; residue-name sets are not a general chemistry type
+system.
 
-The character-themed API belongs only at the root facade:
+Values are immutable after construction. Temporary mutation is local to an owning
+builder. Shared ownership is explicit through `Arc` or immutable Python wrappers; no
+global mutable model or cache is allowed. The one process-wide parallel-worker counter
+is an atomic resource lease, not application state.
 
-- `nibbler.chomp(...)` may provide a friendly parse entry point.
-- Conventional APIs such as `nibbler.cif.read(...)`, `nibbler.cif.write(...)`, and
-  `nibbler.cif.validate(...)` remain the searchable, composable foundation.
-- Internal types, error names, module names, configuration, and diagnostics MUST NOT
-  use jokes or character lore.
+## 4. Rust rules
 
-### 3.2 Make invalid states difficult to represent
+### Control flow and modules
 
-- Semantically distinct identifiers SHOULD use distinct types when accidental mixing
-  would be plausible.
-- CIF unknown (`?`), not-applicable (`.`), absent, and present values MUST remain
-  distinct. They MUST NOT be encoded as magic strings, negative numbers, empty strings,
-  or floating-point NaNs.
-- Boolean parameters are forbidden when the call site would not reveal what `true`
-  means. Use a named enum.
-- Input sizes and byte offsets MUST use checked conversions and checked arithmetic.
-- Chemistry classifications MUST carry provenance and confidence as specified in
-  [DESIGN.md](DESIGN.md); a residue-name set is not a type system.
+- Prefer `match`, early returns, and small state machines over callbacks and hidden
+  control flow.
+- A function does one conceptual job. Fifty lines is a review prompt, not a mechanical
+  limit; a longer linear parser transition may be clearer than fragmented helpers.
+- A module has one reason to change. Five hundred lines is a decomposition prompt, not
+  a reason to create one-function files.
+- Extract shared code at real duplication or a strong domain boundary, not anticipated
+  reuse.
+- Keep hot-path helpers local when measurement shows that abstraction changes code
+  generation.
+- Macros are limited to small, obvious repetition or generated schema data.
 
-## 4. Rust implementation rules
+### Failure policy
 
-### 4.1 Control flow
+Library behavior must not panic because of input bytes, Python arguments, integer
+overflow, allocation sizes, or destination failures.
 
-- Prefer explicit `match`, early returns, and small state machines over callback webs,
-  deeply nested branches, or encoded bit tricks.
-- Functions SHOULD do one conceptual job. Around 50 lines is a review prompt, not a
-  mechanical limit; a longer linear parser transition can be clearer than fragmented
-  helpers.
-- Modules SHOULD have a single reason to change. A module approaching 500 lines should
-  be reviewed for separable responsibilities, but MUST NOT be split into meaningless
-  one-function files.
-- Abstractions are introduced after concrete duplication or a demonstrated boundary,
-  not in anticipation of reuse.
-- A generic or trait MUST have at least two real implementations, define an important
-  boundary, or deliver a measured static-dispatch benefit.
-- Macros are reserved for generated schema tables and small, obvious repetition.
-  Public declarative macros and procedural macros are out of scope initially.
+- `unwrap`, `expect`, `panic!`, `todo!`, and `unimplemented!` are denied on reachable
+  library paths.
+- Direct indexing requires a locally visible bound or checked alternative.
+- `debug_assert!` may document a programmer invariant, never validate input.
+- Tests and fuzz targets may use assertions and setup `expect` calls.
+- Errors carry stable codes and structured context. String matching must not drive
+  native control flow.
 
-### 4.2 Panic policy
+The crate sets `unsafe_code = "forbid"`. Production code must remain safe Rust.
 
-Library code MUST NOT panic because of file contents, Python arguments, destination
-failures, integer overflow, or allocation-size calculations.
+### Documentation and comments
 
-- `unwrap`, `expect`, `panic!`, `todo!`, and `unimplemented!` are forbidden on reachable
-  library input paths.
-- Direct indexing requires a locally obvious bound or a checked alternative.
-- Internal invariants SHOULD use typed construction. `debug_assert!` MAY document an
-  invariant when violating it indicates a programmer defect, never malformed input.
-- Test code MAY use `unwrap` or `expect` when it makes the asserted setup clearer.
-- Fuzz targets MUST treat every panic, abort, excessive allocation, and nontermination
-  as a defect.
+Public Rust APIs document ownership, missing states, failure modes, and useful examples.
+Comments explain grammar rules, proof obligations, or counterintuitive performance
+constraints; they do not paraphrase the next line. A performance-sensitive comment
+names the guardrail or benchmark that justifies the shape.
 
-Errors MUST be structured. Each diagnostic carries a stable code, severity, message,
-source span when available, and causal context. Errors are translated at the PyO3
-boundary once; string matching MUST NOT drive control flow.
+## 5. Python rules
 
-### 4.3 Unsafe code
+- The package is a typed facade, not a second implementation.
+- Per-row Python loops are forbidden in native parse, validation, semantic-build, and
+  write paths.
+- Public functions and classes have complete annotations; `py.typed` and `_core.pyi`
+  ship with the package.
+- pandas, Polars, and PyArrow remain optional imports at the method that needs them.
+- Public dispatch is explicit. No monkey patching, metaclass registry, or dynamic
+  attribute protocol defines behavior.
+- Validate external Python inputs once at the facade, then pass normalized plain values
+  across PyO3.
+- Translate native error tuples centrally into the public exception hierarchy.
+- An obvious convenience wrapper should fit on one screen; complex behavior belongs in
+  a named domain function with direct tests.
 
-The initial workspace MUST compile with `unsafe_code = "forbid"`. If profiling later
-proves that `unsafe` is required for FFI or a material hot-path improvement, relaxing
-that rule requires a focused design review and all of the following:
+Public APIs may change before 1.0 when the result is materially simpler. Such a change
+updates exports, stubs, callers, examples, tests, and documentation in the same patch.
+Do not keep aliases, forwarding modules, or deprecated wrappers unless compatibility is
+an explicit release requirement.
 
-1. a benchmark showing the representative benefit;
-2. a safe implementation retained in the benchmark or differential test;
-3. isolation in the smallest practical module and function;
-4. a `SAFETY:` comment stating every caller and memory invariant;
-5. targeted property, fuzz, sanitizer, and Miri coverage where applicable; and
-6. an entry in the pull request's complexity ledger.
+## 6. Dependencies
 
-An unsafe optimization that is merely faster in a microbenchmark, or whose invariants
-cannot be stated locally, MUST NOT merge.
+Every runtime dependency must satisfy a current requirement, remove more code or risk
+than it adds, have an acceptable license and maintenance posture, and preserve the
+supported toolchain. Default features are disabled unless required.
 
-### 4.4 Comments and documentation
+Current native dependencies are:
 
-Comments explain grammar decisions, invariants, lifetimes, or counterintuitive
-performance findings. They do not translate the next line into English.
+| Dependency | Purpose |
+| --- | --- |
+| `arrow-array`, `arrow-schema` | typed column buffers and Arrow C Stream export |
+| `flate2` with `zlib-rs` | portable gzip decoding |
+| `memchr` | byte scanning in lexer and loop-boundary kernels |
+| `pyo3` | optional Python extension boundary |
+| `regex` | compiled DDL2 type-pattern validation |
+| `rmp-serde`, `serde`, `serde_bytes` | BinaryCIF MessagePack model |
+| `proptest` (development) | property tests |
 
-Public types and functions MUST document missing-value behavior, ownership or borrowing,
-failure modes, and a minimal example. Non-obvious parser states and writer ordering
-rules MUST link to the governing specification section or dictionary concept.
+There is one Rust crate and one Python package. Cargo and Python lock inputs must remain
+reproducible. Runtime dependencies may not introduce network access.
 
-## 5. Python implementation rules
+## 7. Performance work
 
-- The Python package is a typed facade over the native core, not a second parser or
-  semantic engine.
-- Per-row Python loops are forbidden in native read, validation, and write paths.
-- Python MUST NOT duplicate component classification, identifier reconciliation, value
-  quoting, or category-ordering logic.
-- Public Python APIs MUST have complete type annotations and ship `py.typed` plus useful
-  generated or maintained stubs for native symbols.
-- Imports MUST remain light. pandas, Polars, PyArrow, NumPy, and compression libraries
-  are optional integrations unless the core contract explicitly requires them.
-- Dynamic attribute dispatch, metaclass registries, and monkey patching MUST NOT be used
-  to define the public API.
-- A convenience wrapper SHOULD normally fit on one screen. Complex behavior belongs in
-  a named Rust or Python domain function with direct tests.
+Performance changes follow a scientific loop:
 
-## 6. Dependency policy
+1. name the end-to-end workload and correctness guardrails;
+2. record a reproducible comparison on pinned inputs;
+3. profile before changing architecture;
+4. implement the smallest credible mechanism;
+5. compare interleaved samples and peak RSS;
+6. run semantic, determinism, and adversarial tests; and
+7. keep the change only when the representative result is neutral or better.
 
-Every runtime dependency must:
+The unit of success is a usable `CifDocument`, `CifTable`, Arrow table, or semantic
+model, not a token-count microbenchmark. Report logical decompressed throughput for
+gzip and source-byte throughput for CIF/BinaryCIF. Record hardware, compiler, build
+profile, corpus digest, warmups, samples, latency distribution, throughput, RSS, and
+output digest.
 
-1. solve a current requirement;
-2. remove more risk or maintained code than it introduces;
-3. have an acceptable license and maintenance posture;
-4. expose a narrower, clearer boundary than a local implementation; and
-5. be tested with default features disabled unless those features are required.
+Optimizations must preserve strict grammar, stable errors, resource-limit ordering,
+source order, worker-count determinism, and small-file latency. Specialized probes may
+decline work and fall back to the grammar owner; they must never redefine validity.
 
-The pull request adding a dependency MUST record its purpose, enabled features,
-alternatives considered, and effect on wheel size and clean build time. Transitive
-dependency count is a design signal, not a vanity metric.
+Current mechanisms and measurements live in
+[docs/performance-report.md](docs/performance-report.md). Experimental history is
+isolated in [docs/improvement-beam.md](docs/improvement-beam.md), not mixed into current
+architecture documents.
 
-No dataframe engine, query engine, async runtime, logging framework, parser generator,
-or general plugin framework belongs in the core merely for convenience. Standard
-library solutions are preferred when they remain direct and correct.
+## 8. Tests
 
-Dependencies used only for tests, fuzzing, generation, or benchmarks MUST remain out of
-the runtime graph. Generated dictionary artifacts MUST record the generator version and
-input hash and MUST be reproducible without network access.
+Tests are organized by invariant rather than implementation detail:
 
-### 6.1 Current native dependency ledger
+- Rust unit and integration tests cover grammar, errors, limits, projection,
+  dictionaries, BinaryCIF, semantic models, and writers.
+- Python tests cover the public facade, optional interchange, transactional I/O,
+  deterministic scanning, error conversion, and typing contracts.
+- manifest tests pin every fixture by size and SHA-256.
+- interoperability tests qualify outputs with installed external readers/validators.
+- fuzz targets exercise the lexer, parse/write/parse equivalence, and formatter.
+- the PDB stress corpus exercises small structures, chemistry, multiple models, a
+  ribosome, and a multi-million-atom assembly in CIF, gzip, and BinaryCIF.
 
-- `memchr` provides portable, safe delimiter search in the measured lexer hot path.
-  Default features are disabled. The rejected alternative was retaining scalar byte
-  search, which was slower on every large text-CIF workload.
-- `serde`, `serde_bytes`, and `rmp-serde` define the BinaryCIF MessagePack boundary.
-  Only Serde derive/std and `serde_bytes` std are enabled; BinaryCIF byte blobs borrow
-  from the input. A handwritten MessagePack implementation was rejected because it
-  would duplicate a security-sensitive container parser without improving the CIF
-  domain model.
+Every bug fix adds the smallest failing case at the layer that owns the invariant. A
+performance path has a serial or general-path equivalence test. Tests do not depend on
+network access; fetch commands populate ignored caches separately.
 
-On the Phase 6 macOS arm64 release build, the extension is 5,970,752 bytes and the
-compressed wheel is 1,661,723 bytes. No pre-Phase-6 wheel from the same worktree was
-retained, so an artifact-size delta is not claimed. The added crates are pure Rust and
-the cached release wheel build completed in 4.94 seconds; clean-build impact is tracked
-by CI rather than inferred from that incremental measurement.
+## 9. Required checks
 
-## 7. Performance without obscurity
+The repository-local micromamba environment is the only supported development runtime.
+The `Makefile` is authoritative:
 
-Performance work follows this loop:
-
-1. name the user-visible workload and input distribution;
-2. record a reproducible baseline;
-3. identify a measured bottleneck;
-4. state a mechanical hypothesis;
-5. implement the smallest change that tests it;
-6. run correctness, allocation, memory, and wall-time comparisons; and
-7. keep the change only if the benefit is material for the named workload.
-
-Benchmark evidence MUST include corpus hashes, command, hardware, software versions,
-sample count, and variance or confidence information. Microbenchmarks explain a
-mechanism; the Section 17 end-to-end workloads decide promotion.
-
-The following require benchmark evidence and an explanatory comment or design note:
-
-- custom SIMD or branchless parsing;
-- manual buffering that replaces a standard primitive;
-- caching with eviction or invalidation behavior;
-- duplicated representations;
-- specialized allocators;
-- unsafe code; and
-- platform-specific kernels.
-
-Do not retain speculative fast paths. If an optimization does not materially improve
-its target workload, delete it. Machine-specific code MUST sit behind a small safe
-interface and have a portable implementation tested for semantic equality.
-
-## 8. Test design
-
-- Tests assert public behavior, format invariants, or important internal state-machine
-  transitions, not private call sequences.
-- Every parser or writer bug fix begins with the smallest durable regression fixture.
-- Table-driven tests are preferred for grammar and quoting boundaries.
-- Property tests cover token boundaries, missing states, integer/float formatting,
-  projection equivalence, and parse-write-parse invariants.
-- Fuzzing covers tokenization, parsing, validation, and parse-write-parse composition.
-- Differential tests compare trusted implementations where contracts overlap, but
-  Nibbler's specified behavior remains authoritative.
-- Golden files are appropriate for canonical output and diagnostics. Reviewers MUST be
-  able to inspect the semantic change; blindly regenerated snapshots cannot merge.
-- Randomized tests MUST record seeds and minimize failures into committed fixtures.
-- Tests MUST NOT depend on the network, wall-clock ordering, locale, thread schedule, or
-  mutable global state.
-
-Ligands, ions, waters, branched carbohydrates, modified residues, alternate locations,
-negative sequence identifiers, insertion codes, and unknown components are first-class
-test dimensions, not an edge-case bucket.
-
-## 9. Tooling and continuous integration
-
-The bootstrap implementation SHOULD establish these gates before optimization begins:
-
-```text
-cargo fmt --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace --all-features
-RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
-ruff format --check .
-ruff check .
-mypy --strict python
-pytest
+```console
+make bootstrap          # create .mamba/nibbler-dev
+make develop            # build the development extension
+make format             # Rust and Python formatting
+make lint               # rustfmt, Clippy, Ruff
+make typecheck          # strict mypy
+make test               # Rust and Python tests
+make docs               # rustdoc with warnings denied
+make corpus             # verify pinned local fixtures
+make validate-fixtures  # external fixture qualification
+make check              # all gates plus benchmark smoke test
 ```
 
-Exact directories MAY change with the scaffold, but equivalent checks MUST remain.
-Compiler and linter exceptions require a local explanation; workspace-wide suppression
-is forbidden for a local issue.
+Direct equivalents use the same environment and flags:
 
-Pull-request CI MUST include supported-platform unit tests and Python wheel smoke tests.
-Scheduled CI SHOULD run the malformed corpus, fuzzers, Miri, sanitizers, dependency
-audits, and the reproducible benchmark suite. Expensive scheduled checks do not replace
-targeted regression tests on pull requests.
+```console
+micromamba run -p .mamba/nibbler-dev cargo fmt --all -- --check
+micromamba run -p .mamba/nibbler-dev cargo clippy --all-targets \
+  --no-default-features -- -D warnings
+micromamba run -p .mamba/nibbler-dev cargo test --no-default-features
+micromamba run -p .mamba/nibbler-dev pytest
+micromamba run -p .mamba/nibbler-dev ruff format --check .
+micromamba run -p .mamba/nibbler-dev ruff check .
+micromamba run -p .mamba/nibbler-dev mypy --strict python benchmarks tools
+micromamba run -p .mamba/nibbler-dev env RUSTDOCFLAGS=-D warnings \
+  cargo doc --no-deps --no-default-features
+micromamba run -p .mamba/nibbler-dev python -m tools.verify_corpus
+```
 
-Performance regression thresholds MUST be based on a stable baseline and noise study.
-A noisy benchmark must be repaired, not converted into a meaningless hard gate.
+Release benchmarks require `maturin develop --release`. Native PGO wheels are built
+per target and Python ABI with:
 
-## 10. Change and review policy
+```console
+micromamba run -p .mamba/nibbler-dev python -m tools.build_pgo
+```
 
-Each change MUST be focused. Unrelated cleanup, generated artifacts, vendored data, API
-changes, and performance work should be separate unless splitting would make the
-correctness argument harder.
+## 10. Change policy and definition of done
 
-A pull request description records:
+A change is complete only when:
 
-- the problem and affected invariant;
-- the chosen approach and the simpler alternatives rejected;
-- new public API or compatibility effects;
-- correctness tests and validators run;
-- benchmark results when hot code changes;
-- new dependencies, unsafe code, caches, generated code, or platform specialization;
-  and
-- remaining risk.
+- the design has one clear owner per invariant;
+- obsolete code and compatibility layers are removed;
+- public types, stubs, docstrings, examples, and design documents agree;
+- formatting, lint, typing, tests, rustdoc, corpus verification, and affected
+  interoperability checks pass;
+- performance-sensitive changes include representative A/B evidence; and
+- the diff has no generated caches, build artifacts, fetched corpora, or secrets.
 
-The last-but-one item is the **complexity ledger**. It is empty for an ordinary change.
-Each entry must state why the complexity is earned, where its invariant is tested, who
-owns it, and what evidence would justify deleting it.
-
-Reviewers MUST reject a change when:
-
-- behavior is duplicated across parser, writer, Python, or profile layers;
-- malformed input can panic or cause an uncontrolled allocation;
-- chemistry is inferred silently from an incomplete name list;
-- a new abstraction has no present use;
-- an optimization lacks representative evidence;
-- a dependency substitutes a framework for a small explicit boundary;
-- diagnostics discard location or causal information;
-- tests encode implementation accidents rather than the contract; or
-- the author cannot state the invariant locally.
-
-Before 1.0, obsolete internal and provisional API paths SHOULD be deleted rather than
-wrapped in compatibility layers. Stable public compatibility is deliberate and tested;
-dead code, commented-out implementations, and indefinite deprecations are forbidden.
-
-## 11. Definition of done
-
-A production change is done only when:
-
-1. its contract and names are clear without oral context;
-2. malformed and boundary inputs have explicit behavior;
-3. tests cover the success, missing-value, and failure paths;
-4. format, lint, type, documentation, and relevant sanitizer checks pass;
-5. affected CIF and profile fixtures revalidate;
-6. performance claims are reproducible and correctness-equivalent;
-7. public documentation and examples match the implementation; and
-8. the complexity ledger is empty or every entry is justified.
-
-The desired result is intentionally boring code on a fast path: explicit state,
-predictable ownership, narrow interfaces, and enough benchmark evidence that no reader
-has to trust cleverness.
+Reviews check correctness and also ask whether a smaller, flatter implementation would
+make local reasoning easier. The chosen design must be the smallest sufficient design;
+historical alternatives belong only in the experiment ledger.

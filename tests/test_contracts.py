@@ -49,7 +49,7 @@ def test_validation_report_raises_only_for_errors() -> None:
     warning_report.raise_for_errors()
     assert warning_report.is_valid
 
-    error_report = ValidationReport.from_iterable([warning, error])
+    error_report = ValidationReport((warning, error))
     assert not error_report.is_valid
     assert error_report.errors == (error,)
     with pytest.raises(ValidationError) as raised:

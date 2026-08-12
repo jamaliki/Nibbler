@@ -1,49 +1,75 @@
 # Benchmark contract
 
-Phase 0 froze workloads and comparison engines before optimization. Phase 2 adds an
-executable, correctness-qualified `projected-atom-site` adapter for Nibbler and every
-baseline. Each engine runs in a fresh process so peak RSS and imports are isolated.
-The runner refuses to publish results from an unoptimized Nibbler extension.
+Nibbler benchmarks publish timing only after proving that the measured result is
+correct. End-to-end construction of a projected table or complete document is the unit
+of work; token counters are diagnostic tools, not release evidence.
+
+## Cross-library projection
+
+The comparison runner projects `label_comp_id`, `Cartn_x`, `Cartn_y`, and `Cartn_z`
+from `_atom_site` with Nibbler, Gemmi, Biotite, and Bio.PDB. Each engine runs in a fresh
+process so imports and peak RSS are isolated. Row values are hashed with unambiguous
+field boundaries, and any mismatch aborts the report. Nibbler must be a release build.
 
 ```console
 make develop-release
-python -m benchmarks.run --list
-python -m benchmarks.run --file tests/fixtures/chemistry/ligand_ion_water.cif --json
-python -m benchmarks.run --synthetic-rows 100000 --warmups 1 --samples 3
+micromamba run -p .mamba/nibbler-dev python -m benchmarks.run --list
+micromamba run -p .mamba/nibbler-dev python -m benchmarks.run \
+  --file tests/fixtures/chemistry/ligand_ion_water.cif --json
+micromamba run -p .mamba/nibbler-dev python -m benchmarks.run \
+  --synthetic-rows 100000 --warmups 1 --samples 3
 ```
 
-`make benchmarks` installs the release extension automatically.
+`make benchmarks` installs the release extension and runs a smoke sample.
 
-The report records the input digest, engine version, command, hardware, warmup/sample
-counts, p50/p95/p99 latency, decompressed throughput, peak resident memory, and a digest
-of projected rows. A semantic mismatch fails the command rather than publishing timing.
-End-to-end workloads, rather than isolated token microbenchmarks, decide whether an
-optimization is promoted.
+The JSON report records the exact command, input SHA-256, byte counts, engine versions,
+platform, Python version, CPU count, warmups, samples, p50/p95/p99 latency, logical
+decompressed throughput, files per second, peak RSS, row count, and semantic digest.
 
-## Real PDB stress corpus
+## PDB stress corpus
 
-Phase 6 adds five hash-pinned RCSB structures spanning a small protein, ligand/metal
-chemistry, a multi-model NMR ensemble, a ribosome, and a 2.44-million-atom assembly.
-The files are downloaded into the ignored `.cache/pdb-stress` directory; tests never
-depend on network access.
+`pdb_corpus.toml` pins five RCSB structures by byte size, SHA-256, and atom count:
+
+| ID | Workload |
+| --- | --- |
+| `1crn` | small protein and latency floor |
+| `4hhb` | protein with ligand and metal chemistry |
+| `1d3z` | multi-model NMR ensemble |
+| `6qnr` | large ribosome |
+| `3j3q` | 2.44-million-atom ribosomal assembly |
+
+Fetches go to ignored `.cache/pdb-stress`; tests never require network access.
 
 ```console
-python -m tools.fetch_pdb_corpus
-python -m benchmarks.pdb_stress --warmups 1 --samples 3
-python -m benchmarks.pdb_stress --formats all --warmups 1 --samples 3
-python -m benchmarks.pdb_stress --full-document --warmups 0 --samples 1
+micromamba run -p .mamba/nibbler-dev python -m tools.fetch_pdb_corpus
+micromamba run -p .mamba/nibbler-dev python -m benchmarks.pdb_stress \
+  --warmups 1 --samples 3
+micromamba run -p .mamba/nibbler-dev python -m benchmarks.pdb_stress \
+  --formats all --warmups 1 --samples 3
+micromamba run -p .mamba/nibbler-dev python -m benchmarks.pdb_stress \
+  --ids 6qnr 3j3q --formats cif --full-document --warmups 0 --samples 1
 ```
 
-The staged runner measures warm file reads, native `_atom_site` projection, Arrow import,
-and optional isolated full-document materialization separately. `--formats all` adds the
-pinned gzip inputs and reports their throughput against logical decompressed CIF bytes.
-CIF, BinaryCIF, and gzip typed projections must compare equal before timings are
-reported. Manifest sizes, SHA-256 digests, and atom counts are enforced rather than only
-printed. Workload rationale, hardware, software, and sample counts are included in the
-manifest or JSON report.
+The staged runner measures warm file reads, native schema-typed `_atom_site`
+projection, Arrow import, and optionally isolated full-document materialization. CIF,
+BinaryCIF, and gzip projections must have the manifest atom count and equal Arrow
+tables. Full-document workers also record peak RSS and canonical output digest.
 
-On the 2026-08-12 16-core Apple M4 Max development machine, the final corpus-trained PGO
-wheel projected the two large text CIF files at 1.60-2.09 GB/s, BinaryCIF at
-1.97-2.07 GB/s, and gzip at 0.69-0.81 GB/s of logical CIF. Arrow import took 0.7 ms for
-6qnr and 4.9 ms for 3j3q. Full text materialization reached 0.97-1.51 GB/s. These are
-workload-specific observations, not portable thresholds.
+Throughput uses source bytes for CIF and BinaryCIF, and logical decompressed CIF bytes
+for gzip. Reports are workload-specific observations, never portable hardware claims.
+The current qualified checkpoint is in
+[../docs/performance-report.md](../docs/performance-report.md).
+
+## Promotion rule
+
+A performance change is retained only when:
+
+1. representative pinned inputs show a repeatable end-to-end win or neutral result;
+2. small-file latency and peak memory remain acceptable;
+3. exact projected values or canonical document bytes remain equal;
+4. strict errors, resource limits, and worker-count determinism still pass; and
+5. the implementation remains understandable under
+   [../ENGINEERING.md](../ENGINEERING.md).
+
+Historical measurements and non-retained approaches are isolated in
+[../docs/improvement-beam.md](../docs/improvement-beam.md).

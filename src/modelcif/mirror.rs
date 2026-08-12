@@ -7,6 +7,7 @@ use std::fmt::{self, Display, Formatter};
 use crate::cif::{
     BlockKind, CifBlock, CifDocument, CifEntry, CifLoop, CifRow, CifValue, CifValueRef,
 };
+use crate::pdbx::category::{case_key, category_name, item_name};
 
 use super::aggregate::ModelCifModel;
 use super::qa::QaValue;
@@ -118,9 +119,9 @@ fn mirror_local_metric(
         }
         let key = (
             *model_id,
-            fold(site.asym_id()),
+            case_key(site.asym_id()),
             site.sequence_id(),
-            fold(site.component_id()),
+            case_key(site.component_id()),
         );
         if values.insert(key, *value).is_some() {
             return Err(WriteError::new(
@@ -189,12 +190,12 @@ fn mirror_atom_loop(cif_loop: &CifLoop, values: &ResidueValues) -> Result<CifLoo
             Some(sequence_id) => {
                 let key = (
                     integer(row_value(row, model)?, "_atom_site.pdbx_PDB_model_num")?,
-                    fold(text_value(
+                    case_key(text_value(
                         row_value(row, asym)?,
                         "_atom_site.label_asym_id",
                     )?),
                     sequence_id,
-                    fold(text_value(
+                    case_key(text_value(
                         row_value(row, component)?,
                         "_atom_site.label_comp_id",
                     )?),
@@ -281,17 +282,5 @@ fn text_value<'a>(value: CifValueRef<'a>, tag: &str) -> Result<&'a str, WriteErr
 }
 
 fn loop_category(cif_loop: &CifLoop) -> Option<&str> {
-    category(cif_loop.tags().first()?.as_str())
-}
-
-fn category(tag: &str) -> Option<&str> {
-    tag.strip_prefix('_')?.split_once('.').map(|(name, _)| name)
-}
-
-fn item_name(tag: &str) -> Option<&str> {
-    tag.strip_prefix('_')?.split_once('.').map(|(_, item)| item)
-}
-
-fn fold(value: &str) -> String {
-    value.to_ascii_lowercase()
+    category_name(cif_loop.tags().first()?.as_str())
 }

@@ -6,7 +6,7 @@ from importlib import import_module
 from typing import Literal, Protocol, TypeAlias, cast
 
 from . import _core
-from .errors import WriteError
+from ._native import raise_write_error
 
 MissingPolicy: TypeAlias = Literal["collapse", "columns", "extension"]
 
@@ -117,20 +117,15 @@ class CifTable:
 class MmcifModel:
     """An immutable, source-backed macromolecular coordinate model."""
 
-    __slots__ = ("_native", "_profile")
+    __slots__ = ("_native",)
 
-    def __init__(
-        self,
-        native: _core._PdbxModel | _core._ModelCifModel,
-        profile: Literal["pdbx", "modelcif"],
-    ) -> None:
+    def __init__(self, native: _core._MmcifModel) -> None:
         self._native = native
-        self._profile = profile
 
     @property
     def profile(self) -> Literal["pdbx", "modelcif"]:
         """Return the semantic profile used to construct this model."""
-        return self._profile
+        return self._native.profile
 
     @property
     def entry_id(self) -> str:
@@ -175,50 +170,42 @@ class MmcifModel:
     @property
     def prediction_model_count(self) -> int:
         """Return the number of deposited prediction models."""
-        native = self._modelcif_native()
-        return 0 if native is None else native.prediction_model_count
+        return self._native.prediction_model_count
 
     @property
     def target_entity_count(self) -> int:
         """Return the number of declared prediction targets."""
-        native = self._modelcif_native()
-        return 0 if native is None else native.target_entity_count
+        return self._native.target_entity_count
 
     @property
     def template_count(self) -> int:
         """Return the number of structural templates."""
-        native = self._modelcif_native()
-        return 0 if native is None else native.template_count
+        return self._native.template_count
 
     @property
     def qa_metric_count(self) -> int:
         """Return the number of quality-metric definitions."""
-        native = self._modelcif_native()
-        return 0 if native is None else native.qa_metric_count
+        return self._native.qa_metric_count
 
     @property
     def qa_value_count(self) -> int:
         """Return the number of global, local, and pairwise QA values."""
-        native = self._modelcif_native()
-        return 0 if native is None else native.qa_value_count
+        return self._native.qa_value_count
 
     @property
     def software_names(self) -> tuple[str, ...]:
         """Return prediction software names in source order."""
-        native = self._modelcif_native()
-        return () if native is None else tuple(native.software_names)
+        return tuple(self._native.software_names)
 
     @property
     def qa_metric_names(self) -> tuple[str, ...]:
         """Return quality-metric names in source order."""
-        native = self._modelcif_native()
-        return () if native is None else tuple(native.qa_metric_names)
+        return tuple(self._native.qa_metric_names)
 
     @property
     def qa_metric_modes(self) -> tuple[str, ...]:
         """Return quality-metric modes in source order."""
-        native = self._modelcif_native()
-        return () if native is None else tuple(native.qa_metric_modes)
+        return tuple(self._native.qa_metric_modes)
 
     def to_document(self, *, mirror_local_qa_metric: int | None = None) -> CifDocument:
         """Return a generic document in canonical profile order.
@@ -226,27 +213,13 @@ class MmcifModel:
         ``mirror_local_qa_metric`` explicitly copies one local ModelCIF QA metric
         into output B factors for viewer compatibility. The QA records remain intact.
         """
-        native = self._modelcif_native()
-        if native is None:
-            if mirror_local_qa_metric is not None:
-                raise ValueError("mirror_local_qa_metric requires a ModelCIF model")
-            return CifDocument(self._native.to_document(), "pdbx")
+        if self.profile == "pdbx" and mirror_local_qa_metric is not None:
+            raise ValueError("mirror_local_qa_metric requires a ModelCIF model")
         try:
-            document = native.to_document(mirror_local_qa_metric)
+            document = self._native.to_document(mirror_local_qa_metric)
         except ValueError as error:
-            if len(error.args) != 2:
-                raise
-            code, message = error.args
-            raise WriteError(code=str(code), message=str(message)) from None
-        return CifDocument(document, "modelcif")
-
-    def _modelcif_native(self) -> _core._ModelCifModel | None:
-        if isinstance(self._native, _core._ModelCifModel):
-            return self._native
-        return None
-
-    def _source_document(self) -> CifDocument:
-        return CifDocument(self._native.source_document(), self.profile)
+            raise_write_error(error)
+        return CifDocument(document, self.profile)
 
     def __repr__(self) -> str:
         return (

@@ -1,3 +1,4 @@
+use std::ops::Range;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 
@@ -26,12 +27,6 @@ pub(crate) struct LoopChunk {
     pub(crate) start: usize,
     pub(crate) end: usize,
     pub(crate) value_prefix: usize,
-}
-
-#[derive(Clone, Copy)]
-pub(crate) struct LoopRange {
-    pub(crate) start: usize,
-    pub(crate) end: usize,
 }
 
 pub(crate) struct ProjectedChunk<T> {
@@ -128,15 +123,6 @@ impl Drop for WorkerLease {
     }
 }
 
-struct ChunkScan {
-    chunk: RawChunk,
-    values: usize,
-    last_value: Option<Token>,
-    control: Option<Token>,
-    error: Option<ParseError>,
-    retained: Vec<Vec<SourceCell>>,
-}
-
 pub(crate) fn scan_loop(
     source: &SourceBuffer,
     value_start: usize,
@@ -147,44 +133,31 @@ pub(crate) fn scan_loop(
     else {
         return Ok(None);
     };
-    let scans = scan_chunks(source, &raw_chunks, max_token_bytes, kernel)?;
-    let loop_end = scans
-        .iter()
-        .filter_map(|scan| scan.control.as_ref())
-        .min_by_key(|token| token.span.start)
-        .map_or(source.len(), |token| token.span.start);
-    if let Some(error) = scans
-        .iter()
-        .filter_map(|scan| scan.error.as_ref())
-        .filter(|error| error.span().byte_start() < loop_end)
-        .min_by_key(|error| error.span().byte_start())
-    {
-        return Err(error.clone());
-    }
-
-    let control = scans
-        .iter()
-        .filter_map(|scan| scan.control.as_ref())
-        .min_by_key(|token| token.span.start)
-        .cloned();
+    let scans = run_workers(
+        source,
+        &raw_chunks,
+        "parallel lexer worker terminated unexpectedly",
+        |source, chunk| scan_chunk(source, chunk, max_token_bytes, kernel),
+    )?;
+    let (loop_end, control) = loop_boundary(source, &scans)?;
     let mut chunks = Vec::new();
     let mut value_count = 0;
     let mut last_value = None;
     let mut retained: Vec<Vec<SourceCell>> = Vec::new();
-    for mut scan in scans {
-        if scan.chunk.start >= loop_end {
+    for (mut scan, raw_chunk) in scans.into_iter().zip(raw_chunks) {
+        if raw_chunk.start >= loop_end {
             break;
         }
         chunks.push(LoopChunk {
-            start: scan.chunk.start,
-            end: scan.chunk.end.min(loop_end),
+            start: raw_chunk.start,
+            end: raw_chunk.end.min(loop_end),
             value_prefix: value_count,
         });
         value_count += scan.values;
         if scan.last_value.is_some() {
             last_value = scan.last_value.take();
         }
-        retained.append(&mut scan.retained);
+        retained.append(&mut scan.output);
         if scan.control.is_some() {
             break;
         }
@@ -210,65 +183,20 @@ pub(crate) fn scan_projected_loop<T, F>(
 ) -> Result<Option<ProjectedLoop<T>>, ParseError>
 where
     T: Send,
-    F: Fn(SourceBuffer, LoopRange) -> ProjectedChunk<T> + Sync,
+    F: Fn(SourceBuffer, Range<usize>) -> ProjectedChunk<T> + Sync,
 {
     let Some((raw_chunks, lease)) =
         prepare_chunks(source, value_start, max_token_bytes, LoopKernel::Project)?
     else {
         return Ok(None);
     };
-    let scans = thread::scope(|scope| {
-        let handles = raw_chunks
-            .iter()
-            .copied()
-            .map(|chunk| {
-                let source = source.clone();
-                let project = &project;
-                scope.spawn(move || {
-                    project(
-                        source,
-                        LoopRange {
-                            start: chunk.start,
-                            end: chunk.end,
-                        },
-                    )
-                })
-            })
-            .collect::<Vec<_>>();
-        handles
-            .into_iter()
-            .zip(&raw_chunks)
-            .map(|(handle, chunk)| {
-                handle.join().map_err(|_| {
-                    source.error(
-                        ParseErrorCode::UnexpectedControl,
-                        "parallel projection worker terminated unexpectedly",
-                        chunk.start,
-                        chunk.start,
-                    )
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()
-    })?;
-    let loop_end = scans
-        .iter()
-        .filter_map(|scan| scan.control.as_ref())
-        .min_by_key(|token| token.span.start)
-        .map_or(source.len(), |token| token.span.start);
-    if let Some(error) = scans
-        .iter()
-        .filter_map(|scan| scan.error.as_ref())
-        .filter(|error| error.span().byte_start() < loop_end)
-        .min_by_key(|error| error.span().byte_start())
-    {
-        return Err(error.clone());
-    }
-
-    let control = scans
-        .iter()
-        .filter_map(|scan| scan.control.as_ref())
-        .min_by_key(|token| token.span.start)
-        .cloned();
+    let scans = run_workers(
+        source,
+        &raw_chunks,
+        "parallel projection worker terminated unexpectedly",
+        |source, chunk| project(source, chunk.start..chunk.end),
+    )?;
+    let (loop_end, control) = loop_boundary(source, &scans)?;
     let mut chunks = Vec::new();
     let mut outputs = Vec::new();
     let mut value_count = 0;
@@ -320,7 +248,12 @@ fn prepare_chunks(
         return Ok(None);
     }
     if kernel == LoopKernel::Retain
-        && !loop_reaches_parallel_threshold(source, value_start, max_token_bytes)?
+        && !loop_reaches(
+            source,
+            value_start,
+            value_start + PARALLEL_LOOP_MIN_BYTES,
+            max_token_bytes,
+        )
     {
         return Ok(None);
     }
@@ -335,13 +268,27 @@ fn prepare_chunks(
     Ok(Some((chunks, lease)))
 }
 
-fn loop_reaches_parallel_threshold(
+fn loop_boundary<T>(
     source: &SourceBuffer,
-    value_start: usize,
-    max_token_bytes: usize,
-) -> Result<bool, ParseError> {
-    let target = value_start + PARALLEL_LOOP_MIN_BYTES;
-    Ok(loop_reaches(source, value_start, target, max_token_bytes))
+    scans: &[ProjectedChunk<T>],
+) -> Result<(usize, Option<Token>), ParseError> {
+    let control = scans
+        .iter()
+        .filter_map(|scan| scan.control.as_ref())
+        .min_by_key(|token| token.span.start)
+        .cloned();
+    let loop_end = control
+        .as_ref()
+        .map_or(source.len(), |token| token.span.start);
+    if let Some(error) = scans
+        .iter()
+        .filter_map(|scan| scan.error.as_ref())
+        .filter(|error| error.span().byte_start() < loop_end)
+        .min_by_key(|error| error.span().byte_start())
+    {
+        return Err(error.clone());
+    }
+    Ok((loop_end, control))
 }
 
 fn acquire_workers(requested: usize) -> Option<WorkerLease> {
@@ -368,19 +315,24 @@ fn acquire_workers(requested: usize) -> Option<WorkerLease> {
     }
 }
 
-fn scan_chunks(
+fn run_workers<T, F>(
     source: &SourceBuffer,
     chunks: &[RawChunk],
-    max_token_bytes: usize,
-    kernel: LoopKernel,
-) -> Result<Vec<ChunkScan>, ParseError> {
+    panic_message: &'static str,
+    work: F,
+) -> Result<Vec<T>, ParseError>
+where
+    T: Send,
+    F: Fn(SourceBuffer, RawChunk) -> T + Sync,
+{
     thread::scope(|scope| {
         let handles = chunks
             .iter()
             .copied()
             .map(|chunk| {
                 let source = source.clone();
-                scope.spawn(move || scan_chunk(source, chunk, max_token_bytes, kernel))
+                let work = &work;
+                scope.spawn(move || work(source, chunk))
             })
             .collect::<Vec<_>>();
         handles
@@ -390,7 +342,7 @@ fn scan_chunks(
                 handle.join().map_err(|_| {
                     source.error(
                         ParseErrorCode::UnexpectedControl,
-                        "parallel lexer worker terminated unexpectedly",
+                        panic_message,
                         chunk.start,
                         chunk.start,
                     )
@@ -405,7 +357,7 @@ fn scan_chunk(
     chunk: RawChunk,
     max_token_bytes: usize,
     kernel: LoopKernel,
-) -> ChunkScan {
+) -> ProjectedChunk<Vec<Vec<SourceCell>>> {
     let mut lexer = Lexer::bounded(source.clone(), chunk.start, chunk.end, max_token_bytes);
     let mut values = 0;
     let mut last_value = None;
@@ -420,33 +372,30 @@ fn scan_chunk(
                 last_value = Some(token);
             }
             Ok(Some(control)) => {
-                return ChunkScan {
-                    chunk,
+                return ProjectedChunk {
                     values,
                     last_value,
                     control: Some(control),
                     error: None,
-                    retained,
+                    output: retained,
                 };
             }
             Ok(None) => {
-                return ChunkScan {
-                    chunk,
+                return ProjectedChunk {
                     values,
                     last_value,
                     control: None,
                     error: None,
-                    retained,
+                    output: retained,
                 };
             }
             Err(error) => {
-                return ChunkScan {
-                    chunk,
+                return ProjectedChunk {
                     values,
                     last_value,
                     control: None,
                     error: Some(error),
-                    retained,
+                    output: retained,
                 };
             }
         }

@@ -405,11 +405,11 @@ impl Parser {
         {
             let direct =
                 sink.try_parallel_loop(&self.source, &tags, value_start, self.limits.token_bytes)?;
-            let mut parallel = match direct {
+            let parallel = match direct {
                 Some(parallel) => Some(parallel),
                 None => scan_loop(&self.source, value_start, self.limits.token_bytes, kernel)?,
             };
-            let Some(mut parallel) = parallel.take() else {
+            let Some(mut parallel) = parallel else {
                 return self.parse_loop_serial(loop_token, tags, sink);
             };
             if parallel.value_count == 0 {

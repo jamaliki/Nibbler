@@ -2,7 +2,9 @@
 
 use std::collections::BTreeSet;
 
-use super::validation::{Validator, fold};
+use crate::pdbx::category::case_key;
+
+use super::validation::Validator;
 
 impl Validator<'_> {
     pub(super) fn templates(&mut self) {
@@ -33,7 +35,7 @@ impl Validator<'_> {
             );
             if !self
                 .target_instances
-                .contains(&fold(&template.target_asym_id))
+                .contains(&case_key(&template.target_asym_id))
             {
                 self.error(
                     "MODELCIF_TEMPLATE_TARGET",
@@ -70,7 +72,7 @@ impl Validator<'_> {
             );
             if !self
                 .target_instances
-                .contains(&fold(&mapping.target_asym_id))
+                .contains(&case_key(&mapping.target_asym_id))
             {
                 self.error(
                     "MODELCIF_TEMPLATE_MAPPING_TARGET",
@@ -113,7 +115,7 @@ impl Validator<'_> {
             );
             if !self
                 .target_instances
-                .contains(&fold(&detail.target_asym_id))
+                .contains(&case_key(&detail.target_asym_id))
             {
                 self.error(
                     "MODELCIF_ALIGNMENT_TARGET",

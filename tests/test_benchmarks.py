@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+
 import pytest
 
 from benchmarks.pdb_stress import selected_formats
@@ -31,3 +34,13 @@ def test_benchmark_rejects_debug_extension(
 def test_pdb_stress_format_selection_includes_pinned_gzip() -> None:
     assert selected_formats("gzip") == ("cif.gz",)
     assert selected_formats("all") == ("cif", "bcif", "cif.gz")
+
+
+@pytest.mark.parametrize("module", ("tools.fetch_pdb_corpus", "tools.pgo_train"))
+def test_corpus_tools_support_module_entry_points(module: str) -> None:
+    subprocess.run(
+        [sys.executable, "-m", module, "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )

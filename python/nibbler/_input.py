@@ -5,22 +5,12 @@ from __future__ import annotations
 import os
 from collections.abc import Collection, Mapping
 from os import PathLike
-from typing import BinaryIO, NoReturn, TypeAlias, cast
+from typing import BinaryIO, TypeAlias
 
 from .contracts import MissingKind
-from .errors import BatchError, ParseError, ProjectionError, SchemaError
 
 Source: TypeAlias = str | PathLike[str] | bytes | bytearray | memoryview | BinaryIO
 PredicateSpec: TypeAlias = tuple[str, str, list[str]]
-ErrorFields: TypeAlias = tuple[
-    str,
-    str,
-    str | None,
-    int | None,
-    int | None,
-    int | None,
-    int | None,
-]
 
 
 def _normalize_source(source: Source) -> tuple[str, bytes | None]:
@@ -103,37 +93,3 @@ def _predicate_text(value: object) -> str:
     if isinstance(value, bytes):
         return value.decode("utf-8")
     return str(value)
-
-
-def _raise_native_error(error: ValueError) -> NoReturn:
-    if len(error.args) != 7:
-        raise error
-    code, message, source_name, line, column, byte_start, byte_end = error.args
-    if str(code).startswith("CIF_SCHEMA_"):
-        raise SchemaError(code=str(code), message=str(message)) from None
-    exception_type = (
-        ProjectionError if str(code).startswith("CIF_PROJECTION_") else ParseError
-    )
-    raise exception_type(
-        code=str(code),
-        message=str(message),
-        source_name=None if source_name is None else str(source_name),
-        line=cast(int | None, line),
-        column=cast(int | None, column),
-        byte_start=cast(int | None, byte_start),
-        byte_end=cast(int | None, byte_end),
-    ) from None
-
-
-def _batch_error(source_index: int, fields: ErrorFields) -> BatchError:
-    code, message, source_name, line, column, byte_start, byte_end = fields
-    return BatchError(
-        source_index,
-        code=code,
-        message=message,
-        source_name=source_name,
-        line=line,
-        column=column,
-        byte_start=byte_start,
-        byte_end=byte_end,
-    )

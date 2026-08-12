@@ -1,7 +1,7 @@
 //! Deterministic ModelCIF category ordering.
 
-use crate::cif::{BlockKind, CifBlock, CifDocument, CifEntry};
-use crate::pdbx;
+use crate::cif::CifDocument;
+use crate::pdbx::writer::canonical_document_ordered;
 
 use super::aggregate::ModelCifModel;
 
@@ -61,42 +61,5 @@ const CATEGORY_ORDER: &[&str] = &[
 /// Construct canonical ModelCIF category order without confidence mirroring.
 #[must_use]
 pub fn canonical_document(model: &ModelCifModel) -> CifDocument {
-    reorder_document(pdbx::canonical_document(model.coordinates()))
-}
-
-fn reorder_document(document: CifDocument) -> CifDocument {
-    CifDocument::new(document.blocks().iter().map(reorder_block).collect())
-}
-
-fn reorder_block(block: &CifBlock) -> CifBlock {
-    let mut entries = block
-        .entries()
-        .iter()
-        .cloned()
-        .enumerate()
-        .map(|(source_index, entry)| (category_rank(&entry), source_index, entry))
-        .collect::<Vec<_>>();
-    entries.sort_by_key(|(rank, source_index, _)| (*rank, *source_index));
-    let entries = entries.into_iter().map(|(_, _, entry)| entry).collect();
-    match block.kind() {
-        BlockKind::Data => CifBlock::data(block.code().unwrap_or_default().to_owned(), entries),
-        BlockKind::Global => CifBlock::global(entries),
-    }
-}
-
-fn category_rank(entry: &CifEntry) -> usize {
-    let tag = match entry {
-        CifEntry::Item(item) => item.tag(),
-        CifEntry::Loop(cif_loop) => cif_loop.tags().first().map_or("", String::as_str),
-        CifEntry::Frame(_) => return CATEGORY_ORDER.len() + 1,
-    };
-    let name = category(tag).unwrap_or("");
-    CATEGORY_ORDER
-        .iter()
-        .position(|expected| name.eq_ignore_ascii_case(expected))
-        .unwrap_or(CATEGORY_ORDER.len())
-}
-
-fn category(tag: &str) -> Option<&str> {
-    tag.strip_prefix('_')?.split_once('.').map(|(name, _)| name)
+    canonical_document_ordered(model.coordinates(), CATEGORY_ORDER)
 }

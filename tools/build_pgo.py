@@ -64,6 +64,7 @@ def profile_inputs_digest(manifest: Path) -> str:
         ROOT / "Cargo.lock",
         ROOT / "pyproject.toml",
         manifest,
+        ROOT / "benchmarks/corpus.py",
         TRAINING_WORKER,
     ]
     files.extend(sorted((ROOT / "src").rglob("*.rs")))
@@ -203,7 +204,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     run(
         (
             sys.executable,
-            TRAINING_WORKER,
+            "-m",
+            "tools.pgo_train",
             "--corpus",
             corpus,
             "--manifest",

@@ -1,69 +1,18 @@
 //! Construction of typed ModelCIF metadata over one PDBx coordinate model.
 
-use std::error::Error;
-use std::fmt::{self, Display, Formatter};
-
 use crate::cif::CifDocument;
 use crate::pdbx::category::CategoryIndex;
-use crate::pdbx::{ComponentRegistry, build_model_with_registry as build_pdbx};
+use crate::pdbx::{ComponentRegistry, SemanticError, build_model_with_registry as build_pdbx};
 
 use super::aggregate::ModelCifModel;
 use super::{source_prediction, source_provenance, source_qa, source_template};
-
-/// A structural or typed failure while building a ModelCIF semantic model.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ModelCifError {
-    code: &'static str,
-    message: String,
-    context: Vec<String>,
-}
-
-impl ModelCifError {
-    pub(super) fn new(
-        code: &'static str,
-        message: impl Into<String>,
-        context: Vec<String>,
-    ) -> Self {
-        Self {
-            code,
-            message: message.into(),
-            context,
-        }
-    }
-
-    /// Return the stable machine-readable error code.
-    #[must_use]
-    pub const fn code(&self) -> &'static str {
-        self.code
-    }
-
-    /// Return the human-readable failure detail.
-    #[must_use]
-    pub fn message(&self) -> &str {
-        &self.message
-    }
-
-    /// Return category, item, and row context when available.
-    #[must_use]
-    pub fn context(&self) -> &[String] {
-        &self.context
-    }
-}
-
-impl Display for ModelCifError {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}: {}", self.code, self.message)
-    }
-}
-
-impl Error for ModelCifError {}
 
 /// Build ModelCIF semantics without a caller-selected component registry.
 ///
 /// # Errors
 ///
 /// Returns an error when the coordinate graph or a present ModelCIF row is structurally invalid.
-pub fn build_model(document: &CifDocument) -> Result<ModelCifModel, ModelCifError> {
+pub fn build_model(document: &CifDocument) -> Result<ModelCifModel, SemanticError> {
     build_model_with_registry(document, None)
 }
 
@@ -75,10 +24,8 @@ pub fn build_model(document: &CifDocument) -> Result<ModelCifModel, ModelCifErro
 pub fn build_model_with_registry(
     document: &CifDocument,
     registry: Option<&ComponentRegistry>,
-) -> Result<ModelCifModel, ModelCifError> {
-    let coordinates = build_pdbx(document, registry).map_err(|error| {
-        ModelCifError::new(error.code(), error.message(), error.context().to_vec())
-    })?;
+) -> Result<ModelCifModel, SemanticError> {
+    let coordinates = build_pdbx(document, registry)?;
     let categories = CategoryIndex::new(&document.blocks()[0]);
 
     Ok(ModelCifModel {

@@ -2,18 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Literal, NoReturn
+from typing import Literal, cast
 
 from . import _core, cif
 from ._input import Source
+from ._native import raise_chemistry_error, raise_schema_error, validation_report
 from ._objects import CifDocument, MmcifModel
-from .cif import Destination, validate_profile
+from .cif import Destination
 from .components import Registry
-from .contracts import Diagnostic, Profile, Severity, ValidationReport
-from .errors import ChemistryError, SchemaError
-
-# The concise conventional spelling documented for model construction.
-Model = MmcifModel
+from .contracts import Profile, ValidationReport
 
 
 def read(
@@ -23,24 +20,20 @@ def read(
     registry: Registry | None = None,
 ) -> MmcifModel:
     """Build an immutable PDBx or ModelCIF semantic model."""
-    selected = _implemented_profile(profile)
+    selected = Profile(profile)
     document = (
         source
         if isinstance(source, CifDocument)
-        else cif.read(source, schema=selected.value)
+        else cast(CifDocument, cif.read(source, schema=selected.value))
     )
-    if not isinstance(document, CifDocument):  # pragma: no cover - defensive narrowing
-        raise TypeError("nibbler.mmcif.read() requires a full CIF document")
     try:
         native_registry = None if registry is None else registry._native
-        native: _core._PdbxModel | _core._ModelCifModel
-        if selected is Profile.MODELCIF:
-            native = _core.build_modelcif_model(document._native, native_registry)
-        else:
-            native = _core.build_pdbx_model(document._native, native_registry)
-        return MmcifModel(native, selected.value)
+        native = _core.build_mmcif_model(
+            document._native, selected.value, native_registry
+        )
+        return MmcifModel(native)
     except ValueError as error:
-        _raise_model_error(error)
+        raise_chemistry_error(error)
 
 
 def validate(
@@ -49,7 +42,7 @@ def validate(
     profile: Profile | str,
 ) -> ValidationReport:
     """Validate a document or semantic model against an explicit profile."""
-    selected = _implemented_profile(profile)
+    selected = Profile(profile)
     return _validate_value(value, selected)
 
 
@@ -60,22 +53,16 @@ def _validate_value(value: object, profile: Profile) -> ValidationReport:
                 raise ValueError(
                     f"model profile is {value.profile!r}, not {profile.value!r}"
                 )
-            if isinstance(value._native, _core._ModelCifModel):
-                fields = _core.validate_modelcif_model(value._native)
-            else:
-                fields = _core.validate_pdbx_model(value._native)
+            fields = _core.validate_mmcif_model(value._native)
         elif isinstance(value, CifDocument):
-            if profile is Profile.MODELCIF:
-                fields = _core.validate_modelcif_document(value._native)
-            else:
-                fields = _core.validate_pdbx_document(value._native)
+            fields = _core.validate_mmcif_document(value._native, profile.value)
         else:
             raise TypeError(
                 "nibbler.mmcif.validate() requires CifDocument or MmcifModel"
             )
     except ValueError as error:
-        _raise_schema_error(error)
-    return _validation_report(fields)
+        raise_schema_error(error)
+    return validation_report(fields)
 
 
 def write(
@@ -89,7 +76,7 @@ def write(
     format: Literal["cif", "bcif"] | None = None,
 ) -> None:
     """Write one complete semantic model with transactional path output."""
-    selected = _implemented_profile(profile)
+    selected = Profile(profile)
     if not isinstance(value, MmcifModel):
         raise TypeError("nibbler.mmcif.write() requires MmcifModel")
     if value.profile != selected.value:
@@ -118,7 +105,7 @@ def write(
     else:
         generic_validation = validate
     document = (
-        value._source_document()
+        CifDocument(value._native.source_document(), value.profile)
         if mode == "preserve"
         else value.to_document(mirror_local_qa_metric=mirror_local_qa_metric)
     )
@@ -129,45 +116,3 @@ def write(
         validate=generic_validation,
         format=format,
     )
-
-
-def _implemented_profile(profile: Profile | str) -> Profile:
-    return validate_profile(profile)
-
-
-def _validation_report(
-    fields: tuple[str, str, list[str], list[tuple[str, str, str, list[str]]]],
-) -> ValidationReport:
-    schema_name, version, coverage, diagnostics = fields
-    return ValidationReport(
-        tuple(
-            Diagnostic(
-                code=code,
-                severity=Severity(severity),
-                message=message,
-                context=tuple(context),
-            )
-            for code, severity, message, context in diagnostics
-        ),
-        schema=schema_name,
-        dictionary_version=version,
-        coverage=tuple(coverage),
-    )
-
-
-def _raise_model_error(error: ValueError) -> NoReturn:
-    if len(error.args) != 3:
-        raise error
-    code, message, context = error.args
-    raise ChemistryError(
-        code=str(code),
-        message=str(message),
-        context=tuple(str(value) for value in context),
-    ) from None
-
-
-def _raise_schema_error(error: ValueError) -> NoReturn:
-    if len(error.args) != 2:
-        raise error
-    code, message = error.args
-    raise SchemaError(code=str(code), message=str(message)) from None

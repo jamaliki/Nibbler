@@ -2,7 +2,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::validation::{Validator, fold};
+use crate::pdbx::category::case_key;
+
+use super::validation::Validator;
 
 impl Validator<'_> {
     pub(super) fn targets(&mut self) {
@@ -21,17 +23,17 @@ impl Validator<'_> {
             .coordinates
             .entities()
             .iter()
-            .map(|value| fold(value.id()))
+            .map(|value| case_key(value.id()))
             .collect::<BTreeSet<_>>();
         let coordinate_asym = self
             .model
             .coordinates
             .asym_units()
             .iter()
-            .map(|value| (fold(value.id()), fold(value.entity_id())))
+            .map(|value| (case_key(value.id()), case_key(value.entity_id())))
             .collect::<BTreeMap<_, _>>();
         for target in &self.model.targets {
-            if !coordinate_entities.contains(&fold(&target.entity_id)) {
+            if !coordinate_entities.contains(&case_key(&target.entity_id)) {
                 self.error(
                     "MODELCIF_TARGET_ENTITY",
                     format!(
@@ -49,8 +51,8 @@ impl Validator<'_> {
             );
         }
         for instance in &self.model.target_instances {
-            match coordinate_asym.get(&fold(&instance.asym_id)) {
-                Some(entity_id) if *entity_id == fold(&instance.entity_id) => {}
+            match coordinate_asym.get(&case_key(&instance.asym_id)) {
+                Some(entity_id) if *entity_id == case_key(&instance.entity_id) => {}
                 Some(_) => self.error(
                     "MODELCIF_TARGET_INSTANCE_ENTITY",
                     format!(
@@ -70,7 +72,7 @@ impl Validator<'_> {
             }
             if !self
                 .target_entities
-                .contains_key(&fold(&instance.entity_id))
+                .contains_key(&case_key(&instance.entity_id))
             {
                 self.error(
                     "MODELCIF_TARGET_INSTANCE_TARGET",

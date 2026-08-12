@@ -22,7 +22,6 @@ def test_mmcif_read_builds_source_backed_semantic_model() -> None:
     model = nibbler.mmcif.read(CHEMISTRY)
 
     assert isinstance(model, MmcifModel)
-    assert isinstance(model, nibbler.mmcif.Model)
     assert model.entry_id == "NIBBLER_LIGAND_ION_WATER"
     assert model.entity_count == 4
     assert model.asym_unit_count == 4

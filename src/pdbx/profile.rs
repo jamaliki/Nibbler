@@ -1,4 +1,6 @@
-//! Stable PDBx profile diagnostics and validation report.
+//! Stable semantic diagnostics and validation reports.
+
+use crate::cif::{Severity, ValidationReport};
 
 pub(super) const MAX_DIAGNOSTICS: usize = 10_000;
 const COVERAGE: &[&str] = &[
@@ -13,7 +15,7 @@ const COVERAGE: &[&str] = &[
     "struct-conn-endpoints",
 ];
 
-/// Severity of one PDBx profile finding.
+/// Severity of one semantic-profile finding.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProfileSeverity {
     /// The document is not a valid strict PDBx coordinate model.
@@ -33,7 +35,7 @@ impl ProfileSeverity {
     }
 }
 
-/// One stable dictionary or semantic PDBx validation finding.
+/// One stable dictionary or semantic-profile validation finding.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProfileDiagnostic {
     code: String,
@@ -55,6 +57,27 @@ impl ProfileDiagnostic {
             message: message.into(),
             context,
         }
+    }
+
+    pub(crate) fn from_dictionary(finding: &crate::cif::Diagnostic) -> Self {
+        Self::new(
+            finding.code(),
+            match finding.severity() {
+                Severity::Error => ProfileSeverity::Error,
+                Severity::Warning => ProfileSeverity::Warning,
+            },
+            finding.message(),
+            finding.context().to_vec(),
+        )
+    }
+
+    pub(crate) fn from_semantic(error: &super::SemanticError) -> Self {
+        Self::new(
+            error.code(),
+            ProfileSeverity::Error,
+            error.message(),
+            error.context().to_vec(),
+        )
     }
 
     /// Return the stable machine-readable code.
@@ -82,36 +105,51 @@ impl ProfileDiagnostic {
     }
 }
 
-/// Immutable result of dictionary and PDBx semantic validation.
+/// Immutable result of dictionary and semantic-profile validation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProfileValidationReport {
+    dictionary_version: &'static str,
+    coverage: &'static [&'static str],
     diagnostics: Vec<ProfileDiagnostic>,
 }
 
 impl ProfileValidationReport {
-    pub(super) fn new(mut diagnostics: Vec<ProfileDiagnostic>) -> Self {
+    pub(super) fn pdbx(diagnostics: Vec<ProfileDiagnostic>) -> Self {
+        Self::new("5.416", COVERAGE, "PDBX_DIAGNOSTICS_TRUNCATED", diagnostics)
+    }
+
+    pub(crate) fn new(
+        dictionary_version: &'static str,
+        coverage: &'static [&'static str],
+        truncation_code: &'static str,
+        mut diagnostics: Vec<ProfileDiagnostic>,
+    ) -> Self {
         if diagnostics.len() > MAX_DIAGNOSTICS {
             diagnostics.truncate(MAX_DIAGNOSTICS);
             diagnostics.push(ProfileDiagnostic::new(
-                "PDBX_DIAGNOSTICS_TRUNCATED",
+                truncation_code,
                 ProfileSeverity::Warning,
                 format!("validation stopped after {MAX_DIAGNOSTICS} findings"),
                 Vec::new(),
             ));
         }
-        Self { diagnostics }
+        Self {
+            dictionary_version,
+            coverage,
+            diagnostics,
+        }
     }
 
-    /// Return the exact PDBx dictionary version used by this profile.
+    /// Return the exact dictionary version used by this profile.
     #[must_use]
     pub const fn dictionary_version(&self) -> &'static str {
-        "5.416"
+        self.dictionary_version
     }
 
     /// Return the constraint families applied by this report.
     #[must_use]
     pub const fn coverage(&self) -> &'static [&'static str] {
-        COVERAGE
+        self.coverage
     }
 
     /// Return findings in deterministic check order.
@@ -128,4 +166,12 @@ impl ProfileValidationReport {
             .iter()
             .any(|diagnostic| diagnostic.severity == ProfileSeverity::Error)
     }
+}
+
+pub(crate) fn dictionary_diagnostics(report: &ValidationReport) -> Vec<ProfileDiagnostic> {
+    report
+        .diagnostics()
+        .iter()
+        .map(ProfileDiagnostic::from_dictionary)
+        .collect()
 }

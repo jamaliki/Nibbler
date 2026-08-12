@@ -7,9 +7,7 @@ use super::dictionary::{CategoryDefinition, Dictionary, ItemDefinition};
 use super::document::{BlockKind, CifDocument, CifEntry, CifValueRef};
 use super::numeric::parse_float;
 use super::schema::LoadedSchema;
-use super::validation::{Diagnostic, Severity};
-
-const MAX_DIAGNOSTICS: usize = 10_000;
+use super::validation::{Diagnostic, MAX_DIAGNOSTICS, Severity};
 
 pub(super) fn validate(document: &CifDocument, schema: &LoadedSchema) -> (Vec<Diagnostic>, bool) {
     let mut validator = Validator {

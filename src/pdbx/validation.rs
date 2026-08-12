@@ -2,15 +2,15 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::cif::{
-    CifDocument, SchemaError, SchemaName, Severity, validate_document as validate_cif,
-};
+use crate::cif::{CifDocument, SchemaError, SchemaName, validate_document as validate_cif};
 
+use super::category::case_key;
 use super::model::{
     AsymUnit, AtomSite, ComponentDefinition, ComponentResolution, Entity, PdbxModel,
 };
 use super::profile::{
     MAX_DIAGNOSTICS, ProfileDiagnostic, ProfileSeverity, ProfileValidationReport,
+    dictionary_diagnostics,
 };
 use super::source::build_model;
 
@@ -21,37 +21,18 @@ use super::source::build_model;
 /// Returns [`SchemaError`] only if the embedded PDBx dictionary cannot be loaded.
 pub fn validate_document(document: &CifDocument) -> Result<ProfileValidationReport, SchemaError> {
     let dictionary = validate_cif(document, SchemaName::Pdbx)?;
-    let mut diagnostics = dictionary
-        .diagnostics()
-        .iter()
-        .map(|finding| {
-            ProfileDiagnostic::new(
-                finding.code(),
-                match finding.severity() {
-                    Severity::Error => ProfileSeverity::Error,
-                    Severity::Warning => ProfileSeverity::Warning,
-                },
-                finding.message(),
-                finding.context().to_vec(),
-            )
-        })
-        .collect::<Vec<_>>();
+    let mut diagnostics = dictionary_diagnostics(&dictionary);
     match build_model(document) {
         Ok(model) => diagnostics.extend(validate_semantics(&model)),
-        Err(error) => diagnostics.push(ProfileDiagnostic::new(
-            error.code(),
-            ProfileSeverity::Error,
-            error.message(),
-            error.context().to_vec(),
-        )),
+        Err(error) => diagnostics.push(ProfileDiagnostic::from_semantic(&error)),
     }
-    Ok(ProfileValidationReport::new(diagnostics))
+    Ok(ProfileValidationReport::pdbx(diagnostics))
 }
 
 /// Validate one constructed PDBx model against semantic profile invariants.
 #[must_use]
 pub fn validate_model(model: &PdbxModel) -> ProfileValidationReport {
-    ProfileValidationReport::new(validate_semantics(model))
+    ProfileValidationReport::pdbx(validate_semantics(model))
 }
 
 fn validate_semantics(model: &PdbxModel) -> Vec<ProfileDiagnostic> {
@@ -120,7 +101,7 @@ impl Validator<'_> {
         let mut connections = BTreeSet::new();
         for connection in self.model.connections() {
             let (id, _) = connection.identity();
-            if !connections.insert(fold(id)) {
+            if !connections.insert(case_key(id)) {
                 self.error(
                     "PDBX_CONNECTION_ID_DUPLICATE",
                     format!("connection identifier {id:?} is not unique"),
@@ -149,7 +130,7 @@ impl Validator<'_> {
             let atoms = component
                 .atoms()
                 .iter()
-                .map(|atom| fold(atom.atom_id()))
+                .map(|atom| case_key(atom.atom_id()))
                 .collect::<BTreeSet<_>>();
             if atoms.len() != component.atoms().len() {
                 self.error(
@@ -163,7 +144,7 @@ impl Validator<'_> {
             }
             for bond in component.bonds() {
                 let (first, second) = bond.atom_ids();
-                if !atoms.contains(&fold(first)) || !atoms.contains(&fold(second)) {
+                if !atoms.contains(&case_key(first)) || !atoms.contains(&case_key(second)) {
                     self.error(
                         "PDBX_COMPONENT_BOND_ENDPOINT",
                         format!(
@@ -187,7 +168,7 @@ impl Validator<'_> {
         let mut seen = BTreeSet::new();
         for value in values {
             let id = identifier(value);
-            if !seen.insert(fold(id)) {
+            if !seen.insert(case_key(id)) {
                 self.error(
                     code,
                     format!("{label} identifier {id:?} is not unique"),
@@ -222,7 +203,8 @@ impl Validator<'_> {
         message: impl Into<String>,
         context: Vec<String>,
     ) {
-        if self.diagnostics.len() < MAX_DIAGNOSTICS {
+        // Retain one overflow finding so the report can prove truncation occurred.
+        if self.diagnostics.len() <= MAX_DIAGNOSTICS {
             self.diagnostics
                 .push(ProfileDiagnostic::new(code, severity, message, context));
         }
@@ -232,12 +214,8 @@ impl Validator<'_> {
 fn index<T>(values: &[T], identifier: impl Fn(&T) -> &str) -> BTreeMap<String, &T> {
     values
         .iter()
-        .map(|value| (fold(identifier(value)), value))
+        .map(|value| (case_key(identifier(value)), value))
         .collect()
-}
-
-pub(super) fn fold(value: &str) -> String {
-    value.to_ascii_lowercase()
 }
 
 pub(super) fn equal(left: &str, right: &str) -> bool {

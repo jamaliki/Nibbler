@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from benchmarks.workloads import workload_names
+from benchmarks.corpus import load_structures
+from benchmarks.run import WORKLOADS
 from tools.fetch_schemas import load_schema_locks
 from tools.verify_corpus import load_manifest, verify_corpus
 
@@ -18,12 +19,19 @@ def test_corpus_prioritizes_chemistry_risks() -> None:
 
 
 def test_benchmark_workload_names_are_stable() -> None:
-    assert workload_names() == (
+    assert tuple(WORKLOADS) == (
         "full-document",
         "projected-atom-site",
         "chemistry-heavy-validation",
         "canonical-round-trip",
     )
+
+
+def test_pdb_manifest_models_derived_and_remote_files() -> None:
+    structure = load_structures()[0]
+    assert structure.cif.bytes > 0
+    assert structure.bcif.url.startswith("https://")
+    assert structure.cif_gz.url.startswith("https://")
 
 
 def test_schema_versions_and_digests_are_locked() -> None:

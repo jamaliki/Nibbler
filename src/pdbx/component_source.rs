@@ -2,17 +2,17 @@
 
 use std::collections::BTreeMap;
 
-use super::category::CategoryIndex;
+use super::category::{CategoryIndex, case_key};
+use super::error::SemanticError;
 use super::fields::{
     duplicate, optional_bool, optional_charge, optional_float, optional_text, required_text,
 };
 use super::model::{ComponentAtom, ComponentBond, ComponentDefinition, ComponentResolution};
-use super::source::ModelError;
 
 pub(super) fn component_definitions(
     categories: &CategoryIndex<'_>,
     resolution: ComponentResolution,
-) -> Result<BTreeMap<String, ComponentDefinition>, ModelError> {
+) -> Result<BTreeMap<String, ComponentDefinition>, SemanticError> {
     let mut output = BTreeMap::new();
     for (row_index, row) in categories.rows("chem_comp").iter().enumerate() {
         let id = required_text(row, "chem_comp", "id", row_index)?;
@@ -27,7 +27,7 @@ pub(super) fn component_definitions(
             bonds: Vec::new(),
             resolution,
         };
-        if output.insert(fold(&id), definition).is_some() {
+        if output.insert(case_key(&id), definition).is_some() {
             return Err(duplicate("chem_comp", "id", &id, row_index));
         }
     }
@@ -61,11 +61,11 @@ fn attach_component_atoms(
     categories: &CategoryIndex<'_>,
     components: &mut BTreeMap<String, ComponentDefinition>,
     resolution: ComponentResolution,
-) -> Result<(), ModelError> {
+) -> Result<(), SemanticError> {
     for (row_index, row) in categories.rows("chem_comp_atom").iter().enumerate() {
         let component_id = required_text(row, "chem_comp_atom", "comp_id", row_index)?;
         let definition = components
-            .entry(fold(&component_id))
+            .entry(case_key(&component_id))
             .or_insert_with(|| component_shell(component_id, resolution));
         definition.atoms.push(ComponentAtom {
             atom_id: required_text(row, "chem_comp_atom", "atom_id", row_index)?,
@@ -80,11 +80,11 @@ fn attach_component_bonds(
     categories: &CategoryIndex<'_>,
     components: &mut BTreeMap<String, ComponentDefinition>,
     resolution: ComponentResolution,
-) -> Result<(), ModelError> {
+) -> Result<(), SemanticError> {
     for (row_index, row) in categories.rows("chem_comp_bond").iter().enumerate() {
         let component_id = required_text(row, "chem_comp_bond", "comp_id", row_index)?;
         let definition = components
-            .entry(fold(&component_id))
+            .entry(case_key(&component_id))
             .or_insert_with(|| component_shell(component_id, resolution));
         definition.bonds.push(ComponentBond {
             first_atom_id: required_text(row, "chem_comp_bond", "atom_id_1", row_index)?,
@@ -116,8 +116,4 @@ fn option_text_conflicts(left: Option<&str>, right: Option<&str>) -> bool {
 
 fn option_value_conflicts<T: PartialEq>(left: Option<T>, right: Option<T>) -> bool {
     matches!((left, right), (Some(left), Some(right)) if left != right)
-}
-
-fn fold(value: &str) -> String {
-    value.to_ascii_lowercase()
 }

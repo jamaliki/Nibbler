@@ -15,14 +15,19 @@ from ._input import (
     Source,
     _normalize_predicates,
     _normalize_source,
-    _raise_native_error,
+)
+from ._native import (
+    raise_read_error,
+    raise_schema_error,
+    raise_write_error,
+    validation_report,
 )
 from ._objects import CifDocument as CifDocument
 from ._objects import CifTable as CifTable
 from ._objects import MissingPolicy as MissingPolicy
 from ._scan import BatchDiagnostics as BatchDiagnostics
 from ._scan import ScanResult as ScanResult
-from .contracts import Diagnostic, Profile, Severity, ValidationReport
+from .contracts import ValidationReport
 from .errors import SchemaError, WriteError
 
 Destination: TypeAlias = str | PathLike[str] | BinaryIO
@@ -68,7 +73,7 @@ def read(
                 normalized_schema,
             )
     except ValueError as error:
-        _raise_native_error(error)
+        raise_read_error(error)
     if isinstance(native, _core._CifDocument):
         return CifDocument(native, normalized_schema)
     return CifTable(native)
@@ -116,22 +121,8 @@ def validate(value: object, *, schema: str | None = None) -> ValidationReport:
             value._native, selected
         )
     except ValueError as error:
-        _raise_schema_error(error)
-    diagnostics = tuple(
-        Diagnostic(
-            code=code,
-            severity=Severity(severity),
-            message=message,
-            context=tuple(context),
-        )
-        for code, severity, message, context in fields
-    )
-    return ValidationReport(
-        diagnostics,
-        schema=schema_name,
-        dictionary_version=version,
-        coverage=tuple(coverage),
-    )
+        raise_schema_error(error)
+    return validation_report((schema_name, version, coverage, fields))
 
 
 def write(
@@ -155,7 +146,7 @@ def write(
                 code="CIF_SCHEMA_REQUIRED",
                 message="validate='dictionary' requires a schema-attached document",
             )
-        _validation_report(value).raise_for_errors()
+        _validate_document(value).raise_for_errors()
 
     destination_file = _destination_file(destination)
     output_format = _output_format(destination_file, format)
@@ -184,13 +175,6 @@ def _normalize_schema(schema: str) -> str:
     return normalized
 
 
-def _raise_schema_error(error: ValueError) -> None:
-    if len(error.args) != 2:
-        raise error
-    code, message = error.args
-    raise SchemaError(code=str(code), message=str(message)) from None
-
-
 def _document_payload(
     document: CifDocument,
     mode: Literal["canonical", "preserve"],
@@ -204,10 +188,7 @@ def _document_payload(
         )
         return text.encode("utf-8")
     except ValueError as error:
-        if len(error.args) != 2:
-            raise
-        code, message = error.args
-        raise WriteError(code=str(code), message=str(message)) from None
+        raise_write_error(error)
 
 
 def _output_format(
@@ -277,7 +258,7 @@ def _write_path_transactionally(
                     destination=str(destination),
                 )
             if validation == "dictionary":
-                _validation_report(reparsed, schema=schema).raise_for_errors()
+                _validate_document(reparsed, schema=schema).raise_for_errors()
         os.replace(temporary, destination)
         temporary = None
     except OSError as error:
@@ -293,12 +274,8 @@ def _write_path_transactionally(
             temporary.unlink(missing_ok=True)
 
 
-def _validation_report(
+def _validate_document(
     document: CifDocument, *, schema: str | None = None
 ) -> ValidationReport:
+    """Validate from write(), where the public `validate` parameter shadows the API."""
     return validate(document, schema=schema)
-
-
-def validate_profile(profile: Profile | str) -> Profile:
-    """Normalize a semantic profile without accepting invented values."""
-    return profile if isinstance(profile, Profile) else Profile(profile)

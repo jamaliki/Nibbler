@@ -1,170 +1,207 @@
-# Nibbler performance search report
+# Performance architecture and qualification
 
-## Hardware-limit cycle
+- Status: current implementation
+- Qualified: 2026-08-12
+- Reference host: 16-core Apple M4 Max
+- Corpus: hash-pinned PDB CIF, gzip, and BinaryCIF inputs in
+  [`benchmarks/pdb_corpus.toml`](../benchmarks/pdb_corpus.toml)
 
-The second cycle eliminated the generic second projection scan on row-aligned chunks,
-parallelized exact safe-boundary discovery, made full-document retention single-pass,
-reduced each text cell descriptor from 12 to 8 bytes, replaced a serial generic-lexer
-eligibility pass with a conservative allocation-free byte probe, and removed the final
-source-sized input copy. It used fresh current-tree baselines because the installed
-development extension was not byte-identical to the earlier published PGO artifact.
+This document describes the performance design present in the repository and its
+qualified checkpoint. Historical experiments are recorded separately in
+[improvement-beam.md](improvement-beam.md).
 
-## Scope and guardrails
+## 1. Performance contract
 
-The Phase 6 optimization search targeted end-to-end construction of usable projected
-tables and complete documents, not isolated token counters. Tests used the hash-pinned
-PDB corpus in `.cache/pdb-stress` on a 16-core Apple M4 Max. Strict CIF semantics,
-deterministic source order and errors, configured resource limits, bounded concurrency,
-small-file latency, and `unsafe_code = "forbid"` were hard gates.
+Nibbler measures end-to-end construction of a usable projected table or complete
+logical document. A timing is publishable only when:
 
-Baseline and final JSON artifacts are under `.cache/performance/`. Representative
-commands are:
+- strict CIF behavior and stable error locations are unchanged;
+- projected Arrow tables or canonical document bytes are exactly equal;
+- resource limits and the earliest error are stable across worker counts;
+- concurrency is bounded;
+- small-file latency and peak RSS remain acceptable; and
+- the release extension, input digests, compiler, hardware, warmups, and samples are
+  recorded.
+
+MB/s uses source bytes for CIF and BinaryCIF and logical decompressed CIF bytes for
+gzip. See [../benchmarks/README.md](../benchmarks/README.md) for commands and report
+fields.
+
+## 2. Qualified checkpoint
+
+Medians below use the corpus-trained, fingerprinted PGO wheel on the reference host.
+Large projections use two warmups and seven samples; large full documents use one
+warmup and three samples in isolated processes; `1crn` uses three warmups and eleven
+samples. They are workload-specific measurements, not portable thresholds.
+
+Measured artifact and toolchain:
+
+- package: `nibbler-cif 0.1.0`;
+- wheel: `nibbler_cif-0.1.0-cp312-cp312-macosx_11_0_arm64.whl`, SHA-256
+  `f5043697ec45f7ac73c4ce5a208c654e77e3e7b73848b1b1135baf1a6c15d19f`;
+- native extension SHA-256:
+  `2cd5f645d18131f7e9bc732ae3d8f16654383245d41f87f9f2d05f6a8f721b04`;
+- Python/platform: CPython 3.12.13 on `macOS-26.5.2-arm64-arm-64bit`;
+- compiler: `rustc 1.97.1` commit `8bab26f4f68e0e26f0bb7960be334d5b520ea452`,
+  LLVM 22.1.6, target `aarch64-apple-darwin`; and
+- PGO input fingerprint:
+  `a4dc014fc5c91ac98048f9cdb4892aa21a2f416171bbf8a85756fc43d8962564`.
+
+| Workload | PDB | Throughput |
+| --- | --- | ---: |
+| text projection | `6qnr` | 1,435 MB/s |
+| text projection | `3j3q` | 1,813 MB/s |
+| text full document | `6qnr` | 934 MB/s |
+| text full document | `3j3q` | 1,407 MB/s |
+| BinaryCIF projection | `6qnr` | 1,818 MB/s |
+| BinaryCIF projection | `3j3q` | 1,934 MB/s |
+| BinaryCIF full document | `6qnr` | 693 MB/s |
+| BinaryCIF full document | `3j3q` | 885 MB/s |
+| gzip text projection | `6qnr` | 662 MB/s logical CIF |
+| gzip text projection | `3j3q` | 752 MB/s logical CIF |
+
+Small `1crn` latency is 0.31 ms for text projection, 0.29 ms for a text document,
+0.80 ms for BinaryCIF projection, and 0.94 ms for a BinaryCIF document.
+
+Peak RSS for full documents is:
+
+| Format | `6qnr` | `3j3q` |
+| --- | ---: | ---: |
+| text CIF | 266 MB | 1.49 GB |
+| BinaryCIF | 233 MB | 0.93 GB |
+
+Arrow import of the already projected table takes 0.7 ms for `6qnr` and 5.0 ms for
+`3j3q`.
+
+## 3. Text representation
+
+`SourceBuffer` owns one immutable UTF-8 allocation behind `Arc`. Raw and decompressed
+owned input moves into that allocation rather than being copied into a second source
+string. A `CifDocument` owns its block slice behind another `Arc`, so semantic models
+can retain the source document without duplicating it.
+
+Text loop values are 8-byte source descriptors. The source bytes determine text bounds,
+quote style, and missing kind lazily. Parallel document construction stores descriptors
+in 65,536-cell segments that become final document storage directly; it does not join
+all cells into a second contiguous vector.
+
+BinaryCIF keeps decoded typed/dictionary columns. It does not expand every cell into a
+row-major enum.
+
+## 4. Lexer
+
+Ordinary unquoted values use one scalar pass for delimiter discovery and forbidden
+character validation. Quoted values, semicolon text, comments, control words, UTF-8,
+and token limits stay in the same strict production lexer.
+
+The parser is the only owner of block, frame, tag, and loop grammar. Performance kernels
+may find candidate loop ranges or materialize values, but they cannot accept input that
+the parser would reject.
+
+## 5. Bounded intra-file parallelism
+
+When at least 8 MiB remains from a loop's first value, the loop may request
+`ceil(remaining bytes / 2 MiB)` workers, capped by available parallelism. Document mode
+first proves that the loop itself reaches the threshold. A process-wide atomic lease
+makes concurrent intra-file loop kernels share the host's available parallelism. The
+outer multi-file scan pool is bounded independently. Fewer than two loop workers means
+serial loop execution.
+
+The large-loop path is:
+
+1. **Eligibility.** Document mode uses an allocation-free byte probe to prove that the
+   current loop reaches the 8 MiB threshold. Ambiguous or malformed input declines the
+   fast path.
+2. **Safe boundaries.** Workers summarize line-leading semicolons; the coordinator
+   composes the exact two-state text-field state machine and produces ranges that never
+   split a semicolon value.
+3. **Validation.** Every range runs the production lexer, counts values, records the
+   last value/control token, and reports a located error.
+4. **Document retention.** Validation workers store compact source cells directly in
+   final source-ordered segments.
+5. **Projection.** Workers validate and build typed selected columns in one pass while
+   assuming local column phase zero. Global prefix counts prove every chunk boundary is
+   row-aligned before output or typed errors are committed. If the proof fails, Nibbler
+   discards speculative output and runs the general aligned projection path.
+6. **Commit.** The coordinator selects the earliest error before the loop control token,
+   checks row/value limits, and exposes chunks in source order without copying payload
+   buffers.
+
+Custom limits that could change observable error ordering force serial loop processing.
+The safe-boundary index and speculative commit rules have adversarial serial/parallel
+equivalence tests for comments, quotes, multiline text, row wrapping, control-looking
+values, incomplete rows, predicates, and lexical/resource errors.
+
+## 6. Projection and Arrow
+
+Projection plans normalize requested items and compile predicate column indexes once
+per category occurrence. Unselected values are validated but not retained. A compiled
+dictionary selects text, `int64`, or `float64` builders; schema-less values remain text.
+
+Columns retain parallel Arrow chunks rather than concatenating them. Missing-kind counts
+are computed once per column, and Arrow import reuses the segmented buffers through the
+C Stream interface. The public missing policy is applied only at export.
+
+## 7. Gzip and input
+
+`flate2` uses the portable pure-Rust `zlib-rs` backend. Decompression enforces input,
+output, and expansion-ratio limits. Its initial output reserve is bounded by:
+
+- five times compressed size;
+- the configured decompressed limit;
+- the configured expansion-ratio limit; and
+- 256 MiB.
+
+The reserve reduces reallocations without trusting the compressed stream. Text,
+BinaryCIF, and gzip are detected by content, and all feed the same document/projection
+contracts.
+
+## 8. Profile-guided release build
+
+`tools/build_pgo.py` is the release-wheel workflow. It:
+
+1. rejects inherited profile flags and non-host targets;
+2. builds an instrumented wheel;
+3. verifies the pinned corpus by size and SHA-256;
+4. trains text, BinaryCIF, gzip, projection, and full-document paths while checking
+   output counts;
+5. merges data with the active Rust toolchain's `llvm-profdata`;
+6. rebuilds the optimized wheel; and
+7. publishes the ABI-specific wheel plus compiler, target, source, and corpus
+   fingerprint metadata.
 
 ```console
-micromamba run -p .mamba/nibbler-dev maturin develop --release
+micromamba run -p .mamba/nibbler-dev python -m tools.build_pgo
+```
+
+Profiles are never checked into Cargo configuration because they are coupled to the
+compiler, target, ABI, source, and training workload.
+
+## 9. Hardware interpretation
+
+On the reference host, warm file reads measure 12-24 GB/s and a payload copy measures
+about 169 GB/s, while strict text parsing reaches 1-2 GB/s. Modeled document traffic is
+only about 4 GB/s. The parser is therefore compute- and control-flow-bound, not DRAM- or
+storage-bandwidth-bound.
+
+End-to-end average utilization varies with serial metadata and output ownership, from
+roughly 2.7 to 7.4 cores on the large corpus cases. The current design is near the
+practical throughput limit of its strict generic lexer and logical-output contract, not
+the machine's literal memory-copy limit.
+
+## 10. Qualification commands
+
+The current implementation is gated by:
+
+```console
+make check
 micromamba run -p .mamba/nibbler-dev python -m benchmarks.pdb_stress \
   --formats all --warmups 2 --samples 7 --json
 micromamba run -p .mamba/nibbler-dev python -m benchmarks.pdb_stress \
   --ids 6qnr 3j3q --formats cif --full-document --warmups 1 --samples 3 --json
-micromamba run -p .mamba/nibbler-dev python tools/build_pgo.py
+micromamba run -p .mamba/nibbler-dev python -m tools.build_pgo
 ```
 
-## Results
-
-Large-file medians compare the initial Phase 6 release extension with the final
-corpus-trained native PGO wheel. MB/s uses source bytes for CIF/BinaryCIF and logical
-decompressed CIF bytes for gzip.
-
-| Workload | PDB | Baseline | Final | Change |
-|---|---|---:|---:|---:|
-| text projection | 6qnr | 321 MB/s | 1,603 MB/s | 4.99x |
-| text projection | 3j3q | 278 MB/s | 2,092 MB/s | 7.53x |
-| text full document | 6qnr | 272 MB/s | 969 MB/s | 3.56x |
-| text full document | 3j3q | 243 MB/s | 1,512 MB/s | 6.22x |
-| BinaryCIF projection | 6qnr | 1,269 MB/s | 2,068 MB/s | 1.63x |
-| BinaryCIF projection | 3j3q | 1,303 MB/s | 1,971 MB/s | 1.51x |
-| BinaryCIF full document | 6qnr | 188 MB/s | 811 MB/s | 4.32x |
-| BinaryCIF full document | 3j3q | 206 MB/s | 874 MB/s | 4.24x |
-| gzip text projection | 6qnr | - | 694 MB/s | - |
-| gzip text projection | 3j3q | - | 808 MB/s | - |
-
-Final full-document peak RSS was 405 MB for 6qnr text, 1.90 GB for 3j3q text,
-279 MB for 6qnr BinaryCIF, and 1.12 GB for 3j3q BinaryCIF. Relative to the initial
-BinaryCIF full-document representation, the large cases use 55-77% less peak memory.
-Small 1crn text projection/full latency is 0.30/0.28 ms and BinaryCIF is
-0.67/0.98 ms.
-
-Against the final same-source and same-compiler plain wheel, PGO improves 6qnr/3j3q
-text projection by 16.8/18.1% and text full construction by 13.2/13.7%.
-
-Arrow export originally repeated whole-column missing-state counts for every parallel
-chunk. Hoisting those counts reduced Python Arrow import from 9.7 to 0.7 ms on 6qnr and
-from 73.8 to 4.9 ms on 3j3q.
-
-## Promoted mechanisms
-
-### Compact documents
-
-Text loops store 8-byte source token spans with one shared source allocation. Quote style,
-missing kind, and content bounds are derived lazily from the immutable source. Parallel
-text documents own segmented cell chunks directly in the validation pass, avoiding both
-a second scan and a concatenation copy. BinaryCIF
-documents retain decoded typed/dictionary columns rather than expanding row-major value
-enums. Public APIs expose borrowed values and rows.
-
-### Fused strict lexer
-
-Ordinary unquoted values use one scalar pass for delimiter discovery and forbidden
-character validation. Real 6qnr tokens average 2.95 bytes and 99.5% are shorter than
-eight bytes, so scalar fusion beat speculative long-token SIMD. Isolated gains were
-8.7-10.2% on the large text files and neutral on the small file.
-
-### Bounded intra-file parallelism
-
-The serial parser remains the sole block/frame/tag grammar owner. Loops at least 8 MiB
-use up to `min(available cores, ceil(loop tail / 2 MiB))` workers under a process-wide
-atomic budget:
-
-1. summarize column-one semicolons in parallel and compose the exact two-state text-field
-   DFA to find safe boundaries;
-2. tokenize, validate, classify, and count each range with the production lexer;
-3. for projection, speculatively build each chunk at local column phase zero, then commit
-   only when global prefix counts prove every chunk is row-aligned; otherwise use the
-   generic second-pass fallback;
-4. for documents, retain 8-byte source spans during that same validation pass;
-5. expose chunks in source order without copying their payload buffers.
-
-Document mode first proves that a loop itself reaches 8 MiB, preventing small metadata
-loops near the start of a large file from repeatedly scanning the tail. This eligibility
-probe recognizes whitespace, comments, quotes, semicolon text, bare values, and control
-tokens directly without allocating token objects. Ambiguous or malformed input falls
-back to the canonical lexer, so the probe never owns parse semantics. Against the
-adjacent generic-lexer gate it reduced 6qnr/3j3q full-document latency by 23.2/12.1%.
-Custom value/row limits that could become observable force the serial path. Workers
-report located parser errors, and the coordinator selects the earliest source error
-before the first loop control token.
-
-### Input and release pipeline
-
-`flate2` uses the portable pure-Rust `zlib-rs` backend. Gzip output gets a bounded reserve
-limited by compressed size, decompressed limit, expansion-ratio limit, and 256 MiB. This
-reduced large gzip end-to-end time by 17.6-22.6% before intra-file parallelism and lowered
-one-shot 3j3q gzip RSS by 16.7%.
-
-Raw and decompressed UTF-8 input is moved into the immutable `SourceBuffer` rather than
-copied from an owned `Vec<u8>` into a second reference-counted string. The outer
-`Arc<SourceInner>` already provides shared ownership. An adjacent copy-vs-consume A/B
-improved 6qnr projection/full by 4.0/1.5% and 3j3q by 9.4/5.6%, while reducing large-text
-peak RSS by 7-22%.
-
-`tools/build_pgo.py` builds an instrumented wheel, trains it against verified text,
-BinaryCIF, gzip, projection, and document workloads, merges profiles using the active
-rustc's `llvm-profdata`, rebuilds, and publishes a wheel plus fingerprint metadata.
-Profiles are deliberately not stored in Cargo configuration because they are coupled to
-the compiler, source, target, Python ABI, and workload.
-
-## Rejected or parked experiments
-
-- Parallel full-document vectors followed by concatenation: rejected after measuring
-  45-87 MB/s and 0.74-4.4 GB RSS; exact chunk ownership replaced it.
-- `target-cpu=native`, thin LTO, and static native flags: no stable gain.
-- one codegen unit/fat LTO: helped BinaryCIF by up to 6.5% but regressed text about 15%.
-- mmap input: an owned-buffer source copy was removed without mapping or `unsafe`; mapping
-  itself still has only the remaining file-read fraction as its ceiling and would add
-  platform-specific ownership complexity.
-- SIMD for ordinary PDB tokens: corpus tokens are too short; a hybrid is only justified
-  if adversarial long unquoted-token throughput becomes a maintained guardrail.
-- Reusing the serial 8 MiB eligibility prefix: 9-16% slower because it serialized cell
-  materialization and reduced parallel work.
-- Removing the eligibility probe: about 8x slower on large PDB files because many small
-  metadata loops repeatedly launched worker waves against a large remaining tail.
-- A specialized batch loop scanner: improved quote-free 3j3q slightly but regressed
-  quote-heavy 6qnr full construction by 5.4%; rejected rather than corpus-dispatched.
-
-## Validation
-
-- the complete Rust unit/integration suite plus one doctest, including a >8 MiB
-  forced-serial versus parallel adversarial loop with multiline text, quoted controls,
-  predicates, row spans, and `stop_` handoff.
-- `cargo clippy --release --all-targets -- -D warnings`.
-- 65 Python tests against the final PGO wheel.
-- strict Ruff and mypy checks for the PGO and stress tools.
-- all five pinned PDB structures in raw CIF, BinaryCIF, and gzip: exact manifest sizes and
-  SHA-256 hashes, expected atom counts, and equal projected Arrow tables.
-- all five full raw CIF, gzip CIF, and BinaryCIF documents serialized canonically,
-  reparsed, and reproduced identical canonical bytes; the largest output was 225 MB.
-
-## Residual ceiling
-
-The final PGO build reaches 1.60-2.09 GB/s text projection and 0.97-1.51 GB/s full
-construction on the two large corpus files. Final average utilization ranges from 2.7
-to 7.4 cores end to end; the parallel atom-loop work is diluted by serial metadata,
-input, and output ownership. Pre-B15 plain-build profiling attributed 57% of projection
-and 74% of document worker samples to the strict lexer, boundary indexing about 1%, and
-cell stores at most 14%; B15 then removed the 24.5% main-thread eligibility-lexer share.
-Modeled document traffic is roughly 4 GB/s versus 169 GB/s measured `memcpy`, so the
-residual is branch/control-flow compute, not DRAM bandwidth. Warm file reads are
-12-24 GB/s. Nibbler is therefore near the practical limit of this exact generic-lexer
-architecture, not the machine's literal byte-copy limit. Another large gain requires a
-universally faster strict lexer; a quote-sensitive specialization was measured and
-rejected because it regressed a representative PDB file.
+Qualification covers the Rust and Python suites, Clippy, rustdoc, Ruff, strict mypy,
+manifest verification, equal typed projections across all three input encodings, and
+canonical parse/write/parse equality for complete documents.

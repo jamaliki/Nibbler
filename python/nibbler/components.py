@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from . import _core, cif
 from ._input import Source
+from ._native import raise_chemistry_error
 from ._objects import CifDocument
-from .errors import ChemistryError
 
 
 class Registry:
@@ -25,14 +25,7 @@ class Registry:
         try:
             return cls(_core.build_component_registry(document._native))
         except ValueError as error:
-            if len(error.args) != 3:
-                raise
-            code, message, context = error.args
-            raise ChemistryError(
-                code=str(code),
-                message=str(message),
-                context=tuple(str(value) for value in context),
-            ) from None
+            raise_chemistry_error(error)
 
     def __len__(self) -> int:
         return len(self._native)

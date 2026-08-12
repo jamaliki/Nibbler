@@ -329,6 +329,10 @@ fn classify_unquoted(text: &str) -> TokenKind {
     }
 }
 
+fn eq_ascii_case(left: &str, right: &str) -> bool {
+    left.eq_ignore_ascii_case(right)
+}
+
 pub(crate) const fn is_whitespace(byte: u8) -> bool {
     matches!(byte, b' ' | b'\t' | b'\n' | b'\r')
 }
@@ -348,10 +352,6 @@ fn preceding_line_ending_start(bytes: &[u8], byte_offset: usize) -> usize {
         content_end -= 1;
     }
     content_end
-}
-
-fn eq_ascii_case(left: &str, right: &str) -> bool {
-    left.eq_ignore_ascii_case(right)
 }
 
 fn starts_ascii_case(text: &str, prefix: &str) -> bool {

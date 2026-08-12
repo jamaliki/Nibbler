@@ -3,13 +3,14 @@ use std::thread;
 use super::document::BlockKind;
 use super::error::ParseErrorCode;
 use super::lexer::Lexer;
-use super::parallel::{LoopKernel, LoopRange, ParallelLoop, ProjectedChunk, scan_projected_loop};
+use super::parallel::{LoopKernel, ParallelLoop, ProjectedChunk, scan_projected_loop};
 use super::projection::{
-    ColumnSpec, Predicate, ProjectionError, ProjectionErrorCode, ProjectionPlan,
+    ColumnSpec, ProjectionColumns, ProjectionError, ProjectionErrorCode, ProjectionPlan,
+    predicate_matches,
 };
 use super::sink::{ParseSink, ParsedValue};
 use super::source::SourceBuffer;
-use super::table::{CifCell, CifTable, ColumnBuilder, ColumnType, TableBuilder};
+use super::table::{CifCell, CifTable, ColumnBuilder, TableBuilder};
 use super::token::TokenKind;
 
 pub(super) struct TableSink {
@@ -27,9 +28,8 @@ pub(super) struct TableSink {
 
 struct LoopProjection {
     target_by_tag: Vec<Option<usize>>,
-    needed: Vec<ColumnSpec>,
+    columns: ProjectionColumns,
     values: Vec<Option<CifCell>>,
-    predicate_free: bool,
 }
 
 impl TableSink {
@@ -99,11 +99,12 @@ impl TableSink {
             .iter()
             .map(|(spec, _)| spec.clone())
             .collect();
-        let Some(needed) = self.prepare_columns(&available) else {
+        let Some(columns) = self.prepare_columns(&available) else {
             self.scalar_values.clear();
             return;
         };
-        let mut values = needed
+        let mut values = columns
+            .columns
             .iter()
             .map(|spec| {
                 self.scalar_values
@@ -113,10 +114,10 @@ impl TableSink {
             })
             .collect::<Vec<_>>();
         self.scalar_values.clear();
-        self.retain_row(&needed, &mut values);
+        self.retain_row(&columns, &mut values);
     }
 
-    fn prepare_columns(&mut self, available: &[ColumnSpec]) -> Option<Vec<ColumnSpec>> {
+    fn prepare_columns(&mut self, available: &[ColumnSpec]) -> Option<ProjectionColumns> {
         let outputs = self
             .plan
             .columns
@@ -135,17 +136,8 @@ impl TableSink {
             return None;
         }
 
-        let mut needed = outputs;
-        for predicate in &self.plan.predicates {
-            let Ok(spec) = normalize_column(&self.plan.category, predicate.column()) else {
-                debug_assert!(false, "predicate was validated when the plan was built");
-                continue;
-            };
-            if !needed.iter().any(|candidate| candidate.key == spec.key) {
-                needed.push(spec);
-            }
-        }
-        if let Some(missing) = needed.iter().find(|required| {
+        let columns = self.plan.prepare_columns(outputs);
+        if let Some(missing) = columns.columns.iter().find(|required| {
             !available
                 .iter()
                 .any(|candidate| candidate.key == required.key)
@@ -159,14 +151,25 @@ impl TableSink {
             );
             return None;
         }
-        Some(needed)
+        Some(columns)
     }
 
-    fn retain_row(&mut self, needed: &[ColumnSpec], values: &mut [Option<CifCell>]) {
+    fn retain_row(&mut self, columns: &ProjectionColumns, values: &mut [Option<CifCell>]) {
         if self.error.is_some() || values.iter().any(Option::is_none) {
             return;
         }
-        if !self.predicates_match(needed, values) {
+        if !self
+            .plan
+            .predicates
+            .iter()
+            .zip(&columns.predicate_columns)
+            .all(|(predicate, &index)| {
+                values
+                    .get(index)
+                    .and_then(Option::as_ref)
+                    .is_some_and(|cell| predicate_matches(&predicate.predicate, cell))
+            })
+        {
             return;
         }
         let mut append_error = None;
@@ -185,24 +188,6 @@ impl TableSink {
             return;
         }
         self.append_provenance();
-    }
-
-    fn predicates_match(&self, needed: &[ColumnSpec], values: &[Option<CifCell>]) -> bool {
-        self.plan.predicates.iter().all(|predicate| {
-            let Ok(spec) = normalize_column(&self.plan.category, predicate.column()) else {
-                return false;
-            };
-            let Some(index) = needed
-                .iter()
-                .position(|candidate| candidate.key == spec.key)
-            else {
-                return false;
-            };
-            let Some(cell) = values.get(index).and_then(Option::as_ref) else {
-                return false;
-            };
-            predicate_matches(predicate, cell)
-        })
     }
 
     fn set_error(&mut self, code: ProjectionErrorCode, message: impl Into<String>) {
@@ -230,7 +215,7 @@ impl TableSink {
             );
             return None;
         };
-        Some(ColumnSpec::from_item(item, column_type))
+        Some(ColumnSpec::new(item, column_type))
     }
 }
 
@@ -287,7 +272,7 @@ impl ParseSink for TableSink {
             self.current_loop = None;
             return;
         }
-        let Some(needed) = self.prepare_columns(&available) else {
+        let Some(columns) = self.prepare_columns(&available) else {
             return;
         };
         let target_by_tag = tags
@@ -298,16 +283,15 @@ impl ParseSink for TableSink {
                         return None;
                     }
                     let key = item.to_ascii_lowercase();
-                    needed.iter().position(|spec| spec.key == key)
+                    columns.columns.iter().position(|spec| spec.key == key)
                 })
             })
             .collect();
-        let values = vec![None; needed.len()];
+        let values = vec![None; columns.columns.len()];
         self.current_loop = Some(LoopProjection {
             target_by_tag,
-            needed,
+            columns,
             values,
-            predicate_free: self.plan.predicates.is_empty(),
         });
     }
 
@@ -321,7 +305,7 @@ impl ParseSink for TableSink {
         if self
             .current_loop
             .as_ref()
-            .is_some_and(|cif_loop| cif_loop.predicate_free)
+            .is_some_and(|cif_loop| cif_loop.columns.predicate_columns.is_empty())
         {
             let target_index = self
                 .current_loop
@@ -480,7 +464,7 @@ impl ParseSink for TableSink {
         if self
             .current_loop
             .as_ref()
-            .is_some_and(|cif_loop| cif_loop.predicate_free)
+            .is_some_and(|cif_loop| cif_loop.columns.predicate_columns.is_empty())
         {
             self.append_provenance();
             return;
@@ -488,7 +472,7 @@ impl ParseSink for TableSink {
         let Some(mut cif_loop) = self.current_loop.take() else {
             return;
         };
-        self.retain_row(&cif_loop.needed, &mut cif_loop.values);
+        self.retain_row(&cif_loop.columns, &mut cif_loop.values);
         cif_loop.values.fill(None);
         self.current_loop = Some(cif_loop);
     }
@@ -506,7 +490,7 @@ fn project_chunk_speculative(
     block_code: Option<&str>,
     frame_code: Option<&str>,
     tags: &[String],
-    range: LoopRange,
+    range: std::ops::Range<usize>,
     max_token_bytes: usize,
 ) -> ProjectedChunk<Result<CifTable, ProjectionError>> {
     let mut sink = TableSink::new(source_name, plan.clone());
@@ -604,74 +588,12 @@ fn project_chunk(
     sink.finish()
 }
 
-impl ColumnSpec {
-    pub(super) fn from_item(item: &str, column_type: ColumnType) -> Self {
-        Self {
-            name: item.to_owned(),
-            key: item.to_ascii_lowercase(),
-            column_type,
-        }
-    }
-}
-
 fn cell_from_value(value: &ParsedValue<'_>) -> CifCell {
     match (value.is_unquoted(), value.as_str()) {
         (true, "?") => CifCell::Unknown,
         (true, ".") => CifCell::NotApplicable,
         _ => CifCell::Text(value.as_str().to_owned()),
     }
-}
-
-pub(super) fn predicate_matches(predicate: &Predicate, cell: &CifCell) -> bool {
-    match predicate {
-        Predicate::Equal { value, .. } => cell.as_text() == Some(value),
-        Predicate::NotEqual { value, .. } => cell.as_text().is_some_and(|text| text != value),
-        Predicate::In { values, .. } => cell
-            .as_text()
-            .is_some_and(|text| values.iter().any(|value| value == text)),
-        Predicate::Missing { kind, .. } => cell
-            .missing_kind()
-            .is_some_and(|actual| kind.is_none_or(|expected| actual == expected)),
-    }
-}
-
-pub(super) fn normalize_category(category: &str) -> Result<String, ProjectionError> {
-    let category = category.strip_prefix('_').unwrap_or(category);
-    if category.is_empty()
-        || category.contains('.')
-        || category.bytes().any(|byte| byte.is_ascii_whitespace())
-    {
-        return Err(ProjectionError::new(
-            ProjectionErrorCode::InvalidCategory,
-            format!("invalid CIF category {category:?}"),
-        ));
-    }
-    Ok(category.to_ascii_lowercase())
-}
-
-pub(super) fn normalize_column(
-    category: &str,
-    selector: &str,
-) -> Result<ColumnSpec, ProjectionError> {
-    let selector = selector.strip_prefix('_').unwrap_or(selector);
-    let item = if let Some((selected_category, item)) = selector.split_once('.') {
-        if !selected_category.eq_ignore_ascii_case(category) {
-            return Err(ProjectionError::new(
-                ProjectionErrorCode::InvalidColumn,
-                format!("column {selector:?} does not belong to category {category:?}"),
-            ));
-        }
-        item
-    } else {
-        selector
-    };
-    if item.is_empty() || item.bytes().any(|byte| byte.is_ascii_whitespace()) {
-        return Err(ProjectionError::new(
-            ProjectionErrorCode::InvalidColumn,
-            format!("invalid CIF column {selector:?}"),
-        ));
-    }
-    Ok(ColumnSpec::from_item(item, ColumnType::Text))
 }
 
 fn split_tag(tag: &str) -> Option<(&str, &str)> {

@@ -12,21 +12,6 @@ class NibblerError(Exception):
     """Base class for errors raised by Nibbler."""
 
 
-class FeatureUnavailableError(NibblerError):
-    """Raised when an API belongs to a later implementation phase."""
-
-    operation: str
-    required_phase: int
-
-    def __init__(self, operation: str, required_phase: int) -> None:
-        self.operation = operation
-        self.required_phase = required_phase
-        super().__init__(
-            f"{operation} is not implemented in this build; "
-            f"it is scheduled for Phase {required_phase}"
-        )
-
-
 class ParseError(NibblerError):
     """A structured source, decompression, or CIF syntax failure."""
 

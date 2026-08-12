@@ -19,7 +19,6 @@ from .contracts import (
 from .errors import (
     BatchError,
     ChemistryError,
-    FeatureUnavailableError,
     NibblerError,
     ParseError,
     ProjectionError,
@@ -35,7 +34,6 @@ __all__ = [
     "CifDocument",
     "CifTable",
     "Diagnostic",
-    "FeatureUnavailableError",
     "MissingKind",
     "MmcifModel",
     "NibblerError",

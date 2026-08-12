@@ -353,11 +353,10 @@ impl SourceCell {
         let bytes = source.as_str().as_bytes();
         let start = self.span_start as usize;
         let end = self.span_end as usize;
-        let line_start = start == 0 || matches!(bytes[start - 1], b'\n' | b'\r');
         let (content, quote_style) = match bytes[start] {
             b'\'' => (start + 1..end - 1, QuoteStyle::Single),
             b'"' => (start + 1..end - 1, QuoteStyle::Double),
-            b';' if line_start => (
+            b';' if start == 0 || matches!(bytes[start - 1], b'\n' | b'\r') => (
                 start + 1..preceding_line_ending_start(bytes, end - 1),
                 QuoteStyle::TextField,
             ),
@@ -804,23 +803,19 @@ impl CifBlock {
 /// An order-preserving generic CIF document.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CifDocument {
-    blocks: Vec<CifBlock>,
+    blocks: Arc<[CifBlock]>,
 }
 
 impl CifDocument {
     pub(crate) fn new(blocks: Vec<CifBlock>) -> Self {
-        Self { blocks }
+        Self {
+            blocks: blocks.into(),
+        }
     }
 
     /// Return blocks in source order.
     #[must_use]
     pub fn blocks(&self) -> &[CifBlock] {
         &self.blocks
-    }
-
-    /// Return whether the document has no blocks.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.blocks.is_empty()
     }
 }

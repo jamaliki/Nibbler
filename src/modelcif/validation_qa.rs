@@ -2,8 +2,10 @@
 
 use std::collections::BTreeSet;
 
+use crate::pdbx::category::case_key;
+
 use super::qa::{QaValue, ResidueSite};
-use super::validation::{Validator, fold};
+use super::validation::Validator;
 
 impl Validator<'_> {
     pub(super) fn qa(&mut self) {
@@ -22,9 +24,9 @@ impl Validator<'_> {
                 atom.label_seq_id().map(|sequence_id| {
                     (
                         atom.model_number(),
-                        fold(asym_id),
+                        case_key(asym_id),
                         sequence_id,
-                        fold(component_id),
+                        case_key(component_id),
                     )
                 })
             })
@@ -101,9 +103,9 @@ impl Validator<'_> {
     ) {
         let key = (
             model_id,
-            fold(&site.asym_id),
+            case_key(&site.asym_id),
             site.sequence_id,
-            fold(&site.component_id),
+            case_key(&site.component_id),
         );
         if !sites.contains(&key) {
             self.error(

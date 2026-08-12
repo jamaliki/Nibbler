@@ -1,5 +1,6 @@
 //! Target, data, and prediction-model row decoding.
 
+use crate::pdbx::SemanticError;
 use crate::pdbx::category::CategoryIndex;
 
 use super::fields::{optional_integer, optional_text, required_integer, required_text};
@@ -8,11 +9,10 @@ use super::model::{
     TargetInstance,
 };
 use super::provenance::DataGroupMember;
-use super::source::ModelCifError;
 
 pub(super) fn audit_conform(
     categories: &CategoryIndex<'_>,
-) -> Result<Vec<(String, String)>, ModelCifError> {
+) -> Result<Vec<(String, String)>, SemanticError> {
     categories
         .rows("audit_conform")
         .iter()
@@ -26,7 +26,7 @@ pub(super) fn audit_conform(
         .collect()
 }
 
-pub(super) fn data(categories: &CategoryIndex<'_>) -> Result<Vec<Data>, ModelCifError> {
+pub(super) fn data(categories: &CategoryIndex<'_>) -> Result<Vec<Data>, SemanticError> {
     categories
         .rows("ma_data")
         .iter()
@@ -43,7 +43,7 @@ pub(super) fn data(categories: &CategoryIndex<'_>) -> Result<Vec<Data>, ModelCif
 
 pub(super) fn data_groups(
     categories: &CategoryIndex<'_>,
-) -> Result<Vec<DataGroupMember>, ModelCifError> {
+) -> Result<Vec<DataGroupMember>, SemanticError> {
     categories
         .rows("ma_data_group")
         .iter()
@@ -58,7 +58,7 @@ pub(super) fn data_groups(
         .collect()
 }
 
-pub(super) fn targets(categories: &CategoryIndex<'_>) -> Result<Vec<TargetEntity>, ModelCifError> {
+pub(super) fn targets(categories: &CategoryIndex<'_>) -> Result<Vec<TargetEntity>, SemanticError> {
     categories
         .rows("ma_target_entity")
         .iter()
@@ -75,7 +75,7 @@ pub(super) fn targets(categories: &CategoryIndex<'_>) -> Result<Vec<TargetEntity
 
 pub(super) fn target_instances(
     categories: &CategoryIndex<'_>,
-) -> Result<Vec<TargetInstance>, ModelCifError> {
+) -> Result<Vec<TargetInstance>, SemanticError> {
     categories
         .rows("ma_target_entity_instance")
         .iter()
@@ -92,7 +92,7 @@ pub(super) fn target_instances(
 
 pub(super) fn models(
     categories: &CategoryIndex<'_>,
-) -> Result<Vec<PredictionModel>, ModelCifError> {
+) -> Result<Vec<PredictionModel>, SemanticError> {
     categories
         .rows("ma_model_list")
         .iter()
@@ -112,7 +112,7 @@ pub(super) fn models(
 
 pub(super) fn model_groups(
     categories: &CategoryIndex<'_>,
-) -> Result<Vec<ModelGroup>, ModelCifError> {
+) -> Result<Vec<ModelGroup>, SemanticError> {
     categories
         .rows("ma_model_group")
         .iter()
@@ -129,7 +129,7 @@ pub(super) fn model_groups(
 
 pub(super) fn model_group_links(
     categories: &CategoryIndex<'_>,
-) -> Result<Vec<ModelGroupLink>, ModelCifError> {
+) -> Result<Vec<ModelGroupLink>, SemanticError> {
     categories
         .rows("ma_model_group_link")
         .iter()
@@ -145,7 +145,7 @@ pub(super) fn model_group_links(
 
 pub(super) fn representatives(
     categories: &CategoryIndex<'_>,
-) -> Result<Vec<ModelRepresentative>, ModelCifError> {
+) -> Result<Vec<ModelRepresentative>, SemanticError> {
     categories
         .rows("ma_model_representative")
         .iter()

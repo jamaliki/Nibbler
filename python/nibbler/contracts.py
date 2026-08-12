@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum, unique
 
@@ -81,11 +80,6 @@ class ValidationReport:
     schema: str | None = None
     dictionary_version: str | None = None
     coverage: tuple[str, ...] = ()
-
-    @classmethod
-    def from_iterable(cls, diagnostics: Iterable[Diagnostic]) -> ValidationReport:
-        """Construct a report while taking an immutable snapshot."""
-        return cls(tuple(diagnostics))
 
     @property
     def errors(self) -> tuple[Diagnostic, ...]:

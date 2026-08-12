@@ -10,24 +10,20 @@ import statistics
 import subprocess
 import sys
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:  # pragma: no cover - Python 3.10
-    import tomli as tomllib
+from typing import Any, Protocol, TypeVar, cast
 
 import nibbler
 from nibbler import CifDocument, CifTable
 
+from .corpus import DEFAULT_MANIFEST, Structure, load_structures, select_structures
 from .run import peak_rss_bytes, require_release_nibbler
 
-MANIFEST = Path("benchmarks/pdb_corpus.toml")
 DEFAULT_CORPUS = Path(".cache/pdb-stress")
 PROJECTED_COLUMNS = ("label_comp_id", "Cartn_x", "Cartn_y", "Cartn_z")
+T = TypeVar("T")
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,9 +64,28 @@ class StructureResult:
     projections_equal: bool
 
 
+@dataclass(frozen=True, slots=True)
+class StressReport:
+    command: str
+    platform: str
+    machine: str
+    python: str
+    nibbler: str
+    warmups: int
+    samples: int
+    columns: tuple[str, ...]
+    structures: tuple[StructureResult, ...]
+
+
+class ArrowTable(Protocol):
+    def __len__(self) -> int: ...
+
+    def equals(self, other: object) -> bool: ...
+
+
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--manifest", type=Path, default=MANIFEST)
+    parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--corpus", type=Path, default=DEFAULT_CORPUS)
     parser.add_argument("--ids", nargs="*", default=[])
     parser.add_argument(
@@ -87,27 +102,17 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def load_structures(manifest: Path) -> list[Mapping[str, Any]]:
-    with manifest.open("rb") as stream:
-        document: dict[str, Any] = tomllib.load(stream)
-    structures = document.get("structures")
-    if not isinstance(structures, list):
-        raise RuntimeError(f"{manifest}: missing [[structures]] entries")
-    return structures
-
-
 def timed(
-    operation: Callable[[], object],
+    operation: Callable[[], T],
     *,
     warmups: int,
     samples: int,
     input_bytes: int | None = None,
-) -> tuple[StageResult, object]:
+) -> tuple[StageResult, T]:
     if warmups < 0 or samples < 1:
         raise ValueError("warmups must be non-negative and samples must be positive")
-    result: object = None
     for _ in range(warmups):
-        result = operation()
+        operation()
     durations = []
     for _ in range(samples):
         start = time.perf_counter_ns()
@@ -163,8 +168,6 @@ def run_format(
         samples=samples,
         input_bytes=logical_input_bytes,
     )
-    if not isinstance(native_table, CifTable):
-        raise RuntimeError(f"{file}: native stage returned the wrong type")
     arrow_result, arrow_table = timed(
         native_table.to_pyarrow,
         warmups=warmups,
@@ -202,7 +205,7 @@ def selected_formats(value: str) -> tuple[str, ...]:
 
 
 def run_structure(
-    structure: Mapping[str, Any],
+    structure: Structure,
     corpus: Path,
     formats: tuple[str, ...],
     *,
@@ -210,15 +213,13 @@ def run_structure(
     samples: int,
     full_document: bool,
 ) -> StructureResult:
-    pdb_id = str(structure["id"])
+    pdb_id = structure.pdb_id
     results = []
-    arrows: dict[str, object] = {}
+    arrows: dict[str, ArrowTable] = {}
     for file_format in formats:
-        manifest_key = file_format.replace(".", "_")
-        logical_input_bytes = int(
-            structure["cif_bytes"]
-            if file_format == "cif.gz"
-            else structure[f"{manifest_key}_bytes"]
+        expected = structure.file(file_format)
+        logical_input_bytes = (
+            structure.cif.bytes if file_format == "cif.gz" else expected.bytes
         )
         result, arrow_table = run_format(
             corpus / f"{pdb_id}.{file_format}",
@@ -228,27 +229,26 @@ def run_structure(
             samples=samples,
             full_document=full_document,
         )
-        expected_bytes = int(structure[f"{manifest_key}_bytes"])
-        expected_digest = str(structure[f"{manifest_key}_sha256"])
-        if result.input_bytes != expected_bytes or result.sha256 != expected_digest:
+        if result.input_bytes != expected.bytes or result.sha256 != expected.sha256:
             raise RuntimeError(f"{pdb_id}.{file_format}: corpus manifest mismatch")
-        if len(arrow_table) != int(structure["atom_rows"]):  # type: ignore[arg-type]
+        arrow = cast(ArrowTable, arrow_table)
+        if len(arrow) != structure.atom_rows:
             raise RuntimeError(f"{pdb_id}.{file_format}: atom-row count mismatch")
         results.append(result)
-        arrows[file_format] = arrow_table
+        arrows[file_format] = arrow
     equal = True
     reference_format = "cif" if "cif" in arrows else next(iter(arrows))
     reference = arrows[reference_format]
     for file_format, arrow_table in arrows.items():
         if file_format == reference_format:
             continue
-        equal = equal and bool(reference.equals(arrow_table))  # type: ignore[attr-defined]
+        equal = equal and reference.equals(arrow_table)
     if not equal:
         raise RuntimeError(f"{pdb_id}: projected formats differ")
     return StructureResult(
         pdb_id=pdb_id,
-        workload=str(structure["workload"]),
-        atom_rows=int(structure["atom_rows"]),
+        workload=structure.workload,
+        atom_rows=structure.atom_rows,
         formats=tuple(results),
         projections_equal=equal,
     )
@@ -284,7 +284,7 @@ def render(results: Sequence[StructureResult]) -> str:
     return "\n".join(lines)
 
 
-def report(arguments: argparse.Namespace) -> dict[str, object]:
+def report(arguments: argparse.Namespace) -> StressReport:
     require_release_nibbler()
     if arguments.download:
         command = [
@@ -299,11 +299,7 @@ def report(arguments: argparse.Namespace) -> dict[str, object]:
         if arguments.ids:
             command.extend(["--ids", *arguments.ids])
         subprocess.run(command, check=True)
-    structures = load_structures(arguments.manifest)
-    selected = set(arguments.ids)
-    known = {str(structure["id"]) for structure in structures}
-    if unknown := selected - known:
-        raise RuntimeError(f"unknown PDB IDs: {', '.join(sorted(unknown))}")
+    structures = select_structures(load_structures(arguments.manifest), arguments.ids)
     formats = selected_formats(arguments.formats)
     results = tuple(
         run_structure(
@@ -315,20 +311,18 @@ def report(arguments: argparse.Namespace) -> dict[str, object]:
             full_document=arguments.full_document,
         )
         for structure in structures
-        if not selected or str(structure["id"]) in selected
     )
-    return {
-        "command": " ".join(sys.argv),
-        "platform": platform.platform(),
-        "machine": platform.machine(),
-        "python": platform.python_version(),
-        "nibbler": nibbler.__version__,
-        "warmups": arguments.warmups,
-        "samples": arguments.samples,
-        "columns": list(PROJECTED_COLUMNS),
-        "structures": [asdict(result) for result in results],
-        "rendered": render(results),
-    }
+    return StressReport(
+        command=" ".join(sys.argv),
+        platform=platform.platform(),
+        machine=platform.machine(),
+        python=platform.python_version(),
+        nibbler=nibbler.__version__,
+        warmups=arguments.warmups,
+        samples=arguments.samples,
+        columns=PROJECTED_COLUMNS,
+        structures=results,
+    )
 
 
 def run_document_worker(file: Path, warmups: int, samples: int) -> FullDocumentResult:
@@ -396,11 +390,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     report_result = report(arguments)
     if arguments.as_json:
-        output = dict(report_result)
-        output.pop("rendered")
-        print(json.dumps(output, indent=2, sort_keys=True))
+        print(json.dumps(asdict(report_result), indent=2, sort_keys=True))
     else:
-        print(report_result["rendered"])
+        print(render(report_result.structures))
     return 0
 
 

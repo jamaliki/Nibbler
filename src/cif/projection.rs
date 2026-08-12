@@ -6,10 +6,10 @@ use std::sync::Arc;
 use super::SchemaName;
 use super::error::ParseError;
 use super::parser::{ParseOptions, parse_source_into};
-use super::projection_sink::{TableSink, normalize_category, normalize_column};
+use super::projection_sink::TableSink;
 use super::schema::loaded_schema;
 use super::source::SourceBuffer;
-use super::table::{CifTable, ColumnType, MissingKind};
+use super::table::{CifCell, CifTable, ColumnType, MissingKind};
 
 /// One native predicate evaluated while parsing projected rows.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -60,7 +60,7 @@ impl Predicate {
 pub struct ProjectionPlan {
     pub(super) category: String,
     pub(super) columns: Option<Vec<ColumnSpec>>,
-    pub(super) predicates: Vec<Predicate>,
+    pub(super) predicates: Vec<PlannedPredicate>,
     pub(super) schema_types: Option<Arc<BTreeMap<String, ColumnType>>>,
 }
 
@@ -69,6 +69,27 @@ pub(super) struct ColumnSpec {
     pub(super) name: String,
     pub(super) key: String,
     pub(super) column_type: ColumnType,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) struct PlannedPredicate {
+    pub(super) predicate: Predicate,
+    pub(super) column: ColumnSpec,
+}
+
+pub(super) struct ProjectionColumns {
+    pub(super) columns: Vec<ColumnSpec>,
+    pub(super) predicate_columns: Vec<usize>,
+}
+
+impl ColumnSpec {
+    pub(super) fn new(name: &str, column_type: ColumnType) -> Self {
+        Self {
+            name: name.to_owned(),
+            key: name.to_ascii_lowercase(),
+            column_type,
+        }
+    }
 }
 
 impl ProjectionPlan {
@@ -129,7 +150,7 @@ impl ProjectionPlan {
         if let Some(types) = &self.schema_types {
             schema_column_type(types, &self.category, &column, "predicate item")?;
         }
-        self.predicates.push(predicate);
+        self.predicates.push(PlannedPredicate { predicate, column });
         Ok(self)
     }
 
@@ -177,8 +198,7 @@ impl ProjectionPlan {
             }
         }
         for predicate in &self.predicates {
-            let column = normalize_column(&self.category, predicate.column())?;
-            schema_column_type(&types, &self.category, &column, "predicate item")?;
+            schema_column_type(&types, &self.category, &predicate.column, "predicate item")?;
         }
         self.schema_types = Some(Arc::new(types));
         Ok(self)
@@ -190,6 +210,80 @@ impl ProjectionPlan {
             .and_then(|types| types.get(&item.to_ascii_lowercase()).copied())
             .or_else(|| self.schema_types.is_none().then_some(ColumnType::Text))
     }
+
+    pub(super) fn prepare_columns(&self, outputs: Vec<ColumnSpec>) -> ProjectionColumns {
+        let mut columns = outputs;
+        let mut predicate_columns = Vec::with_capacity(self.predicates.len());
+        for predicate in &self.predicates {
+            let column_index = match columns
+                .iter()
+                .position(|candidate| candidate.key == predicate.column.key)
+            {
+                Some(index) => index,
+                None => {
+                    columns.push(predicate.column.clone());
+                    columns.len() - 1
+                }
+            };
+            predicate_columns.push(column_index);
+        }
+        ProjectionColumns {
+            columns,
+            predicate_columns,
+        }
+    }
+}
+
+pub(super) fn predicate_matches(predicate: &Predicate, cell: &CifCell) -> bool {
+    match predicate {
+        Predicate::Equal { value, .. } => cell.as_text() == Some(value),
+        Predicate::NotEqual { value, .. } => cell.as_text().is_some_and(|text| text != value),
+        Predicate::In { values, .. } => cell
+            .as_text()
+            .is_some_and(|text| values.iter().any(|value| value == text)),
+        Predicate::Missing { kind, .. } => cell
+            .missing_kind()
+            .is_some_and(|actual| kind.is_none_or(|expected| actual == expected)),
+    }
+}
+
+pub(super) fn normalize_category(category: &str) -> Result<String, ProjectionError> {
+    let category = category.strip_prefix('_').unwrap_or(category);
+    if category.is_empty()
+        || category.contains('.')
+        || category.bytes().any(|byte| byte.is_ascii_whitespace())
+    {
+        return Err(ProjectionError::new(
+            ProjectionErrorCode::InvalidCategory,
+            format!("invalid CIF category {category:?}"),
+        ));
+    }
+    Ok(category.to_ascii_lowercase())
+}
+
+pub(super) fn normalize_column(
+    category: &str,
+    selector: &str,
+) -> Result<ColumnSpec, ProjectionError> {
+    let selector = selector.strip_prefix('_').unwrap_or(selector);
+    let item = if let Some((selected_category, item)) = selector.split_once('.') {
+        if !selected_category.eq_ignore_ascii_case(category) {
+            return Err(ProjectionError::new(
+                ProjectionErrorCode::InvalidColumn,
+                format!("column {selector:?} does not belong to category {category:?}"),
+            ));
+        }
+        item
+    } else {
+        selector
+    };
+    if item.is_empty() || item.bytes().any(|byte| byte.is_ascii_whitespace()) {
+        return Err(ProjectionError::new(
+            ProjectionErrorCode::InvalidColumn,
+            format!("invalid CIF column {selector:?}"),
+        ));
+    }
+    Ok(ColumnSpec::new(item, ColumnType::Text))
 }
 
 fn schema_column_type(

@@ -55,6 +55,16 @@ pub(super) fn loop_reaches(
     false
 }
 
+fn starts_ascii_case(token: &[u8], prefix: &[u8]) -> bool {
+    token
+        .get(..prefix.len())
+        .is_some_and(|candidate| candidate.eq_ignore_ascii_case(prefix))
+}
+
+fn is_line_start(bytes: &[u8], offset: usize) -> bool {
+    offset == 0 || matches!(bytes[offset - 1], b'\n' | b'\r')
+}
+
 fn quoted_end(bytes: &[u8], start: usize) -> Option<usize> {
     let quote = bytes[start];
     let mut cursor = start + 1;
@@ -113,16 +123,6 @@ fn is_value(token: &[u8]) -> bool {
         Some(b's') if starts_ascii_case(token, b"save_") => false,
         _ => true,
     }
-}
-
-fn starts_ascii_case(token: &[u8], prefix: &[u8]) -> bool {
-    token
-        .get(..prefix.len())
-        .is_some_and(|candidate| candidate.eq_ignore_ascii_case(prefix))
-}
-
-fn is_line_start(bytes: &[u8], offset: usize) -> bool {
-    offset == 0 || matches!(bytes[offset - 1], b'\n' | b'\r')
 }
 
 #[cfg(test)]

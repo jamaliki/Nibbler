@@ -1,7 +1,8 @@
 use std::borrow::Cow;
 
-use super::codec::{DecodedColumn, decode_data};
+use super::codec::decode_data;
 use super::model::{BinaryData, Encoding};
+use crate::cif::document::ColumnValues;
 
 fn bytes(data: Vec<u8>, encoding: Vec<Encoding<'static>>) -> BinaryData<'static> {
     BinaryData {
@@ -29,7 +30,7 @@ fn decodes_numeric_encoding_chains_in_reverse_order() {
             Encoding::ByteArray { data_type: 3 },
         ],
     ));
-    assert!(matches!(fixed, Ok(DecodedColumn::Floats(values)) if values == [1.2, -2.5]));
+    assert!(matches!(fixed, Ok(ColumnValues::Floats(values)) if values == [1.2, -2.5]));
 
     let interval = decode_data(bytes(
         int32(&[0, 2, 4]),
@@ -43,7 +44,7 @@ fn decodes_numeric_encoding_chains_in_reverse_order() {
             Encoding::ByteArray { data_type: 3 },
         ],
     ));
-    assert!(matches!(interval, Ok(DecodedColumn::Floats(values)) if values == [-1.0, 0.0, 1.0]));
+    assert!(matches!(interval, Ok(ColumnValues::Floats(values)) if values == [-1.0, 0.0, 1.0]));
 
     let packed = decode_data(bytes(
         vec![127, 3, 128, 254],
@@ -56,7 +57,7 @@ fn decodes_numeric_encoding_chains_in_reverse_order() {
             Encoding::ByteArray { data_type: 1 },
         ],
     ));
-    assert!(matches!(packed, Ok(DecodedColumn::Integers(values)) if values == [130, -130]));
+    assert!(matches!(packed, Ok(ColumnValues::Integers(values)) if values == [130, -130]));
 }
 
 #[test]
@@ -71,7 +72,7 @@ fn decodes_run_length_delta_and_compact_string_arrays() {
             Encoding::ByteArray { data_type: 3 },
         ],
     ));
-    assert!(matches!(run_length, Ok(DecodedColumn::Integers(values)) if values == [7, 7, 9, 9, 9]));
+    assert!(matches!(run_length, Ok(ColumnValues::Integers(values)) if values == [7, 7, 9, 9, 9]));
 
     let delta = decode_data(bytes(
         int32(&[2, -1, 4]),
@@ -83,7 +84,7 @@ fn decodes_run_length_delta_and_compact_string_arrays() {
             Encoding::ByteArray { data_type: 3 },
         ],
     ));
-    assert!(matches!(delta, Ok(DecodedColumn::Integers(values)) if values == [12, 11, 15]));
+    assert!(matches!(delta, Ok(ColumnValues::Integers(values)) if values == [12, 11, 15]));
 
     let strings = decode_data(bytes(
         int32(&[1, 0, -1, 1]),
@@ -94,7 +95,7 @@ fn decodes_run_length_delta_and_compact_string_arrays() {
             offsets: Cow::Owned(int32(&[0, 3, 6])),
         }],
     ));
-    let Ok(DecodedColumn::Strings(values)) = strings else {
+    let Ok(ColumnValues::Strings(values)) = strings else {
         unreachable!("StringArray fixture must decode to strings");
     };
     assert_eq!(values.value(0), "ATP");
@@ -133,6 +134,6 @@ fn rejects_truncated_arrays_and_out_of_range_string_indices() {
     ));
     assert!(matches!(
         empty_dictionary,
-        Ok(DecodedColumn::Strings(values)) if values.value(0).is_empty()
+        Ok(ColumnValues::Strings(values)) if values.value(0).is_empty()
     ));
 }

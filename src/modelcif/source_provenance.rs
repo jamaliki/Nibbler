@@ -1,14 +1,14 @@
 //! Software, protocol, and associated-file row decoding.
 
+use crate::pdbx::SemanticError;
 use crate::pdbx::category::CategoryIndex;
 
 use super::fields::{optional_integer, optional_text, required_integer, required_text};
 use super::provenance::{
     ArchiveMember, AssociatedFile, ProtocolStep, Software, SoftwareGroupMember,
 };
-use super::source::ModelCifError;
 
-pub(super) fn software(categories: &CategoryIndex<'_>) -> Result<Vec<Software>, ModelCifError> {
+pub(super) fn software(categories: &CategoryIndex<'_>) -> Result<Vec<Software>, SemanticError> {
     categories
         .rows("software")
         .iter()
@@ -28,7 +28,7 @@ pub(super) fn software(categories: &CategoryIndex<'_>) -> Result<Vec<Software>, 
 
 pub(super) fn software_groups(
     categories: &CategoryIndex<'_>,
-) -> Result<Vec<SoftwareGroupMember>, ModelCifError> {
+) -> Result<Vec<SoftwareGroupMember>, SemanticError> {
     categories
         .rows("ma_software_group")
         .iter()
@@ -51,7 +51,7 @@ pub(super) fn software_groups(
 
 pub(super) fn protocol_steps(
     categories: &CategoryIndex<'_>,
-) -> Result<Vec<ProtocolStep>, ModelCifError> {
+) -> Result<Vec<ProtocolStep>, SemanticError> {
     categories
         .rows("ma_protocol_step")
         .iter()
@@ -89,7 +89,7 @@ pub(super) fn protocol_steps(
 
 pub(super) fn associated_files(
     categories: &CategoryIndex<'_>,
-) -> Result<Vec<AssociatedFile>, ModelCifError> {
+) -> Result<Vec<AssociatedFile>, SemanticError> {
     categories
         .rows("ma_entry_associated_files")
         .iter()
@@ -111,7 +111,7 @@ pub(super) fn associated_files(
 
 pub(super) fn archive_members(
     categories: &CategoryIndex<'_>,
-) -> Result<Vec<ArchiveMember>, ModelCifError> {
+) -> Result<Vec<ArchiveMember>, SemanticError> {
     categories
         .rows("ma_associated_archive_file_details")
         .iter()

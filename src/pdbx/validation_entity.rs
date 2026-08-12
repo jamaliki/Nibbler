@@ -2,8 +2,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use super::category::case_key;
 use super::model::{Entity, EntityKind};
-use super::validation::{Validator, equal, fold};
+use super::validation::{Validator, equal};
 
 impl Validator<'_> {
     pub(super) fn entities(&mut self) {
@@ -30,7 +31,7 @@ impl Validator<'_> {
         let sequence = entity
             .sequence()
             .iter()
-            .map(|monomer| (monomer.number(), fold(monomer.component_id())))
+            .map(|monomer| (monomer.number(), case_key(monomer.component_id())))
             .collect::<BTreeMap<_, _>>();
         for asym_id in self.asym_ids_for_entity(entity.id()) {
             for (number, component_id) in &sequence {
@@ -42,7 +43,7 @@ impl Validator<'_> {
                         equal(&row.asym_id, &asym_id)
                             && equal(&row.entity_id, entity.id())
                             && row.seq_id == *number
-                            && fold(&row.component_id) == *component_id
+                            && case_key(&row.component_id) == *component_id
                     })
                     .count();
                 if count != 1 {
@@ -162,7 +163,7 @@ impl Validator<'_> {
 
     pub(super) fn asym_units(&mut self) {
         for asym in self.model.asym_units() {
-            if !self.entities.contains_key(&fold(asym.entity_id())) {
+            if !self.entities.contains_key(&case_key(asym.entity_id())) {
                 self.error(
                     "PDBX_ASYM_ENTITY",
                     format!(

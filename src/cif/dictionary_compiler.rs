@@ -78,7 +78,7 @@ pub fn compile_dictionary(
     }
     apply_aliases(&mut dictionary, pending_aliases)?;
     apply_links(&mut dictionary, pending_links)?;
-    resolve_inherited_constraints(&mut dictionary)?;
+    resolve_inherited_constraints(&mut dictionary);
     validate_compiled_dictionary(&dictionary)?;
     Ok(dictionary)
 }
@@ -354,7 +354,7 @@ fn apply_links(
     Ok(())
 }
 
-fn resolve_inherited_constraints(dictionary: &mut Dictionary) -> Result<(), DictionaryError> {
+fn resolve_inherited_constraints(dictionary: &mut Dictionary) {
     loop {
         let inherited = dictionary
             .items
@@ -400,7 +400,6 @@ fn resolve_inherited_constraints(dictionary: &mut Dictionary) -> Result<(), Dict
             item.type_code = "any".to_owned();
         }
     }
-    Ok(())
 }
 
 fn validate_compiled_dictionary(dictionary: &Dictionary) -> Result<(), DictionaryError> {

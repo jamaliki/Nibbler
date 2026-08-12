@@ -11,6 +11,14 @@ pub(super) struct RawChunk {
     pub(super) end: usize,
 }
 
+fn is_line_start(bytes: &[u8], byte_offset: usize) -> bool {
+    byte_offset == 0 || matches!(bytes[byte_offset - 1], b'\n' | b'\r')
+}
+
+const fn is_whitespace(byte: u8) -> bool {
+    matches!(byte, b' ' | b'\t' | b'\n' | b'\r')
+}
+
 #[derive(Clone, Copy)]
 struct BoundarySummary {
     end_state: [bool; 2],
@@ -164,14 +172,6 @@ fn boundary_scan_starts(bytes: &[u8], start: usize, targets: &[usize]) -> (Vec<u
         }
     }
     (starts, target_blocks)
-}
-
-fn is_line_start(bytes: &[u8], byte_offset: usize) -> bool {
-    byte_offset == 0 || matches!(bytes[byte_offset - 1], b'\n' | b'\r')
-}
-
-const fn is_whitespace(byte: u8) -> bool {
-    matches!(byte, b' ' | b'\t' | b'\n' | b'\r')
 }
 
 #[cfg(test)]

@@ -2,14 +2,16 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::cif::{
-    CifDocument, SchemaError, SchemaName, Severity, validate_document as validate_cif,
+use crate::cif::{CifDocument, SchemaError, SchemaName, validate_document as validate_cif};
+use crate::pdbx::category::case_key;
+use crate::pdbx::profile::dictionary_diagnostics;
+use crate::pdbx::{
+    ProfileDiagnostic, ProfileSeverity, ProfileValidationReport,
+    validate_model as validate_pdbx_model,
 };
-use crate::pdbx::{ProfileDiagnostic, ProfileSeverity, validate_model as validate_pdbx_model};
 
 use super::aggregate::ModelCifModel;
 use super::model::TargetEntity;
-use super::profile::ModelCifValidationReport;
 use super::provenance::Software;
 use super::qa::QaMetric;
 use super::source::build_model;
@@ -19,39 +21,40 @@ use super::source::build_model;
 /// # Errors
 ///
 /// Returns an error only if the embedded dictionary cannot be loaded.
-pub fn validate_document(document: &CifDocument) -> Result<ModelCifValidationReport, SchemaError> {
+pub fn validate_document(document: &CifDocument) -> Result<ProfileValidationReport, SchemaError> {
     let dictionary = validate_cif(document, SchemaName::ModelCif)?;
-    let mut diagnostics = dictionary
-        .diagnostics()
-        .iter()
-        .map(|finding| {
-            ProfileDiagnostic::new(
-                finding.code(),
-                match finding.severity() {
-                    Severity::Error => ProfileSeverity::Error,
-                    Severity::Warning => ProfileSeverity::Warning,
-                },
-                finding.message(),
-                finding.context().to_vec(),
-            )
-        })
-        .collect::<Vec<_>>();
+    let mut diagnostics = dictionary_diagnostics(&dictionary);
     match build_model(document) {
         Ok(model) => diagnostics.extend(validate_semantics(&model)),
-        Err(error) => diagnostics.push(ProfileDiagnostic::new(
-            error.code(),
-            ProfileSeverity::Error,
-            error.message(),
-            error.context().to_vec(),
-        )),
+        Err(error) => diagnostics.push(ProfileDiagnostic::from_semantic(&error)),
     }
-    Ok(ModelCifValidationReport::new(diagnostics))
+    Ok(report(diagnostics))
 }
 
 /// Validate an already constructed ModelCIF model.
 #[must_use]
-pub fn validate_model(model: &ModelCifModel) -> ModelCifValidationReport {
-    ModelCifValidationReport::new(validate_semantics(model))
+pub fn validate_model(model: &ModelCifModel) -> ProfileValidationReport {
+    report(validate_semantics(model))
+}
+
+fn report(diagnostics: Vec<ProfileDiagnostic>) -> ProfileValidationReport {
+    ProfileValidationReport::new(
+        "1.4.9",
+        &[
+            "modelcif-ddl2-1.4.9",
+            "pdbx-coordinate-semantics",
+            "prediction-targets",
+            "model-groups",
+            "software-provenance",
+            "protocol-data-flow",
+            "template-mappings-alignments",
+            "qa-definitions-values",
+            "associated-files-archives",
+            "confidence-b-factor-separation",
+        ],
+        "MODELCIF_DIAGNOSTICS_TRUNCATED",
+        diagnostics,
+    )
 }
 
 fn validate_semantics(model: &ModelCifModel) -> Vec<ProfileDiagnostic> {
@@ -108,12 +111,12 @@ impl<'a> Validator<'a> {
             target_entities: model
                 .targets
                 .iter()
-                .map(|value| (fold(&value.entity_id), value))
+                .map(|value| (case_key(&value.entity_id), value))
                 .collect(),
             target_instances: model
                 .target_instances
                 .iter()
-                .map(|value| fold(&value.asym_id))
+                .map(|value| case_key(&value.asym_id))
                 .collect(),
             metrics: model
                 .qa_metrics
@@ -220,8 +223,4 @@ impl<'a> Validator<'a> {
             context,
         ));
     }
-}
-
-pub(super) fn fold(value: &str) -> String {
-    value.to_ascii_lowercase()
 }

@@ -2,7 +2,7 @@ use super::document::CifDocument;
 use super::schema::{SchemaError, SchemaName, loaded_schema};
 use super::validation_engine::validate;
 
-const MAX_DIAGNOSTICS: usize = 10_000;
+pub(super) const MAX_DIAGNOSTICS: usize = 10_000;
 const COVERAGE: &[&str] = &[
     "known-categories-items",
     "ddl2-type-patterns",

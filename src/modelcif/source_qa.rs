@@ -1,14 +1,14 @@
 //! Global, local, and pairwise QA row decoding.
 
+use crate::pdbx::SemanticError;
 use crate::pdbx::category::{CategoryIndex, Row};
 
 use super::fields::{
     optional_integer, optional_text, required_float, required_integer, required_text,
 };
 use super::qa::{QaMetric, QaValue, ResidueSite};
-use super::source::ModelCifError;
 
-pub(super) fn qa_metrics(categories: &CategoryIndex<'_>) -> Result<Vec<QaMetric>, ModelCifError> {
+pub(super) fn qa_metrics(categories: &CategoryIndex<'_>) -> Result<Vec<QaMetric>, SemanticError> {
     categories
         .rows("ma_qa_metric")
         .iter()
@@ -32,14 +32,14 @@ pub(super) fn qa_metrics(categories: &CategoryIndex<'_>) -> Result<Vec<QaMetric>
         .collect()
 }
 
-pub(super) fn qa_values(categories: &CategoryIndex<'_>) -> Result<Vec<QaValue>, ModelCifError> {
+pub(super) fn qa_values(categories: &CategoryIndex<'_>) -> Result<Vec<QaValue>, SemanticError> {
     let mut values = global_qa(categories)?;
     values.extend(local_qa(categories)?);
     values.extend(pairwise_qa(categories)?);
     Ok(values)
 }
 
-fn global_qa(categories: &CategoryIndex<'_>) -> Result<Vec<QaValue>, ModelCifError> {
+fn global_qa(categories: &CategoryIndex<'_>) -> Result<Vec<QaValue>, SemanticError> {
     categories
         .rows("ma_qa_metric_global")
         .iter()
@@ -55,7 +55,7 @@ fn global_qa(categories: &CategoryIndex<'_>) -> Result<Vec<QaValue>, ModelCifErr
         .collect()
 }
 
-fn local_qa(categories: &CategoryIndex<'_>) -> Result<Vec<QaValue>, ModelCifError> {
+fn local_qa(categories: &CategoryIndex<'_>) -> Result<Vec<QaValue>, SemanticError> {
     let category = "ma_qa_metric_local";
     categories
         .rows(category)
@@ -73,7 +73,7 @@ fn local_qa(categories: &CategoryIndex<'_>) -> Result<Vec<QaValue>, ModelCifErro
         .collect()
 }
 
-fn pairwise_qa(categories: &CategoryIndex<'_>) -> Result<Vec<QaValue>, ModelCifError> {
+fn pairwise_qa(categories: &CategoryIndex<'_>) -> Result<Vec<QaValue>, SemanticError> {
     let category = "ma_qa_metric_local_pairwise";
     categories
         .rows(category)
@@ -97,7 +97,7 @@ fn residue_site(
     category: &str,
     suffix: &str,
     row_index: usize,
-) -> Result<ResidueSite, ModelCifError> {
+) -> Result<ResidueSite, SemanticError> {
     Ok(ResidueSite {
         asym_id: required_text(row, category, &format!("label_asym_id{suffix}"), row_index)?,
         sequence_id: required_integer(row, category, &format!("label_seq_id{suffix}"), row_index)?,

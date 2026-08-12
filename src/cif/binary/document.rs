@@ -3,7 +3,7 @@
 use crate::cif::document::{ColumnValues, LoopColumn};
 use crate::cif::{CifBlock, CifDocument, CifEntry, CifLoop, Limits};
 
-use super::codec::{DecodedColumn, decode_data};
+use super::codec::decode_data;
 use super::error::{BinaryCifError, BinaryCifErrorCode};
 use super::model::{BinaryCategory, BinaryFile, Encoding};
 
@@ -205,7 +205,7 @@ fn decode_category(category: BinaryCategory<'_>) -> Result<Option<CifLoop>, Bina
 }
 
 pub(super) fn decode_mask(data: super::model::BinaryData) -> Result<Vec<u8>, BinaryCifError> {
-    let DecodedColumn::Integers(values) = decode_data(data)? else {
+    let ColumnValues::Integers(values) = decode_data(data)? else {
         return Err(shape_error("BinaryCIF mask must decode to integers"));
     };
     values

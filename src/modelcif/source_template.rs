@@ -1,16 +1,16 @@
 //! Structural-template and alignment row decoding.
 
+use crate::pdbx::SemanticError;
 use crate::pdbx::category::CategoryIndex;
 
 use super::fields::{
     optional_float, optional_integer, optional_text, required_integer, required_text,
 };
-use super::source::ModelCifError;
 use super::template::{
     Alignment, AlignmentDetail, AlignmentSequence, Template, TemplateMapping, TemplateSegment,
 };
 
-pub(super) fn templates(categories: &CategoryIndex<'_>) -> Result<Vec<Template>, ModelCifError> {
+pub(super) fn templates(categories: &CategoryIndex<'_>) -> Result<Vec<Template>, SemanticError> {
     categories
         .rows("ma_template_details")
         .iter()
@@ -66,7 +66,7 @@ pub(super) fn templates(categories: &CategoryIndex<'_>) -> Result<Vec<Template>,
 
 pub(super) fn template_segments(
     categories: &CategoryIndex<'_>,
-) -> Result<Vec<TemplateSegment>, ModelCifError> {
+) -> Result<Vec<TemplateSegment>, SemanticError> {
     categories
         .rows("ma_template_poly_segment")
         .iter()
@@ -99,7 +99,7 @@ pub(super) fn template_segments(
 
 pub(super) fn template_mappings(
     categories: &CategoryIndex<'_>,
-) -> Result<Vec<TemplateMapping>, ModelCifError> {
+) -> Result<Vec<TemplateMapping>, SemanticError> {
     categories
         .rows("ma_target_template_poly_mapping")
         .iter()
@@ -136,7 +136,7 @@ pub(super) fn template_mappings(
         .collect()
 }
 
-pub(super) fn alignments(categories: &CategoryIndex<'_>) -> Result<Vec<Alignment>, ModelCifError> {
+pub(super) fn alignments(categories: &CategoryIndex<'_>) -> Result<Vec<Alignment>, SemanticError> {
     categories
         .rows("ma_alignment_info")
         .iter()
@@ -161,7 +161,7 @@ pub(super) fn alignments(categories: &CategoryIndex<'_>) -> Result<Vec<Alignment
 
 pub(super) fn alignment_details(
     categories: &CategoryIndex<'_>,
-) -> Result<Vec<AlignmentDetail>, ModelCifError> {
+) -> Result<Vec<AlignmentDetail>, SemanticError> {
     categories
         .rows("ma_alignment_details")
         .iter()
@@ -202,7 +202,7 @@ pub(super) fn alignment_details(
 
 pub(super) fn alignment_sequences(
     categories: &CategoryIndex<'_>,
-) -> Result<Vec<AlignmentSequence>, ModelCifError> {
+) -> Result<Vec<AlignmentSequence>, SemanticError> {
     categories
         .rows("ma_alignment")
         .iter()

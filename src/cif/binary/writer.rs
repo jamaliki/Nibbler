@@ -41,7 +41,18 @@ pub fn encode_binary(document: &CifDocument) -> Result<Vec<u8>, BinaryCifError> 
             .to_owned();
         let categories = collect_categories(block.entries())?
             .into_iter()
-            .map(encode_category)
+            .map(|category| {
+                let columns = category
+                    .columns
+                    .into_iter()
+                    .map(|(name, values)| encode_column(name, values))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(BinaryCategory {
+                    name: format!("_{}", category.name),
+                    row_count: category.row_count,
+                    columns,
+                })
+            })
             .collect::<Result<Vec<_>, _>>()?;
         data_blocks.push(BinaryBlock { header, categories });
     }
@@ -127,19 +138,6 @@ fn collect_categories(entries: &[CifEntry]) -> Result<Vec<CategoryValues>, Binar
         }
     }
     Ok(categories)
-}
-
-fn encode_category(category: CategoryValues) -> Result<BinaryCategory<'static>, BinaryCifError> {
-    let columns = category
-        .columns
-        .into_iter()
-        .map(|(name, values)| encode_column(name, values))
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(BinaryCategory {
-        name: format!("_{}", category.name),
-        row_count: category.row_count,
-        columns,
-    })
 }
 
 fn encode_column(

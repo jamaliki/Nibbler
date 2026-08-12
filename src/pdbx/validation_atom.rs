@@ -1,7 +1,8 @@
 //! Atom-site identity, numeric, chemistry, and connection checks.
 
+use super::category::case_key;
 use super::model::{AtomSite, ConnectionEndpoint, Entity, EntityKind};
-use super::validation::{Validator, atom_context, equal, fold};
+use super::validation::{Validator, atom_context, equal};
 
 impl Validator<'_> {
     pub(super) fn atom_sites(&mut self) {
@@ -12,7 +13,7 @@ impl Validator<'_> {
 
     fn atom_site(&mut self, atom: &AtomSite) {
         let (atom_id, component_id, asym_id, entity_id) = atom.label_ids();
-        let Some(asym) = self.asym_units.get(&fold(asym_id)).copied() else {
+        let Some(asym) = self.asym_units.get(&case_key(asym_id)).copied() else {
             self.error(
                 "PDBX_ATOM_ASYM",
                 format!("atom {:?} references absent asym {asym_id:?}", atom.id()),
@@ -33,7 +34,7 @@ impl Validator<'_> {
             );
             return;
         }
-        let Some(entity) = self.entities.get(&fold(entity_id)).copied() else {
+        let Some(entity) = self.entities.get(&case_key(entity_id)).copied() else {
             return;
         };
         self.atom_entity_identity(atom, entity, component_id);
@@ -78,7 +79,7 @@ impl Validator<'_> {
     }
 
     fn component_atom(&mut self, atom: &AtomSite, atom_id: &str, component_id: &str) {
-        let Some(component) = self.components.get(&fold(component_id)).copied() else {
+        let Some(component) = self.components.get(&case_key(component_id)).copied() else {
             return;
         };
         if component.atoms().is_empty() {

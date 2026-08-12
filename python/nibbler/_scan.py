@@ -10,10 +10,9 @@ from . import _core
 from ._input import (
     PredicateSpec,
     Source,
-    _batch_error,
     _normalize_source,
-    _raise_native_error,
 )
+from ._native import batch_error, raise_read_error
 from ._objects import CifDocument, CifTable
 from .errors import BatchError
 
@@ -85,7 +84,6 @@ class ScanResult(Iterator[ReadResult]):
         "_on_error",
         "_schema",
         "_sources",
-        "_workers",
     )
 
     def __init__(
@@ -100,7 +98,6 @@ class ScanResult(Iterator[ReadResult]):
         on_error: Literal["raise", "collect"],
     ) -> None:
         self._sources = iter(sources)
-        self._workers = workers
         self._on_error = on_error
         self._schema = schema
         self._errors: list[BatchError] = []
@@ -116,15 +113,10 @@ class ScanResult(Iterator[ReadResult]):
                 schema,
             )
         except ValueError as error:
-            _raise_native_error(error)
+            raise_read_error(error)
         for _ in range(workers):
             if not self._submit_next():
                 break
-
-    @property
-    def batches(self) -> ScanResult:
-        """Return the single-pass batch iterator."""
-        return self
 
     @property
     def errors(self) -> BatchDiagnostics:
@@ -151,7 +143,7 @@ class ScanResult(Iterator[ReadResult]):
                 self.close()
                 raise RuntimeError("native scan returned an unknown batch type")
 
-            error = _batch_error(source_index, fields)
+            error = batch_error(source_index, fields)
             self._errors.append(error)
             if self._on_error == "raise":
                 self._native.cancel()

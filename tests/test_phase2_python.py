@@ -134,9 +134,9 @@ def test_feast_keeps_only_one_worker_window_admitted() -> None:
 
     result = nibbler.feast(sources(), workers=2)
     assert admitted == 2
-    assert isinstance(next(result.batches), CifDocument)
+    assert isinstance(next(result), CifDocument)
     assert admitted == 3
-    assert len(list(result.batches)) == 4
+    assert len(list(result)) == 4
     assert admitted == 5
 
 
@@ -149,7 +149,7 @@ def test_feast_collects_errors_without_silent_skips() -> None:
         workers=2,
         on_error="collect",
     )
-    batches = list(result.batches)
+    batches = list(result)
     assert len(batches) == 2
     assert all(isinstance(batch, CifTable) for batch in batches)
     assert len(result.errors) == 1
@@ -167,7 +167,7 @@ def test_feast_collects_errors_without_silent_skips() -> None:
 def test_feast_raises_the_first_error_in_input_order() -> None:
     malformed = FIXTURES / "syntax" / "malformed_loop.cif"
     result = nibbler.feast([MISSING, malformed, MISSING], workers=3)
-    assert isinstance(next(result.batches), CifDocument)
+    assert isinstance(next(result), CifDocument)
     with pytest.raises(BatchError) as raised:
-        next(result.batches)
+        next(result)
     assert raised.value.source_index == 1

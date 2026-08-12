@@ -2,23 +2,18 @@
 
 use std::collections::HashMap;
 
-use crate::cif::projection::{ColumnSpec, Predicate, ProjectionPlan};
-use crate::cif::projection_sink::{normalize_column, predicate_matches};
+use crate::cif::document::ColumnValues;
+use crate::cif::projection::{ColumnSpec, ProjectionPlan, predicate_matches};
 use crate::cif::table::{CifCell, CifTable, ColumnBuilder, MissingKind, TableBuilder};
 
-use super::codec::{DecodedColumn, decode_data};
+use super::codec::decode_data;
 use super::document::{decode_file, decode_mask, normalize_category_name, shape_error};
 use super::error::BinaryCifError;
 use super::model::BinaryCategory;
 
 struct ProjectedColumn {
-    values: DecodedColumn,
+    values: ColumnValues,
     mask: Vec<u8>,
-}
-
-struct CompiledPredicate {
-    column_index: usize,
-    predicate: Predicate,
 }
 
 /// Decode one BinaryCIF category directly into the shared columnar table model.
@@ -112,11 +107,7 @@ fn output_specs(
                     plan.category, column.name
                 ))
             })?;
-            Ok(ColumnSpec {
-                name: column.name.clone(),
-                key: column.name.to_ascii_lowercase(),
-                column_type,
-            })
+            Ok(ColumnSpec::new(&column.name, column_type))
         })
         .collect()
 }
@@ -129,21 +120,15 @@ fn project_category(
     source_name: &str,
     block_code: &str,
 ) -> Result<(), BinaryCifError> {
-    let mut needed = output_specs.to_vec();
-    for predicate in &plan.predicates {
-        let spec = normalize_column(&plan.category, predicate.column())
-            .map_err(|error| shape_error(error.message()))?;
-        if !needed.iter().any(|candidate| candidate.key == spec.key) {
-            needed.push(spec);
-        }
-    }
+    let prepared = plan.prepare_columns(output_specs.to_vec());
+    let needed = &prepared.columns;
     let mut available = category
         .columns
         .into_iter()
         .map(|column| (column.name.to_ascii_lowercase(), column))
         .collect::<HashMap<_, _>>();
     let mut decoded = Vec::with_capacity(needed.len());
-    for spec in &needed {
+    for spec in needed {
         let column = available.remove(&spec.key).ok_or_else(|| {
             shape_error(format!(
                 "category {:?} does not contain required column {:?}",
@@ -176,23 +161,7 @@ fn project_category(
         }
         decoded.push(ProjectedColumn { values, mask });
     }
-    let predicates = plan
-        .predicates
-        .iter()
-        .map(|predicate| {
-            let spec = normalize_column(&plan.category, predicate.column())
-                .map_err(|error| shape_error(error.message()))?;
-            let column_index = needed
-                .iter()
-                .position(|candidate| candidate.key == spec.key)
-                .ok_or_else(|| shape_error("predicate column was not decoded"))?;
-            Ok(CompiledPredicate {
-                column_index,
-                predicate: predicate.clone(),
-            })
-        })
-        .collect::<Result<Vec<_>, BinaryCifError>>()?;
-    if predicates.is_empty() {
+    if prepared.predicate_columns.is_empty() {
         for row_index in 0..category.row_count {
             for (builder, column) in table
                 .columns
@@ -211,9 +180,11 @@ fn project_category(
         for column in &decoded {
             row.push(cell_at(column, row_index)?);
         }
-        if !predicates
+        if !plan
+            .predicates
             .iter()
-            .all(|compiled| predicate_matches(&compiled.predicate, &row[compiled.column_index]))
+            .zip(&prepared.predicate_columns)
+            .all(|(predicate, &column)| predicate_matches(&predicate.predicate, &row[column]))
         {
             continue;
         }
@@ -247,8 +218,8 @@ fn append_at(
         value => return Err(shape_error(format!("invalid BinaryCIF mask value {value}"))),
     }
     match &column.values {
-        DecodedColumn::Integers(values) => builder.append_integer_value(values[row_index]),
-        DecodedColumn::Floats(values) => {
+        ColumnValues::Integers(values) => builder.append_integer_value(values[row_index]),
+        ColumnValues::Floats(values) => {
             let number = values[row_index];
             if !number.is_finite() {
                 return Err(shape_error(
@@ -257,7 +228,7 @@ fn append_at(
             }
             builder.append_float_value(number).map_err(shape_error)?;
         }
-        DecodedColumn::Strings(values) => builder
+        ColumnValues::Strings(values) => builder
             .append_text_value(values.value(row_index))
             .map_err(shape_error)?,
     }
@@ -272,8 +243,8 @@ fn cell_at(column: &ProjectedColumn, row_index: usize) -> Result<CifCell, Binary
         value => return Err(shape_error(format!("invalid BinaryCIF mask value {value}"))),
     }
     Ok(match &column.values {
-        DecodedColumn::Integers(values) => CifCell::Text(values[row_index].to_string()),
-        DecodedColumn::Floats(values) => {
+        ColumnValues::Integers(values) => CifCell::Text(values[row_index].to_string()),
+        ColumnValues::Floats(values) => {
             let value = values[row_index];
             if !value.is_finite() {
                 return Err(shape_error(
@@ -282,7 +253,7 @@ fn cell_at(column: &ProjectedColumn, row_index: usize) -> Result<CifCell, Binary
             }
             CifCell::Text(value.to_string())
         }
-        DecodedColumn::Strings(values) => CifCell::Text(values.value(row_index).to_owned()),
+        ColumnValues::Strings(values) => CifCell::Text(values.value(row_index).to_owned()),
     })
 }
 

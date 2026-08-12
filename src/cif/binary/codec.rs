@@ -7,8 +7,6 @@ use crate::cif::document::{ColumnValues, StringColumn};
 use super::error::{BinaryCifError, BinaryCifErrorCode};
 use super::model::{BinaryData, Encoding};
 
-pub(super) type DecodedColumn = ColumnValues;
-
 enum Decoded<'a> {
     Bytes(Cow<'a, [u8]>),
     Integers(Vec<i64>),
@@ -47,11 +45,11 @@ impl IntegerEncoding {
     }
 }
 
-pub(super) fn decode_data(data: BinaryData<'_>) -> Result<DecodedColumn, BinaryCifError> {
+pub(super) fn decode_data(data: BinaryData<'_>) -> Result<ColumnValues, BinaryCifError> {
     match decode_encoded(data.data, data.encoding)? {
-        Decoded::Integers(values) => Ok(DecodedColumn::Integers(values)),
-        Decoded::Floats(values) => Ok(DecodedColumn::Floats(values)),
-        Decoded::Strings(values) => Ok(DecodedColumn::Strings(values)),
+        Decoded::Integers(values) => Ok(ColumnValues::Integers(values)),
+        Decoded::Floats(values) => Ok(ColumnValues::Floats(values)),
+        Decoded::Strings(values) => Ok(ColumnValues::Strings(values)),
         Decoded::Bytes(_) => Err(encoding_error(
             "encoding chain leaves raw bytes without a ByteArray descriptor",
         )),

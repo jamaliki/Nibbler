@@ -1,4 +1,9 @@
-# Performance improvement beam
+# Historical performance experiment ledger
+
+> This file is an engineering history, not the current design. It is the single place
+> where Nibbler records superseded baselines, promoted experiments, failed approaches,
+> and restart conditions. See [performance-report.md](performance-report.md) for the
+> implementation and qualification that are current.
 
 ## Hardware-limit cycle: final PGO checkpoint, 2026-08-12
 

@@ -28,22 +28,6 @@ class ArrowTable(Protocol):
     def column(self, name: str) -> ArrowColumn: ...
 
 
-@dataclass(frozen=True, slots=True)
-class Baseline:
-    """A reference engine and the distribution that supplies it."""
-
-    name: str
-    distribution: str
-    purpose: str
-
-
-BASELINES = (
-    Baseline("gemmi", "gemmi", "fast general CIF parsing"),
-    Baseline("biotite", "biotite", "columnar structural-biology workflows"),
-    Baseline("biopython", "biopython", "Bio.PDB compatibility workloads"),
-)
-
-
 def project_with_nibbler(file: Path, columns: tuple[str, ...]) -> ProjectedRows:
     """Project atom_site through Nibbler and consume its Arrow stream."""
     import nibbler
@@ -88,9 +72,22 @@ def project_with_biopython(file: Path, columns: tuple[str, ...]) -> ProjectedRow
     )
 
 
-ADAPTERS: dict[str, ProjectionAdapter] = {
-    "nibbler": project_with_nibbler,
-    "gemmi": project_with_gemmi,
-    "biotite": project_with_biotite,
-    "biopython": project_with_biopython,
+@dataclass(frozen=True, slots=True)
+class Engine:
+    """One benchmark engine and everything needed to invoke and describe it."""
+
+    distribution: str
+    purpose: str
+    project: ProjectionAdapter
+
+
+ENGINES = {
+    "nibbler": Engine("nibbler-cif", "Nibbler candidate", project_with_nibbler),
+    "gemmi": Engine("gemmi", "fast general CIF parsing", project_with_gemmi),
+    "biotite": Engine(
+        "biotite", "columnar structural-biology workflows", project_with_biotite
+    ),
+    "biopython": Engine(
+        "biopython", "Bio.PDB compatibility workloads", project_with_biopython
+    ),
 }

@@ -12,8 +12,7 @@ use crate::cif::{
     validate_document as validate_cif_document, write_canonical, write_preserving,
 };
 use crate::modelcif::{
-    MirrorPolicy, ModelCifModel, ModelCifValidationReport,
-    build_model_with_registry as build_modelcif_with_registry,
+    MirrorPolicy, ModelCifModel, build_model_with_registry as build_modelcif_with_registry,
     canonical_document as canonical_modelcif_document,
     canonical_document_with_mirror as canonical_modelcif_document_with_mirror,
     validate_document as validate_modelcif,
@@ -91,14 +90,24 @@ impl PyCifDocument {
     }
 }
 
-#[pyclass(name = "_PdbxModel", frozen)]
-struct PyPdbxModel {
-    model: Arc<PdbxModel>,
+#[derive(Clone)]
+enum NativeMmcifModel {
+    Pdbx(Arc<PdbxModel>),
+    ModelCif(Arc<ModelCifModel>),
 }
 
-#[pyclass(name = "_ModelCifModel", frozen)]
-struct PyModelCifModel {
-    model: Arc<ModelCifModel>,
+impl NativeMmcifModel {
+    fn coordinates(&self) -> &PdbxModel {
+        match self {
+            Self::Pdbx(model) => model,
+            Self::ModelCif(model) => model.coordinates(),
+        }
+    }
+}
+
+#[pyclass(name = "_MmcifModel", frozen)]
+struct PyMmcifModel {
+    model: NativeMmcifModel,
 }
 
 #[pyclass(name = "_ComponentRegistry", frozen)]
@@ -118,79 +127,15 @@ impl PyComponentRegistry {
 }
 
 #[pymethods]
-impl PyPdbxModel {
+impl PyMmcifModel {
     #[getter]
-    fn entry_id(&self) -> &str {
-        self.model.entry_id()
-    }
-
-    #[getter]
-    fn entity_count(&self) -> usize {
-        self.model.entities().len()
-    }
-
-    #[getter]
-    fn asym_unit_count(&self) -> usize {
-        self.model.asym_units().len()
-    }
-
-    #[getter]
-    fn component_count(&self) -> usize {
-        self.model.components().len()
-    }
-
-    #[getter]
-    fn atom_site_count(&self) -> usize {
-        self.model.atom_sites().len()
-    }
-
-    #[getter]
-    fn connection_count(&self) -> usize {
-        self.model.connections().len()
-    }
-
-    #[getter]
-    fn entity_kinds(&self) -> Vec<&str> {
-        self.model
-            .entities()
-            .iter()
-            .map(|entity| entity.kind().as_str())
-            .collect()
-    }
-
-    #[getter]
-    fn component_ids(&self) -> Vec<&str> {
-        self.model
-            .components()
-            .iter()
-            .map(|component| component.id())
-            .collect()
-    }
-
-    fn to_document(&self) -> PyCifDocument {
-        PyCifDocument {
-            document: Arc::new(canonical_document(&self.model)),
+    fn profile(&self) -> &'static str {
+        match self.model {
+            NativeMmcifModel::Pdbx(_) => "pdbx",
+            NativeMmcifModel::ModelCif(_) => "modelcif",
         }
     }
 
-    fn source_document(&self) -> PyCifDocument {
-        PyCifDocument {
-            document: Arc::new(self.model.source_document().clone()),
-        }
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "_PdbxModel(entry_id={:?}, entities={}, atoms={})",
-            self.model.entry_id(),
-            self.model.entities().len(),
-            self.model.atom_sites().len()
-        )
-    }
-}
-
-#[pymethods]
-impl PyModelCifModel {
     #[getter]
     fn entry_id(&self) -> &str {
         self.model.coordinates().entry_id()
@@ -243,67 +188,96 @@ impl PyModelCifModel {
 
     #[getter]
     fn prediction_model_count(&self) -> usize {
-        self.model.models().len()
+        match &self.model {
+            NativeMmcifModel::Pdbx(_) => 0,
+            NativeMmcifModel::ModelCif(model) => model.models().len(),
+        }
     }
 
     #[getter]
     fn target_entity_count(&self) -> usize {
-        self.model.targets().len()
+        match &self.model {
+            NativeMmcifModel::Pdbx(_) => 0,
+            NativeMmcifModel::ModelCif(model) => model.targets().len(),
+        }
     }
 
     #[getter]
     fn template_count(&self) -> usize {
-        self.model.templates().len()
+        match &self.model {
+            NativeMmcifModel::Pdbx(_) => 0,
+            NativeMmcifModel::ModelCif(model) => model.templates().len(),
+        }
     }
 
     #[getter]
     fn qa_metric_count(&self) -> usize {
-        self.model.qa_metrics().len()
+        match &self.model {
+            NativeMmcifModel::Pdbx(_) => 0,
+            NativeMmcifModel::ModelCif(model) => model.qa_metrics().len(),
+        }
     }
 
     #[getter]
     fn qa_value_count(&self) -> usize {
-        self.model.qa_values().len()
+        match &self.model {
+            NativeMmcifModel::Pdbx(_) => 0,
+            NativeMmcifModel::ModelCif(model) => model.qa_values().len(),
+        }
     }
 
     #[getter]
     fn software_names(&self) -> Vec<&str> {
-        self.model
-            .software()
-            .iter()
-            .map(|software| software.name())
-            .collect()
+        match &self.model {
+            NativeMmcifModel::Pdbx(_) => Vec::new(),
+            NativeMmcifModel::ModelCif(model) => model
+                .software()
+                .iter()
+                .map(|software| software.name())
+                .collect(),
+        }
     }
 
     #[getter]
     fn qa_metric_names(&self) -> Vec<&str> {
-        self.model
-            .qa_metrics()
-            .iter()
-            .map(|metric| metric.name())
-            .collect()
+        match &self.model {
+            NativeMmcifModel::Pdbx(_) => Vec::new(),
+            NativeMmcifModel::ModelCif(model) => model
+                .qa_metrics()
+                .iter()
+                .map(|metric| metric.name())
+                .collect(),
+        }
     }
 
     #[getter]
     fn qa_metric_modes(&self) -> Vec<&str> {
-        self.model
-            .qa_metrics()
-            .iter()
-            .map(|metric| metric.mode())
-            .collect()
+        match &self.model {
+            NativeMmcifModel::Pdbx(_) => Vec::new(),
+            NativeMmcifModel::ModelCif(model) => model
+                .qa_metrics()
+                .iter()
+                .map(|metric| metric.mode())
+                .collect(),
+        }
     }
 
     #[pyo3(signature = (mirror_local_qa_metric=None))]
     fn to_document(&self, mirror_local_qa_metric: Option<i64>) -> PyResult<PyCifDocument> {
-        let document = match mirror_local_qa_metric {
-            Some(metric_id) => canonical_modelcif_document_with_mirror(
-                &self.model,
-                MirrorPolicy::LocalMetric(metric_id),
-            )
-            .map_err(|error| {
-                PyValueError::new_err((error.code().to_owned(), error.message().to_owned()))
-            })?,
-            None => canonical_modelcif_document(&self.model),
+        let document = match (&self.model, mirror_local_qa_metric) {
+            (NativeMmcifModel::Pdbx(model), None) => canonical_document(model),
+            (NativeMmcifModel::Pdbx(_), Some(_)) => {
+                return Err(PyValueError::new_err(
+                    "mirror_local_qa_metric requires a ModelCIF model",
+                ));
+            }
+            (NativeMmcifModel::ModelCif(model), Some(metric_id)) => {
+                canonical_modelcif_document_with_mirror(model, MirrorPolicy::LocalMetric(metric_id))
+                    .map_err(|error| {
+                        PyValueError::new_err((error.code().to_owned(), error.message().to_owned()))
+                    })?
+            }
+            (NativeMmcifModel::ModelCif(model), None) => canonical_modelcif_document(model),
         };
         Ok(PyCifDocument {
             document: Arc::new(document),
@@ -318,11 +292,11 @@ impl PyModelCifModel {
 
     fn __repr__(&self) -> String {
         format!(
-            "_ModelCifModel(entry_id={:?}, models={}, qa_metrics={}, atoms={})",
-            self.model.coordinates().entry_id(),
-            self.model.models().len(),
-            self.model.qa_metrics().len(),
-            self.model.coordinates().atom_sites().len()
+            "_MmcifModel(profile={:?}, entry_id={:?}, entities={}, atoms={})",
+            self.profile(),
+            self.entry_id(),
+            self.entity_count(),
+            self.atom_site_count()
         )
     }
 }
@@ -364,43 +338,33 @@ fn validate_document(
 }
 
 #[pyfunction]
-#[pyo3(signature = (document, registry=None))]
-fn build_pdbx_model(
+#[pyo3(signature = (document, profile, registry=None))]
+fn build_mmcif_model(
     py: Python<'_>,
     document: &PyCifDocument,
+    profile: &str,
     registry: Option<&PyComponentRegistry>,
-) -> PyResult<PyPdbxModel> {
+) -> PyResult<PyMmcifModel> {
+    let profile = profile
+        .parse::<SchemaName>()
+        .map_err(|error| PyValueError::new_err((error.code(), error.message().to_owned())))?;
     let document = Arc::clone(&document.document);
     let registry = registry.map(|value| Arc::clone(&value.registry));
-    let model = py
-        .detach(move || build_model_with_registry(&document, registry.as_deref()))
-        .map_err(model_error_to_python)?;
-    Ok(PyPdbxModel {
-        model: Arc::new(model),
-    })
-}
-
-#[pyfunction]
-#[pyo3(signature = (document, registry=None))]
-fn build_modelcif_model(
-    py: Python<'_>,
-    document: &PyCifDocument,
-    registry: Option<&PyComponentRegistry>,
-) -> PyResult<PyModelCifModel> {
-    let document = Arc::clone(&document.document);
-    let registry = registry.map(|value| Arc::clone(&value.registry));
-    let model = py
-        .detach(move || build_modelcif_with_registry(&document, registry.as_deref()))
-        .map_err(|error| {
-            PyValueError::new_err((
-                error.code().to_owned(),
-                error.message().to_owned(),
-                error.context().to_vec(),
-            ))
-        })?;
-    Ok(PyModelCifModel {
-        model: Arc::new(model),
-    })
+    let model = match profile {
+        SchemaName::Pdbx => {
+            let model = py
+                .detach(move || build_model_with_registry(&document, registry.as_deref()))
+                .map_err(model_error_to_python)?;
+            NativeMmcifModel::Pdbx(Arc::new(model))
+        }
+        SchemaName::ModelCif => {
+            let model = py
+                .detach(move || build_modelcif_with_registry(&document, registry.as_deref()))
+                .map_err(model_error_to_python)?;
+            NativeMmcifModel::ModelCif(Arc::new(model))
+        }
+    };
+    Ok(PyMmcifModel { model })
 }
 
 #[pyfunction]
@@ -417,7 +381,7 @@ fn build_component_registry(
     })
 }
 
-fn model_error_to_python(error: crate::pdbx::ModelError) -> PyErr {
+fn model_error_to_python(error: crate::pdbx::SemanticError) -> PyErr {
     PyValueError::new_err((
         error.code().to_owned(),
         error.message().to_owned(),
@@ -426,45 +390,59 @@ fn model_error_to_python(error: crate::pdbx::ModelError) -> PyErr {
 }
 
 #[pyfunction]
-fn validate_pdbx_document(py: Python<'_>, document: &PyCifDocument) -> PyResult<ValidationFields> {
-    let document = Arc::clone(&document.document);
-    let report = py
-        .detach(move || validate_pdbx(&document))
-        .map_err(|error| PyValueError::new_err((error.code(), error.message().to_owned())))?;
-    Ok(profile_fields(&report))
-}
-
-#[pyfunction]
-fn validate_pdbx_model(py: Python<'_>, model: &PyPdbxModel) -> PyResult<ValidationFields> {
-    let model = Arc::clone(&model.model);
-    let report = py
-        .detach(move || validate_pdbx(&canonical_document(&model)))
-        .map_err(|error| PyValueError::new_err((error.code(), error.message().to_owned())))?;
-    Ok(profile_fields(&report))
-}
-
-#[pyfunction]
-fn validate_modelcif_document(
+fn validate_mmcif_document(
     py: Python<'_>,
     document: &PyCifDocument,
+    profile: &str,
 ) -> PyResult<ValidationFields> {
-    let document = Arc::clone(&document.document);
-    let report = py
-        .detach(move || validate_modelcif(&document))
+    let profile = profile
+        .parse::<SchemaName>()
         .map_err(|error| PyValueError::new_err((error.code(), error.message().to_owned())))?;
-    Ok(modelcif_profile_fields(&report))
+    let document = Arc::clone(&document.document);
+    match profile {
+        SchemaName::Pdbx => {
+            let report = py
+                .detach(move || validate_pdbx(&document))
+                .map_err(|error| {
+                    PyValueError::new_err((error.code(), error.message().to_owned()))
+                })?;
+            Ok(profile_fields("pdbx", &report))
+        }
+        SchemaName::ModelCif => {
+            let report = py
+                .detach(move || validate_modelcif(&document))
+                .map_err(|error| {
+                    PyValueError::new_err((error.code(), error.message().to_owned()))
+                })?;
+            Ok(profile_fields("modelcif", &report))
+        }
+    }
 }
 
 #[pyfunction]
-fn validate_modelcif_model(py: Python<'_>, model: &PyModelCifModel) -> PyResult<ValidationFields> {
-    let model = Arc::clone(&model.model);
-    let report = py
-        .detach(move || validate_modelcif(&canonical_modelcif_document(&model)))
-        .map_err(|error| PyValueError::new_err((error.code(), error.message().to_owned())))?;
-    Ok(modelcif_profile_fields(&report))
+fn validate_mmcif_model(py: Python<'_>, model: &PyMmcifModel) -> PyResult<ValidationFields> {
+    let model = model.model.clone();
+    match model {
+        NativeMmcifModel::Pdbx(model) => {
+            let report = py
+                .detach(move || validate_pdbx(&canonical_document(&model)))
+                .map_err(|error| {
+                    PyValueError::new_err((error.code(), error.message().to_owned()))
+                })?;
+            Ok(profile_fields("pdbx", &report))
+        }
+        NativeMmcifModel::ModelCif(model) => {
+            let report = py
+                .detach(move || validate_modelcif(&canonical_modelcif_document(&model)))
+                .map_err(|error| {
+                    PyValueError::new_err((error.code(), error.message().to_owned()))
+                })?;
+            Ok(profile_fields("modelcif", &report))
+        }
+    }
 }
 
-fn profile_fields(report: &ProfileValidationReport) -> ValidationFields {
+fn profile_fields(profile: &str, report: &ProfileValidationReport) -> ValidationFields {
     let diagnostics = report
         .diagnostics()
         .iter()
@@ -478,32 +456,7 @@ fn profile_fields(report: &ProfileValidationReport) -> ValidationFields {
         })
         .collect();
     (
-        "pdbx".to_owned(),
-        report.dictionary_version().to_owned(),
-        report
-            .coverage()
-            .iter()
-            .map(|value| (*value).to_owned())
-            .collect(),
-        diagnostics,
-    )
-}
-
-fn modelcif_profile_fields(report: &ModelCifValidationReport) -> ValidationFields {
-    let diagnostics = report
-        .diagnostics()
-        .iter()
-        .map(|diagnostic| {
-            (
-                diagnostic.code().to_owned(),
-                diagnostic.severity().as_str().to_owned(),
-                diagnostic.message().to_owned(),
-                diagnostic.context().to_vec(),
-            )
-        })
-        .collect();
-    (
-        "modelcif".to_owned(),
+        profile.to_owned(),
         report.dictionary_version().to_owned(),
         report
             .coverage()
@@ -585,10 +538,14 @@ fn read_file(
     predicates: Vec<PredicateSpec>,
     schema: Option<String>,
 ) -> PyResult<Py<PyAny>> {
-    let plan =
-        build_optional_plan(category, columns, predicates, schema).map_err(error_to_python)?;
-    let output = py.detach(move || execute_read(InputSource::File(file), plan));
-    output_to_python(py, output, false)
+    read_input(
+        py,
+        InputSource::File(file),
+        category,
+        columns,
+        predicates,
+        schema,
+    )
 }
 
 #[pyfunction]
@@ -602,9 +559,29 @@ fn read_bytes(
     predicates: Vec<PredicateSpec>,
     schema: Option<String>,
 ) -> PyResult<Py<PyAny>> {
+    read_input(
+        py,
+        InputSource::Bytes { source_name, bytes },
+        category,
+        columns,
+        predicates,
+        schema,
+    )
+}
+
+fn read_input(
+    py: Python<'_>,
+    input: InputSource,
+    category: Option<String>,
+    columns: Option<Vec<String>>,
+    predicates: Vec<PredicateSpec>,
+    schema: Option<String>,
+) -> PyResult<Py<PyAny>> {
     let plan =
         build_optional_plan(category, columns, predicates, schema).map_err(error_to_python)?;
-    let output = py.detach(move || execute_read(InputSource::Bytes { source_name, bytes }, plan));
+    let output = py
+        .detach(move || execute_read(input, plan))
+        .map_err(error_to_python)?;
     output_to_python(py, output, false)
 }
 
@@ -722,18 +699,18 @@ fn predicate_from_spec(
 
 pub(crate) fn output_to_python(
     py: Python<'_>,
-    output: Result<ReadOutput, ReadFailure>,
+    output: ReadOutput,
     include_provenance: bool,
 ) -> PyResult<Py<PyAny>> {
     match output {
-        Ok(ReadOutput::Document(document)) => Ok(Py::new(
+        ReadOutput::Document(document) => Ok(Py::new(
             py,
             PyCifDocument {
                 document: Arc::new(document),
             },
         )?
         .into_any()),
-        Ok(ReadOutput::Table(table)) => Ok(Py::new(
+        ReadOutput::Table(table) => Ok(Py::new(
             py,
             PyCifTable {
                 table: Arc::new(table),
@@ -742,7 +719,6 @@ pub(crate) fn output_to_python(
             },
         )?
         .into_any()),
-        Err(error) => Err(error_to_python(error)),
     }
 }
 
@@ -825,19 +801,15 @@ fn parse_missing_policy(policy: &str) -> PyResult<ArrowMissingPolicy> {
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCifDocument>()?;
     module.add_class::<PyCifTable>()?;
-    module.add_class::<PyPdbxModel>()?;
-    module.add_class::<PyModelCifModel>()?;
+    module.add_class::<PyMmcifModel>()?;
     module.add_class::<PyComponentRegistry>()?;
     module.add_function(wrap_pyfunction!(read_file, module)?)?;
     module.add_function(wrap_pyfunction!(read_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(validate_document, module)?)?;
-    module.add_function(wrap_pyfunction!(build_pdbx_model, module)?)?;
-    module.add_function(wrap_pyfunction!(build_modelcif_model, module)?)?;
+    module.add_function(wrap_pyfunction!(build_mmcif_model, module)?)?;
     module.add_function(wrap_pyfunction!(build_component_registry, module)?)?;
-    module.add_function(wrap_pyfunction!(validate_pdbx_document, module)?)?;
-    module.add_function(wrap_pyfunction!(validate_pdbx_model, module)?)?;
-    module.add_function(wrap_pyfunction!(validate_modelcif_document, module)?)?;
-    module.add_function(wrap_pyfunction!(validate_modelcif_model, module)?)?;
+    module.add_function(wrap_pyfunction!(validate_mmcif_document, module)?)?;
+    module.add_function(wrap_pyfunction!(validate_mmcif_model, module)?)?;
     crate::python_scan::register(module)?;
     Ok(())
 }

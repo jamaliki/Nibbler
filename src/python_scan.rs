@@ -14,10 +14,7 @@ use crate::python::{
     error_fields, error_to_python, execute_read, output_to_python,
 };
 
-enum Job {
-    Read(usize, InputSource),
-}
-
+type Job = (usize, InputSource);
 type Completed = (usize, Result<ReadOutput, ReadFailure>);
 type PythonScanItem = (usize, Option<Py<PyAny>>, Option<ErrorFields>);
 
@@ -51,7 +48,7 @@ impl NativeScan {
             .map_err(|error| PyRuntimeError::new_err(format!("cannot start scan worker: {error}")))
     }
 
-    fn submit_file(&mut self, py: Python<'_>, file: String) -> PyResult<usize> {
+    fn submit_file(&mut self, py: Python<'_>, file: String) -> PyResult<()> {
         self.submit(py, InputSource::File(file))
     }
 
@@ -60,7 +57,7 @@ impl NativeScan {
         py: Python<'_>,
         source_name: String,
         bytes: Vec<u8>,
-    ) -> PyResult<usize> {
+    ) -> PyResult<()> {
         self.submit(py, InputSource::Bytes { source_name, bytes })
     }
 
@@ -85,7 +82,7 @@ impl NativeScan {
         match result {
             Ok(output) => Ok(Some((
                 index,
-                Some(output_to_python(py, Ok(output), true)?),
+                Some(output_to_python(py, output, true)?),
                 None,
             ))),
             Err(error) => Ok(Some((index, None, Some(error_fields(&error))))),
@@ -133,16 +130,16 @@ impl NativeScan {
         })
     }
 
-    fn submit(&mut self, py: Python<'_>, input: InputSource) -> PyResult<usize> {
+    fn submit(&mut self, py: Python<'_>, input: InputSource) -> PyResult<()> {
         let Some(sender) = &self.job_sender else {
             return Err(PyRuntimeError::new_err("cannot submit to a closed scan"));
         };
         let sender = sender.clone();
         let index = self.submitted_count;
-        py.detach(move || sender.send(Job::Read(index, input)))
+        py.detach(move || sender.send((index, input)))
             .map_err(|_| PyRuntimeError::new_err("native scan workers stopped early"))?;
         self.submitted_count += 1;
-        Ok(index)
+        Ok(())
     }
 }
 
@@ -166,7 +163,7 @@ fn spawn_worker(
         .spawn(move || {
             loop {
                 let job = lock_receiver(&job_receiver).recv();
-                let Ok(Job::Read(index, input)) = job else {
+                let Ok((index, input)) = job else {
                     break;
                 };
                 if completed_sender

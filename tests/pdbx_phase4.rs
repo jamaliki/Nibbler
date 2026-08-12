@@ -4,7 +4,7 @@
 
 use _core::cif::{parse, write_canonical};
 use _core::pdbx::{
-    ComponentResolution, EntityKind, build_component_registry, build_model,
+    ComponentResolution, EntityKind, ProfileSeverity, build_component_registry, build_model,
     build_model_with_registry, canonical_document, validate_document, validate_model,
 };
 
@@ -56,6 +56,33 @@ fn chemistry_fixture_passes_dictionary_and_semantic_profile() {
     assert_eq!(report.dictionary_version(), "5.416");
     assert!(report.coverage().contains(&"chemical-component-resolution"));
     assert!(report.is_valid(), "unexpected: {:?}", report.diagnostics());
+}
+
+#[test]
+fn semantic_diagnostic_limit_reports_truncation() {
+    let duplicate_atom = "ATOM 1 C CA . ALA A 1 1 ? 0.000 0.000 0.000 1.00 10.00 ? 10 ALA X CA 1\n";
+    let source = String::from_utf8(CHEMISTRY.to_vec())
+        .expect("fixture is UTF-8")
+        .replace(
+            "\n_struct_conn_type.id metalc",
+            &format!(
+                "\n{}\n_struct_conn_type.id metalc",
+                duplicate_atom.repeat(10_001)
+            ),
+        );
+    let document = parse(source.as_bytes()).expect("large duplicate fixture must parse");
+    let model = build_model(&document).expect("duplicate atom identifiers remain representable");
+    let report = validate_model(&model);
+
+    assert_eq!(report.diagnostics().len(), 10_001);
+    assert!(
+        report.diagnostics()[..10_000]
+            .iter()
+            .all(|diagnostic| diagnostic.code() == "PDBX_ATOM_ID_DUPLICATE")
+    );
+    let truncated = &report.diagnostics()[10_000];
+    assert_eq!(truncated.code(), "PDBX_DIAGNOSTICS_TRUNCATED");
+    assert_eq!(truncated.severity(), ProfileSeverity::Warning);
 }
 
 #[test]
