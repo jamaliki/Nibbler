@@ -16,6 +16,7 @@ FIXTURE_ROOT = Path(__file__).parent / "fixtures"
         "syntax/minimal.cif",
         "syntax/missing_values.cif",
         "chemistry/ligand_ion_water.cif",
+        "chemistry/branched_glycan.cif",
     ],
 )
 def test_gemmi_accepts_valid_syntax_fixtures(relative_file: str) -> None:

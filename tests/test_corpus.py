@@ -14,7 +14,7 @@ def test_fixture_manifest_is_complete_and_immutable() -> None:
 def test_corpus_prioritizes_chemistry_risks() -> None:
     entries = load_manifest()["fixture"]
     features = {feature for entry in entries for feature in entry["features"]}
-    assert {"ligand", "ion", "water", "modified-residue"} <= features
+    assert {"ligand", "ion", "water", "modified-residue", "glycan"} <= features
 
 
 def test_benchmark_workload_names_are_stable() -> None:

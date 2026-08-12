@@ -78,6 +78,9 @@ class ValidationReport:
     """Immutable collection of validation diagnostics."""
 
     diagnostics: tuple[Diagnostic, ...] = ()
+    schema: str | None = None
+    dictionary_version: str | None = None
+    coverage: tuple[str, ...] = ()
 
     @classmethod
     def from_iterable(cls, diagnostics: Iterable[Diagnostic]) -> ValidationReport:

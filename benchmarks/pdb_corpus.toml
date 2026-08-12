@@ -1,0 +1,67 @@
+version = 1
+retrieved = "2026-08-12"
+
+[[structures]]
+id = "1crn"
+workload = "small protein"
+atom_rows = 327
+cif_gz_url = "https://files.rcsb.org/download/1crn.cif.gz"
+cif_gz_bytes = 17580
+cif_gz_sha256 = "16602cc74cd75747fd48dca2c5f8a674e009bdb50ad521913469769c2bea3c86"
+cif_bytes = 69506
+cif_sha256 = "23787562c427d7c1abe5420e86d5f1d0a6c7007dec1e8ce85645a6d69c32e8ba"
+bcif_url = "https://models.rcsb.org/1crn.bcif"
+bcif_bytes = 151351
+bcif_sha256 = "9b0b12f855cbe1ec15b45d893e28c8f22cf4a616565474dae85d69af30648d86"
+
+[[structures]]
+id = "4hhb"
+workload = "medium protein with ligand and metal"
+atom_rows = 4779
+cif_gz_url = "https://files.rcsb.org/download/4hhb.cif.gz"
+cif_gz_bytes = 187621
+cif_gz_sha256 = "f38119301caea7cd207144b80ed47648e96dfd8ace119acb4837857159682274"
+cif_bytes = 764822
+cif_sha256 = "6c977e3c48fcae60ef116dffff90ce2ae2dbc987f39c3f930d325361a1916812"
+bcif_url = "https://models.rcsb.org/4hhb.bcif"
+bcif_bytes = 530943
+bcif_sha256 = "0480bda9d406e3fed0ddd41027f22e36ad3bfd72df01c3c385acfcf6fc44a86e"
+
+[[structures]]
+id = "1d3z"
+workload = "multi-model NMR ensemble"
+atom_rows = 12310
+cif_gz_url = "https://files.rcsb.org/download/1d3z.cif.gz"
+cif_gz_bytes = 271616
+cif_gz_sha256 = "b516af18d43bfd4a44bda7be14eedbacddfddad1604bcc0eb5317bd9ee516810"
+cif_bytes = 1116383
+cif_sha256 = "7242859f3508ff1711e5b38a78b14c960f137c096f36302406223c93b909c407"
+bcif_url = "https://models.rcsb.org/1d3z.bcif"
+bcif_bytes = 660841
+bcif_sha256 = "9976757699c4d7d339bebdf4e23aee0673ce9d44fb9797ed5d1aa6de5aff8e5d"
+
+[[structures]]
+id = "6qnr"
+workload = "large ribosome"
+atom_rows = 305753
+cif_gz_url = "https://files.rcsb.org/download/6qnr.cif.gz"
+cif_gz_bytes = 8200425
+cif_gz_sha256 = "5e7681c4dbe0137cead6d0de1d5f41690673a96e2a2aaac06e215c3788375f5c"
+cif_bytes = 38853008
+cif_sha256 = "2ebcf56da3caa491bd6c27c4864deb8752bd4d546883085579acc35d3f8643c2"
+bcif_url = "https://models.rcsb.org/6qnr.bcif"
+bcif_bytes = 15741207
+bcif_sha256 = "f380319e3bbac9b41bfbde565e08828a16f3d947c879e92c250cd89bae2c6d86"
+
+[[structures]]
+id = "3j3q"
+workload = "very large ribosomal assembly"
+atom_rows = 2440800
+cif_gz_url = "https://files.rcsb.org/download/3j3q.cif.gz"
+cif_gz_bytes = 49604059
+cif_gz_sha256 = "882b51f5edf58e81eb1223b19575ae441297c3697c3b5f90ff3cf47c5578ee76"
+cif_bytes = 241803672
+cif_sha256 = "6900fc1a7fae2b49d02872458413c48dde7e686ba27a747b1ed486a7b0ba354d"
+bcif_url = "https://models.rcsb.org/3j3q.bcif"
+bcif_bytes = 113322354
+bcif_sha256 = "45e21aec328035f8a2cdf8c6953ebd6c7125241f97ba98f0615a725259f4265d"

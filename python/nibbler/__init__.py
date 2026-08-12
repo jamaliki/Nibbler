@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Literal, NoReturn
+from typing import Literal
 
-from . import cif, mmcif
+from . import cif, components, mmcif
 from ._core import contract_version, native_version
-from .cif import Destination
+from ._objects import MmcifModel
+from .cif import BatchDiagnostics, CifDocument, CifTable, Destination, ScanResult
 from .contracts import (
     Diagnostic,
     MissingKind,
@@ -15,26 +16,48 @@ from .contracts import (
     SourceSpan,
     ValidationReport,
 )
-from .errors import FeatureUnavailableError, NibblerError, ValidationError
+from .errors import (
+    BatchError,
+    ChemistryError,
+    FeatureUnavailableError,
+    NibblerError,
+    ParseError,
+    ProjectionError,
+    SchemaError,
+    ValidationError,
+    WriteError,
+)
 
 __all__ = [
+    "BatchDiagnostics",
+    "BatchError",
+    "ChemistryError",
+    "CifDocument",
+    "CifTable",
     "Diagnostic",
     "FeatureUnavailableError",
     "MissingKind",
+    "MmcifModel",
     "NibblerError",
+    "ParseError",
     "Profile",
+    "ProjectionError",
+    "ScanResult",
+    "SchemaError",
     "Severity",
     "SourceSpan",
     "ValidationError",
     "ValidationReport",
+    "WriteError",
     "chomp",
     "cif",
+    "components",
     "contract_version",
+    "dump",
     "feast",
     "mmcif",
     "native_version",
     "sniff",
-    "spit",
 ]
 
 __version__ = native_version()
@@ -49,37 +72,45 @@ def sniff(
     *,
     profile: Profile | str | None = None,
     schema: str | None = None,
-) -> NoReturn:
+) -> ValidationReport:
     """Validate generic CIF or an explicit macromolecular profile."""
     if profile is None:
-        cif.validate(value, schema=schema)
+        return cif.validate(value, schema=schema)
     if schema is not None:
         raise TypeError("schema and profile are mutually exclusive")
-    mmcif.validate(value, profile=profile)
+    return mmcif.validate(value, profile=profile)
 
 
-def spit(
+def dump(
     value: object,
     destination: Destination,
     *,
     profile: Profile | str | None = None,
     mode: Literal["canonical", "preserve"] = "canonical",
-    validate: Literal["none", "syntax", "dictionary", "profile"] = "syntax",
-) -> NoReturn:
+    validate: Literal["none", "syntax", "dictionary", "profile"] | None = None,
+    mirror_local_qa_metric: int | None = None,
+    format: Literal["cif", "bcif"] | None = None,
+) -> None:
     """Write generic CIF or an explicit macromolecular profile."""
     if profile is None:
-        if validate == "profile":
+        if mirror_local_qa_metric is not None:
+            raise ValueError("mirror_local_qa_metric requires profile='modelcif'")
+        generic_validation = "syntax" if validate is None else validate
+        if generic_validation == "profile":
             raise ValueError("validate='profile' requires a profile")
-        cif.write(
+        return cif.write(
             value,
             destination,
             mode=mode,
-            validate=validate,
+            validate=generic_validation,
+            format=format,
         )
-    mmcif.write(
+    return mmcif.write(
         value,
         destination,
         profile=profile,
         mode=mode,
-        validate=validate,
+        validate="profile" if validate is None else validate,
+        mirror_local_qa_metric=mirror_local_qa_metric,
+        format=format,
     )

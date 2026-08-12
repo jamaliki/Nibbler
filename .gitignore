@@ -1,6 +1,7 @@
 # Native and Python build outputs
 /target/
 /dist/
+/dist-pgo/
 *.egg-info/
 *.so
 *.dylib

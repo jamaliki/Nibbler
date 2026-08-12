@@ -210,6 +210,23 @@ Dependencies used only for tests, fuzzing, generation, or benchmarks MUST remain
 the runtime graph. Generated dictionary artifacts MUST record the generator version and
 input hash and MUST be reproducible without network access.
 
+### 6.1 Current native dependency ledger
+
+- `memchr` provides portable, safe delimiter search in the measured lexer hot path.
+  Default features are disabled. The rejected alternative was retaining scalar byte
+  search, which was slower on every large text-CIF workload.
+- `serde`, `serde_bytes`, and `rmp-serde` define the BinaryCIF MessagePack boundary.
+  Only Serde derive/std and `serde_bytes` std are enabled; BinaryCIF byte blobs borrow
+  from the input. A handwritten MessagePack implementation was rejected because it
+  would duplicate a security-sensitive container parser without improving the CIF
+  domain model.
+
+On the Phase 6 macOS arm64 release build, the extension is 5,970,752 bytes and the
+compressed wheel is 1,661,723 bytes. No pre-Phase-6 wheel from the same worktree was
+retained, so an artifact-size delta is not claimed. The added crates are pure Rust and
+the cached release wheel build completed in 4.94 seconds; clean-build impact is tracked
+by CI rather than inferred from that incremental measurement.
+
 ## 7. Performance without obscurity
 
 Performance work follows this loop:

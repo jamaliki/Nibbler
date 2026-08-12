@@ -28,7 +28,7 @@ expected_diagnostic = "CIF_LOOP_VALUE_COUNT"
 [[fixture]]
 id = "chemistry-ligand-ion-water"
 file = "chemistry/ligand_ion_water.cif"
-sha256 = "5357d5169725d934ae6003a7cced6799fc7c32dc6914028c7be129c9aacc7b32"
+sha256 = "a792ae5884d881acf1d4591a5024d4c5ce60af3ab32eb35c7b466d7e64bf107e"
 classification = "valid"
 profiles = ["cif", "pdbx"]
 features = [
@@ -42,4 +42,41 @@ features = [
   "water",
   "poly-sequence-scheme",
   "nonpoly-scheme",
+  "metal-coordination",
+  "struct-conn",
+]
+
+[[fixture]]
+id = "chemistry-branched-glycan"
+file = "chemistry/branched_glycan.cif"
+sha256 = "29066e0525e0f76c1d04f8c3e2feb7c5db2e022ce67f569803a20ffcad7283d3"
+classification = "valid"
+profiles = ["cif", "pdbx"]
+features = [
+  "branched-entity",
+  "glycan",
+  "branch-component-graph",
+  "branch-scheme",
+  "component-atoms",
+]
+
+[[fixture]]
+id = "modelcif-prediction-with-qa"
+file = "modelcif/prediction_with_qa.cif"
+sha256 = "a490015c0e5c3ec0e50f5672ea82301fa00e74a31226932533b6a6295c8bff1a"
+classification = "valid"
+profiles = ["cif", "modelcif"]
+features = [
+  "prediction-provenance",
+  "target",
+  "model-group",
+  "protocol-data-flow",
+  "software-version",
+  "template",
+  "alignment",
+  "global-qa",
+  "local-qa",
+  "pairwise-qa",
+  "associated-archive",
+  "confidence-b-factor-separation",
 ]

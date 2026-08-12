@@ -42,7 +42,7 @@ _chem_comp.formula
 _chem_comp.formula_weight
 ALA 'L-peptide linking' n ALANINE 'C3 H7 N O2' 89.093
 MSE 'L-peptide linking' y SELENOMETHIONINE 'C5 H11 N O2 Se' 196.106
-ATP non-polymer . ADENOSINE-5'-TRIPHOSPHATE 'C10 H16 N5 O13 P3' 507.181
+ATP non-polymer . "ADENOSINE-5'-TRIPHOSPHATE" 'C10 H16 N5 O13 P3' 507.181
 ZN non-polymer . 'ZINC ION' 'Zn 2' 65.409
 HOH non-polymer . WATER 'H2 O' 18.015
 
@@ -59,7 +59,7 @@ loop_
 _pdbx_entity_nonpoly.entity_id
 _pdbx_entity_nonpoly.name
 _pdbx_entity_nonpoly.comp_id
-2 ADENOSINE-5'-TRIPHOSPHATE ATP
+2 "ADENOSINE-5'-TRIPHOSPHATE" ATP
 3 'ZINC ION' ZN
 4 WATER HOH
 
@@ -95,6 +95,14 @@ C 3 ZN 1 501 501 ZN ZN Z .
 D 4 HOH 1 900 900 HOH HOH W .
 
 loop_
+_atom_type.symbol
+C
+Se
+P
+Zn
+O
+
+loop_
 _atom_site.group_PDB
 _atom_site.id
 _atom_site.type_symbol
@@ -122,3 +130,18 @@ HETATM 3 P PG A ATP B 2 . ? 7.000 1.000 0.000 0.60 20.00 ? -1 ATP L PG 1
 HETATM 4 P PG B ATP B 2 . ? 7.200 1.100 0.100 0.40 21.00 ? -1 ATP L PG 1
 HETATM 5 Zn ZN . ZN C 3 . ? 9.000 0.000 0.000 1.00 18.00 2 501 ZN Z ZN 1
 HETATM 6 O O . HOH D 4 . ? 12.000 0.000 0.000 1.00 25.00 ? 900 HOH W O 1
+
+_struct_conn_type.id metalc
+
+loop_
+_struct_conn.id
+_struct_conn.conn_type_id
+_struct_conn.ptnr1_label_comp_id
+_struct_conn.ptnr1_label_asym_id
+_struct_conn.ptnr1_label_seq_id
+_struct_conn.ptnr1_label_atom_id
+_struct_conn.ptnr2_label_comp_id
+_struct_conn.ptnr2_label_asym_id
+_struct_conn.ptnr2_label_seq_id
+_struct_conn.ptnr2_label_atom_id
+ZN1 metalc ATP B . PG ZN C . ZN

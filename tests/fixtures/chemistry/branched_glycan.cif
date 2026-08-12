@@ -1,0 +1,103 @@
+data_nibbler_branched_glycan
+_entry.id NIBBLER_BRANCHED_GLYCAN
+
+loop_
+_audit_conform.dict_name
+_audit_conform.dict_version
+_audit_conform.dict_location
+mmcif_pdbx.dic 5.416 https://mmcif.wwpdb.org/dictionaries/ascii/mmcif_pdbx.dic
+
+loop_
+_entity.id
+_entity.type
+_entity.pdbx_description
+1 branched 'NAG-MAN test glycan'
+
+_pdbx_entity_branch.entity_id 1
+_pdbx_entity_branch.type oligosaccharide
+
+loop_
+_pdbx_entity_branch_list.entity_id
+_pdbx_entity_branch_list.num
+_pdbx_entity_branch_list.comp_id
+_pdbx_entity_branch_list.hetero
+1 1 NAG n
+1 2 MAN n
+
+loop_
+_pdbx_entity_branch_link.link_id
+_pdbx_entity_branch_link.entity_id
+_pdbx_entity_branch_link.entity_branch_list_num_1
+_pdbx_entity_branch_link.comp_id_1
+_pdbx_entity_branch_link.atom_id_1
+_pdbx_entity_branch_link.leaving_atom_id_1
+_pdbx_entity_branch_link.entity_branch_list_num_2
+_pdbx_entity_branch_link.comp_id_2
+_pdbx_entity_branch_link.atom_id_2
+_pdbx_entity_branch_link.leaving_atom_id_2
+_pdbx_entity_branch_link.value_order
+1 1 1 NAG O4 HO4 2 MAN C1 O1 sing
+
+loop_
+_chem_comp.id
+_chem_comp.type
+_chem_comp.name
+NAG 'D-saccharide, beta linking' 'N-ACETYL-D-GLUCOSAMINE'
+MAN 'D-saccharide, alpha linking' 'ALPHA-D-MANNOSE'
+
+loop_
+_chem_comp_atom.comp_id
+_chem_comp_atom.atom_id
+_chem_comp_atom.type_symbol
+NAG O4 O
+NAG HO4 H
+MAN C1 C
+MAN O1 O
+
+_struct_asym.id G
+_struct_asym.entity_id 1
+
+loop_
+_pdbx_branch_scheme.asym_id
+_pdbx_branch_scheme.entity_id
+_pdbx_branch_scheme.mon_id
+_pdbx_branch_scheme.num
+_pdbx_branch_scheme.pdb_asym_id
+_pdbx_branch_scheme.pdb_mon_id
+_pdbx_branch_scheme.pdb_seq_num
+_pdbx_branch_scheme.auth_mon_id
+_pdbx_branch_scheme.auth_asym_id
+_pdbx_branch_scheme.auth_seq_num
+_pdbx_branch_scheme.hetero
+G 1 NAG 1 G NAG 1 NAG G 1 n
+G 1 MAN 2 G MAN 2 MAN G 2 n
+
+loop_
+_atom_type.symbol
+C
+O
+
+loop_
+_atom_site.group_PDB
+_atom_site.id
+_atom_site.type_symbol
+_atom_site.label_atom_id
+_atom_site.label_alt_id
+_atom_site.label_comp_id
+_atom_site.label_asym_id
+_atom_site.label_entity_id
+_atom_site.label_seq_id
+_atom_site.pdbx_PDB_ins_code
+_atom_site.Cartn_x
+_atom_site.Cartn_y
+_atom_site.Cartn_z
+_atom_site.occupancy
+_atom_site.B_iso_or_equiv
+_atom_site.pdbx_formal_charge
+_atom_site.auth_seq_id
+_atom_site.auth_comp_id
+_atom_site.auth_asym_id
+_atom_site.auth_atom_id
+_atom_site.pdbx_PDB_model_num
+HETATM 1 O O4 . NAG G 1 . ? 0.000 0.000 0.000 1.00 10.00 ? 1 NAG G O4 1
+HETATM 2 C C1 . MAN G 1 . ? 1.400 0.000 0.000 1.00 10.00 ? 2 MAN G C1 1

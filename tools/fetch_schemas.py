@@ -30,12 +30,15 @@ class SchemaLock(TypedDict):
     url: str
     sha256: str
     retrieved_on: str
+    artifact: str
+    extensions: list[str]
 
 
 class SchemaLocks(TypedDict):
     """Serialized schema-lock document."""
 
     format_version: int
+    artifact_format_version: int
     schema: list[SchemaLock]
 
 

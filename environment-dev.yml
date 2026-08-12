@@ -10,3 +10,12 @@ dependencies:
   - mypy=2.3.0
   - tomli=2.4.1
   - gemmi=0.7.5
+  - pyarrow=25.0.0
+  - polars=1.43.2
+  - pandas=2.3.3
+  - biotite=1.7.1
+  - biopython=1.88
+  - pip
+  - pip:
+      - pdbe-mmcif-validator==0.1.92
+      - modelcif==1.7

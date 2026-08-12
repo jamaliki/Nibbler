@@ -233,7 +233,7 @@ The initial root facade contains four themed operations:
 | `nibbler.chomp()` | Parse one source | `nibbler.cif.read()` |
 | `nibbler.feast()` | Parse or scan many sources | `nibbler.cif.scan()` |
 | `nibbler.sniff()` | Validate a document or model | `nibbler.cif.validate()` or `nibbler.mmcif.validate()` |
-| `nibbler.spit()` | Write a document or model | `nibbler.cif.write()` or `nibbler.mmcif.write()` |
+| `nibbler.dump()` | Write a document or model | `nibbler.cif.write()` or `nibbler.mmcif.write()` |
 
 The facade is intentionally small. New themed verbs require a distinct high-level job;
 they MUST NOT become synonyms for existing calls.
@@ -306,7 +306,7 @@ silent skip mode is forbidden.
 report = nibbler.sniff(model, profile="modelcif")
 report.raise_for_errors()
 
-nibbler.spit(
+nibbler.dump(
     model,
     "prediction.cif.gz",
     profile="modelcif",
@@ -315,7 +315,7 @@ nibbler.spit(
 )
 ```
 
-`spit()` dispatches only on explicit Nibbler types. A bare dataframe is ambiguous and
+`dump()` dispatches only on explicit Nibbler types. A bare dataframe is ambiguous and
 MUST first be converted with `nibbler.cif.from_dataframe()`, providing block, category,
 schema, and null-kind policies.
 
@@ -332,9 +332,9 @@ when profitable. Bytes and decompressed content are owned by a reference-counted
 buffer. Full documents may retain value spans into this buffer; projected tables parse
 selected values directly into typed builders.
 
-The source layer detects compression by magic bytes. Filename suffixes are advisory.
-Initial compression support is gzip. BinaryCIF is a later decoder feeding the same
-logical and table sinks.
+The source layer detects compression and format by magic bytes. Filename suffixes are
+advisory. Gzip and BinaryCIF 0.3 feed the same logical and table models rather than
+introducing format-specific public object hierarchies.
 
 ### 6.2 Tokens
 
@@ -617,7 +617,7 @@ Component resolution is deterministic:
    atomic ions.
 5. An unresolved component result.
 
-There is no network lookup in `chomp()`, `sniff()`, or `spit()`. An explicit
+There is no network lookup in `chomp()`, `sniff()`, or `dump()`. An explicit
 `nibbler.components.sync_ccd()` command may manage a versioned cache outside the hot
 path.
 
@@ -712,7 +712,7 @@ connections. It never mutates the parsed source model silently.
 A lossy ML projection is not a serialization model. For example, ADFLIP's inspected
 `StructureData` omits atom names and maps unsupported residues to `<UNK>`; those arrays
 do not contain enough information to reconstruct a correct ligand CIF. Nibbler adapters
-may produce such views for training, but `spit()` rejects them. Callers that need to
+may produce such views for training, but `dump()` rejects them. Callers that need to
 write after ML processing must retain the source-backed `MmcifModel` and attach model
 outputs to its stable atom/component identifiers.
 
@@ -847,7 +847,7 @@ encoding produce an error. The writer never alters content merely to avoid quoti
 
 ### 14.5 Transactional output
 
-For a filesystem destination, `spit()` writes to a temporary file in the destination
+For a filesystem destination, `dump()` writes to a temporary file in the destination
 directory, validates that file, flushes it, and atomically replaces the destination.
 A failed build or validation never leaves a partial target file.
 
@@ -865,7 +865,7 @@ profile     PDBx coordinate-model or ModelCIF semantic completeness
 external    independent parser and validator checks used in CI/release qualification
 ```
 
-High-level `spit()` defaults to `validate="profile"` for an `MmcifModel` and
+High-level `dump()` defaults to `validate="profile"` for an `MmcifModel` and
 `validate="syntax"` for a generic `CifDocument`. Disabling validation requires the
 explicit value `validate="none"`.
 
@@ -921,9 +921,14 @@ External tools are qualification dependencies, not runtime dependencies.
 
 ## 16. Concurrency, resource limits, and security
 
-Parsing one file is single-threaded initially. `feast()` parallelizes independent files
-through a bounded native worker pool and releases the GIL. The main process reorders
-completed results into deterministic input order.
+Small files and outer CIF grammar remain single-threaded. Large loops use bounded
+intra-file parallelism after a serial grammar owner has validated the loop header and
+identified lexically safe partitions. Workers validate/count values, project row-aligned
+chunks or retain exactly sized document chunks, and return results in source order. A
+process-wide inner-worker budget prevents concurrent reads from each launching another
+full intra-file worker pool.
+`feast()` additionally parallelizes independent files and restores deterministic input
+order. All native work releases the GIL.
 
 Configurable hard limits include:
 
@@ -1086,7 +1091,7 @@ Exit gate: projected parsing is correct and benchmarked against all baselines.
 
 - Parse and compile pinned PDBx and ModelCIF dictionaries.
 - Implement dictionary constraints and schema locks.
-- Add `sniff()` and transactional generic `spit()`.
+- Add `sniff()` and transactional generic `dump()`.
 
 Exit gate: generated generic/PDBx category tables pass Nibbler and PDBe dictionary
 validation for the supported constraint set.
@@ -1114,6 +1119,16 @@ Exit gate: goldens pass Nibbler, PDBe, Gemmi, and Python-ModelCIF validation.
 - Consider additional compression backends and SIMD only where profiles show a hotspot.
 - Consider exact comment/trivia preservation if real editing workloads require it.
 
+Implemented scope: complete BinaryCIF 0.3 encoding-chain decoding, deterministic
+encoding, content-based dispatch, direct columnar projection, source-order preserving
+text output with original value lexemes, and a hash-pinned real-PDB stress corpus.
+Exact comments and inter-token whitespace remain intentionally unretained because no
+editing workload has yet justified their document-wide memory cost.
+
+Exit gate: CIF and BinaryCIF projections are semantically equal across the pinned PDB
+stress corpus, malformed chains fail structurally, and staged release benchmarks report
+native projection separately from file reads, Arrow import, and Python materialization.
+
 ## 20. Decisions that remain open
 
 The following require prototypes or corpus measurements:
@@ -1124,9 +1139,6 @@ The following require prototypes or corpus measurements:
 4. The size and update mechanism of the bundled minimal component registry.
 5. Whether comment preservation is default or opt-in for full-document parsing.
 6. The exact permissive coordinate-only rules for unresolved custom ligands.
-7. Whether `spit` remains the final public writer verb after user testing; the
-   conventional `nibbler.cif.write` and `nibbler.mmcif.write` names are fixed.
-
 Open decisions do not weaken these invariants: no silent data loss, no implicit chemical
 guessing, no collapsed CIF missing states internally, no duplicate parser, and no claim
 of semantic completeness without profile validation.

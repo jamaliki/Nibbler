@@ -2,14 +2,29 @@
 
 from __future__ import annotations
 
+import gzip
+import os
+import tempfile
 from collections.abc import Iterable, Mapping, Sequence
 from os import PathLike
-from typing import BinaryIO, Literal, NoReturn, TypeAlias
+from pathlib import Path
+from typing import BinaryIO, Literal, TypeAlias
 
-from .contracts import Profile
-from .errors import FeatureUnavailableError
+from . import _core
+from ._input import (
+    Source,
+    _normalize_predicates,
+    _normalize_source,
+    _raise_native_error,
+)
+from ._objects import CifDocument as CifDocument
+from ._objects import CifTable as CifTable
+from ._objects import MissingPolicy as MissingPolicy
+from ._scan import BatchDiagnostics as BatchDiagnostics
+from ._scan import ScanResult as ScanResult
+from .contracts import Diagnostic, Profile, Severity, ValidationReport
+from .errors import SchemaError, WriteError
 
-Source: TypeAlias = str | PathLike[str] | bytes | bytearray | memoryview | BinaryIO
 Destination: TypeAlias = str | PathLike[str] | BinaryIO
 
 
@@ -20,10 +35,43 @@ def read(
     columns: Sequence[str] | None = None,
     where: Mapping[str, object] | None = None,
     schema: str | None = None,
-) -> NoReturn:
-    """Parse one CIF source once the shared Rust parser is available."""
-    del source, category, columns, where, schema
-    raise FeatureUnavailableError("nibbler.cif.read", required_phase=2)
+) -> CifDocument | CifTable:
+    """Parse one filesystem, bytes-like, or binary-file CIF source.
+
+    With no category this returns :class:`CifDocument`; with one category it returns
+    :class:`CifTable`. Gzip is detected by content. Parsing and decompression release
+    the GIL.
+    """
+    if category is None and (columns is not None or where is not None):
+        raise TypeError("columns and where require category")
+    normalized_schema = None if schema is None else _normalize_schema(schema)
+
+    normalized_columns = None if columns is None else list(columns)
+    predicates = _normalize_predicates(where)
+    source_name, content = _normalize_source(source)
+    try:
+        if content is None:
+            native = _core.read_file(
+                source_name,
+                category,
+                normalized_columns,
+                predicates,
+                normalized_schema,
+            )
+        else:
+            native = _core.read_bytes(
+                source_name,
+                content,
+                category,
+                normalized_columns,
+                predicates,
+                normalized_schema,
+            )
+    except ValueError as error:
+        _raise_native_error(error)
+    if isinstance(native, _core._CifDocument):
+        return CifDocument(native, normalized_schema)
+    return CifTable(native)
 
 
 def scan(
@@ -35,16 +83,55 @@ def scan(
     schema: str | None = None,
     workers: int | None = None,
     on_error: Literal["raise", "collect"] = "raise",
-) -> NoReturn:
-    """Parse many CIF sources once bounded native scanning is available."""
-    del sources, category, columns, where, schema, workers, on_error
-    raise FeatureUnavailableError("nibbler.cif.scan", required_phase=2)
+) -> ScanResult:
+    """Parse many sources through a bounded, deterministic native worker pool."""
+    if category is None and (columns is not None or where is not None):
+        raise TypeError("columns and where require category")
+    normalized_schema = None if schema is None else _normalize_schema(schema)
+    if on_error not in {"raise", "collect"}:
+        raise ValueError("on_error must be 'raise' or 'collect'")
+    worker_count = min(32, os.cpu_count() or 1) if workers is None else workers
+    if not 1 <= worker_count <= 256:
+        raise ValueError("workers must be between 1 and 256")
+    return ScanResult(
+        sources,
+        category=category,
+        columns=columns,
+        predicates=_normalize_predicates(where),
+        schema=normalized_schema,
+        workers=worker_count,
+        on_error=on_error,
+    )
 
 
-def validate(value: object, *, schema: str | None = None) -> NoReturn:
-    """Validate generic CIF syntax and dictionary constraints."""
-    del value, schema
-    raise FeatureUnavailableError("nibbler.cif.validate", required_phase=3)
+def validate(value: object, *, schema: str | None = None) -> ValidationReport:
+    """Validate generic CIF syntax and optional dictionary constraints."""
+    if not isinstance(value, CifDocument):
+        raise TypeError("nibbler.cif.validate() requires CifDocument")
+    selected = value.schema if schema is None else _normalize_schema(schema)
+    if selected is None:
+        return ValidationReport(coverage=("cif-1.1-syntax",))
+    try:
+        schema_name, version, coverage, fields = _core.validate_document(
+            value._native, selected
+        )
+    except ValueError as error:
+        _raise_schema_error(error)
+    diagnostics = tuple(
+        Diagnostic(
+            code=code,
+            severity=Severity(severity),
+            message=message,
+            context=tuple(context),
+        )
+        for code, severity, message, context in fields
+    )
+    return ValidationReport(
+        diagnostics,
+        schema=schema_name,
+        dictionary_version=version,
+        coverage=tuple(coverage),
+    )
 
 
 def write(
@@ -53,10 +140,163 @@ def write(
     *,
     mode: Literal["canonical", "preserve"] = "canonical",
     validate: Literal["none", "syntax", "dictionary"] = "syntax",
-) -> NoReturn:
-    """Write generic CIF once the shared serializer is available."""
-    del value, destination, mode, validate
-    raise FeatureUnavailableError("nibbler.cif.write", required_phase=3)
+    format: Literal["cif", "bcif"] | None = None,
+) -> None:
+    """Serialize CIF or BinaryCIF without leaving a partial path destination."""
+    if not isinstance(value, CifDocument):
+        raise TypeError("nibbler.cif.write() requires CifDocument")
+    if mode not in {"canonical", "preserve"}:
+        raise ValueError("mode must be 'canonical' or 'preserve'")
+    if validate not in {"none", "syntax", "dictionary"}:
+        raise ValueError("validate must be 'none', 'syntax', or 'dictionary'")
+    if validate == "dictionary":
+        if value.schema is None:
+            raise SchemaError(
+                code="CIF_SCHEMA_REQUIRED",
+                message="validate='dictionary' requires a schema-attached document",
+            )
+        _validation_report(value).raise_for_errors()
+
+    destination_file = _destination_file(destination)
+    output_format = _output_format(destination_file, format)
+    if mode == "preserve" and output_format == "bcif":
+        raise ValueError("mode='preserve' requires format='cif'")
+    payload = _document_payload(value, mode, output_format)
+    if destination_file is None:
+        _write_stream(destination, payload)
+        return
+    if destination_file.name.lower().endswith(".gz"):
+        payload = gzip.compress(payload, mtime=0)
+    _write_path_transactionally(destination_file, payload, value.schema, validate)
+
+
+def _normalize_schema(schema: str) -> str:
+    if not isinstance(schema, str):
+        raise TypeError("schema must be a string")
+    normalized = schema.lower()
+    if normalized == "mmcif":
+        return "pdbx"
+    if normalized not in {"pdbx", "modelcif"}:
+        raise SchemaError(
+            code="CIF_SCHEMA_UNKNOWN",
+            message=f"unknown schema {schema!r}; expected 'pdbx' or 'modelcif'",
+        )
+    return normalized
+
+
+def _raise_schema_error(error: ValueError) -> None:
+    if len(error.args) != 2:
+        raise error
+    code, message = error.args
+    raise SchemaError(code=str(code), message=str(message)) from None
+
+
+def _document_payload(
+    document: CifDocument,
+    mode: Literal["canonical", "preserve"],
+    output_format: Literal["cif", "bcif"],
+) -> bytes:
+    try:
+        if output_format == "bcif":
+            return document.to_binary()
+        text = (
+            document.to_preserving() if mode == "preserve" else document.to_canonical()
+        )
+        return text.encode("utf-8")
+    except ValueError as error:
+        if len(error.args) != 2:
+            raise
+        code, message = error.args
+        raise WriteError(code=str(code), message=str(message)) from None
+
+
+def _output_format(
+    destination: Path | None,
+    requested: Literal["cif", "bcif"] | None,
+) -> Literal["cif", "bcif"]:
+    if requested is not None:
+        if requested not in {"cif", "bcif"}:
+            raise ValueError("format must be 'cif' or 'bcif'")
+        return requested
+    if destination is not None:
+        name = destination.name.lower()
+        if name.endswith(".bcif") or name.endswith(".bcif.gz"):
+            return "bcif"
+    return "cif"
+
+
+def _destination_file(destination: Destination) -> Path | None:
+    if not isinstance(destination, (str, os.PathLike)):
+        return None
+    file = os.fspath(destination)
+    if not isinstance(file, str):
+        raise TypeError("filesystem destinations must resolve to a string path")
+    return Path(file)
+
+
+def _write_stream(destination: Destination, payload: bytes) -> None:
+    writer = getattr(destination, "write", None)
+    if writer is None:
+        raise TypeError("destination must be a path or writable binary stream")
+    try:
+        written = writer(payload)
+    except OSError as error:
+        raise WriteError(code="CIF_WRITE_IO", message=str(error)) from error
+    if written is not None and written != len(payload):
+        raise WriteError(
+            code="CIF_WRITE_SHORT",
+            message=f"binary stream accepted {written} of {len(payload)} bytes",
+        )
+
+
+def _write_path_transactionally(
+    destination: Path,
+    payload: bytes,
+    schema: str | None,
+    validation: Literal["none", "syntax", "dictionary"],
+) -> None:
+    parent = destination.parent or Path(".")
+    descriptor = -1
+    temporary: Path | None = None
+    try:
+        descriptor, temporary_name = tempfile.mkstemp(
+            dir=parent, prefix=f".{destination.name}.", suffix=".tmp"
+        )
+        temporary = Path(temporary_name)
+        with os.fdopen(descriptor, "wb") as output:
+            descriptor = -1
+            output.write(payload)
+            output.flush()
+            os.fsync(output.fileno())
+        if validation != "none":
+            reparsed = read(temporary)
+            if not isinstance(reparsed, CifDocument):
+                raise WriteError(
+                    code="CIF_WRITE_REPARSE",
+                    message="transactional output did not reparse as a document",
+                    destination=str(destination),
+                )
+            if validation == "dictionary":
+                _validation_report(reparsed, schema=schema).raise_for_errors()
+        os.replace(temporary, destination)
+        temporary = None
+    except OSError as error:
+        raise WriteError(
+            code="CIF_WRITE_IO",
+            message=str(error),
+            destination=str(destination),
+        ) from error
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def _validation_report(
+    document: CifDocument, *, schema: str | None = None
+) -> ValidationReport:
+    return validate(document, schema=schema)
 
 
 def validate_profile(profile: Profile | str) -> Profile:

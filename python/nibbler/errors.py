@@ -22,8 +22,104 @@ class FeatureUnavailableError(NibblerError):
         self.operation = operation
         self.required_phase = required_phase
         super().__init__(
-            f"{operation} is not implemented in Phase 0; "
+            f"{operation} is not implemented in this build; "
             f"it is scheduled for Phase {required_phase}"
+        )
+
+
+class ParseError(NibblerError):
+    """A structured source, decompression, or CIF syntax failure."""
+
+    def __init__(
+        self,
+        *,
+        code: str,
+        message: str,
+        source_name: str | None = None,
+        line: int | None = None,
+        column: int | None = None,
+        byte_start: int | None = None,
+        byte_end: int | None = None,
+    ) -> None:
+        self.code = code
+        self.message = message
+        self.source_name = source_name
+        self.line = line
+        self.column = column
+        self.byte_start = byte_start
+        self.byte_end = byte_end
+        location = source_name or "<unknown>"
+        if line is not None and column is not None:
+            location = f"{location}:{line}:{column}"
+        super().__init__(f"{location}: {code}: {message}")
+
+
+class ProjectionError(ParseError):
+    """A malformed projection plan or incompatible category occurrence."""
+
+
+class SchemaError(NibblerError):
+    """A schema selector, lock, artifact, or dictionary setup failure."""
+
+    def __init__(self, *, code: str, message: str) -> None:
+        self.code = code
+        self.message = message
+        super().__init__(f"{code}: {message}")
+
+
+class ChemistryError(NibblerError):
+    """A structured failure while constructing a semantic coordinate model."""
+
+    def __init__(
+        self, *, code: str, message: str, context: tuple[str, ...] = ()
+    ) -> None:
+        self.code = code
+        self.message = message
+        self.context = context
+        super().__init__(f"{code}: {message}")
+
+
+class WriteError(NibblerError):
+    """A serialization or destination failure that leaves paths unmodified."""
+
+    def __init__(
+        self,
+        *,
+        code: str,
+        message: str,
+        destination: str | None = None,
+    ) -> None:
+        self.code = code
+        self.message = message
+        self.destination = destination
+        location = "" if destination is None else f"{destination}: "
+        super().__init__(f"{location}{code}: {message}")
+
+
+class BatchError(ParseError):
+    """One source failure collected by a deterministic batch scan."""
+
+    def __init__(
+        self,
+        source_index: int,
+        *,
+        code: str,
+        message: str,
+        source_name: str | None = None,
+        line: int | None = None,
+        column: int | None = None,
+        byte_start: int | None = None,
+        byte_end: int | None = None,
+    ) -> None:
+        self.source_index = source_index
+        super().__init__(
+            code=code,
+            message=message,
+            source_name=source_name,
+            line=line,
+            column=column,
+            byte_start=byte_start,
+            byte_end=byte_end,
         )
 
 

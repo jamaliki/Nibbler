@@ -1,0 +1,37 @@
+[package]
+name = "nibbler-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+rust-version = "1.85"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+nibbler-core = { path = "..", features = ["fuzzing"] }
+
+[[bin]]
+name = "lexer"
+path = "fuzz_targets/lexer.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_round_trip"
+path = "fuzz_targets/parser_round_trip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "formatter"
+path = "fuzz_targets/formatter.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+members = ["."]
