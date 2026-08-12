@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::pdbx::category::case_key;
+use crate::pdbx::fields::case_key;
 
 use super::validation::Validator;
 

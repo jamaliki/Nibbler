@@ -16,7 +16,7 @@ const COVERAGE: &[&str] = &[
 /// Validation diagnostic severity.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Severity {
-    /// Input violates a supported dictionary constraint.
+    /// Input violates an applied dictionary or semantic-profile constraint.
     Error,
     /// Validation coverage or source metadata deserves attention.
     Warning,
@@ -33,7 +33,7 @@ impl Severity {
     }
 }
 
-/// One stable dictionary-validation finding.
+/// One stable validation finding.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Diagnostic {
     pub(super) code: &'static str,
@@ -43,6 +43,20 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
+    pub(crate) fn new(
+        code: &'static str,
+        severity: Severity,
+        message: impl Into<String>,
+        context: Vec<String>,
+    ) -> Self {
+        Self {
+            code,
+            severity,
+            message: message.into(),
+            context,
+        }
+    }
+
     /// Return the stable machine-readable code.
     #[must_use]
     pub const fn code(&self) -> &'static str {
@@ -61,14 +75,14 @@ impl Diagnostic {
         &self.message
     }
 
-    /// Return block, frame, category, item, row, and dictionary context when known.
+    /// Return the structured source or semantic context available for this finding.
     #[must_use]
     pub fn context(&self) -> &[String] {
         &self.context
     }
 }
 
-/// An immutable result for one exact compiled dictionary.
+/// An immutable dictionary or semantic-profile validation result.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ValidationReport {
     schema_name: String,
@@ -78,6 +92,30 @@ pub struct ValidationReport {
 }
 
 impl ValidationReport {
+    pub(crate) fn semantic_profile(
+        schema_name: &'static str,
+        dictionary_version: &'static str,
+        coverage: &'static [&'static str],
+        truncation_code: &'static str,
+        mut diagnostics: Vec<Diagnostic>,
+    ) -> Self {
+        if diagnostics.len() > MAX_DIAGNOSTICS {
+            diagnostics.truncate(MAX_DIAGNOSTICS);
+            diagnostics.push(Diagnostic::new(
+                truncation_code,
+                Severity::Warning,
+                format!("validation stopped after {MAX_DIAGNOSTICS} findings"),
+                Vec::new(),
+            ));
+        }
+        Self {
+            schema_name: schema_name.to_owned(),
+            dictionary_version: dictionary_version.to_owned(),
+            coverage: coverage.iter().map(|value| (*value).to_owned()).collect(),
+            diagnostics,
+        }
+    }
+
     /// Return the selected schema name.
     #[must_use]
     pub fn schema_name(&self) -> &str {

@@ -5,8 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 from . import cif, components, mmcif
-from ._core import contract_version, native_version
-from ._objects import MmcifModel
+from ._core import MmcifModel, contract_version, native_version
 from .cif import BatchDiagnostics, CifDocument, CifTable, Destination, ScanResult
 from .contracts import (
     Diagnostic,

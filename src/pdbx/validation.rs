@@ -2,46 +2,73 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::cif::{CifDocument, SchemaError, SchemaName, validate_document as validate_cif};
+use crate::cif::{
+    CifDocument, Diagnostic, SchemaError, SchemaName, Severity, ValidationReport,
+    validate_document as validate_cif,
+};
 
-use super::category::case_key;
+use super::fields::case_key;
 use super::model::{
     AsymUnit, AtomSite, ComponentDefinition, ComponentResolution, Entity, PdbxModel,
 };
-use super::profile::{
-    MAX_DIAGNOSTICS, ProfileDiagnostic, ProfileSeverity, ProfileValidationReport,
-    dictionary_diagnostics,
-};
 use super::source::build_model;
+
+const MAX_DIAGNOSTICS: usize = 10_000;
+const COVERAGE: &[&str] = &[
+    "pdbx-ddl2-5.416",
+    "entity-asym-coherence",
+    "polymer-sequence-schemes",
+    "nonpolymer-water-schemes",
+    "branched-entity-graphs",
+    "chemical-component-resolution",
+    "component-atom-bonds",
+    "atom-site-identity-coordinates",
+    "struct-conn-endpoints",
+];
 
 /// Validate a source document against both the pinned PDBx dictionary and semantic profile.
 ///
 /// # Errors
 ///
 /// Returns [`SchemaError`] only if the embedded PDBx dictionary cannot be loaded.
-pub fn validate_document(document: &CifDocument) -> Result<ProfileValidationReport, SchemaError> {
+pub fn validate_document(document: &CifDocument) -> Result<ValidationReport, SchemaError> {
     let dictionary = validate_cif(document, SchemaName::Pdbx)?;
-    let mut diagnostics = dictionary_diagnostics(&dictionary);
+    let mut diagnostics = dictionary.diagnostics().to_vec();
     match build_model(document) {
         Ok(model) => diagnostics.extend(validate_semantics(&model)),
-        Err(error) => diagnostics.push(ProfileDiagnostic::from_semantic(&error)),
+        Err(error) => diagnostics.push(Diagnostic::new(
+            error.code(),
+            Severity::Error,
+            error.message(),
+            error.context().to_vec(),
+        )),
     }
-    Ok(ProfileValidationReport::pdbx(diagnostics))
+    Ok(report(diagnostics))
 }
 
 /// Validate one constructed PDBx model against semantic profile invariants.
 #[must_use]
-pub fn validate_model(model: &PdbxModel) -> ProfileValidationReport {
-    ProfileValidationReport::pdbx(validate_semantics(model))
+pub fn validate_model(model: &PdbxModel) -> ValidationReport {
+    report(validate_semantics(model))
 }
 
-fn validate_semantics(model: &PdbxModel) -> Vec<ProfileDiagnostic> {
+fn report(diagnostics: Vec<Diagnostic>) -> ValidationReport {
+    ValidationReport::semantic_profile(
+        "pdbx",
+        "5.416",
+        COVERAGE,
+        "PDBX_DIAGNOSTICS_TRUNCATED",
+        diagnostics,
+    )
+}
+
+fn validate_semantics(model: &PdbxModel) -> Vec<Diagnostic> {
     let mut validator = Validator {
         model,
         diagnostics: Vec::new(),
-        entities: index(model.entities(), Entity::id),
-        asym_units: index(model.asym_units(), AsymUnit::id),
-        components: index(model.components(), ComponentDefinition::id),
+        entities: index(&model.entities, |value| &value.id),
+        asym_units: index(&model.asym_units, |value| &value.id),
+        components: index(&model.components, |value| &value.id),
     };
     validator.audit_conform();
     validator.identifiers();
@@ -55,7 +82,7 @@ fn validate_semantics(model: &PdbxModel) -> Vec<ProfileDiagnostic> {
 
 pub(super) struct Validator<'a> {
     pub(super) model: &'a PdbxModel,
-    pub(super) diagnostics: Vec<ProfileDiagnostic>,
+    pub(super) diagnostics: Vec<Diagnostic>,
     pub(super) entities: BTreeMap<String, &'a Entity>,
     pub(super) asym_units: BTreeMap<String, &'a AsymUnit>,
     pub(super) components: BTreeMap<String, &'a ComponentDefinition>,
@@ -83,24 +110,24 @@ impl Validator<'_> {
         self.unique(
             "PDBX_ENTITY_ID_DUPLICATE",
             "entity",
-            self.model.entities(),
-            Entity::id,
+            &self.model.entities,
+            |value| &value.id,
         );
         self.unique(
             "PDBX_ASYM_ID_DUPLICATE",
             "asym",
-            self.model.asym_units(),
-            AsymUnit::id,
+            &self.model.asym_units,
+            |value| &value.id,
         );
         self.unique(
             "PDBX_ATOM_ID_DUPLICATE",
             "atom",
-            self.model.atom_sites(),
-            AtomSite::id,
+            &self.model.atom_sites,
+            |value| &value.id,
         );
         let mut connections = BTreeSet::new();
-        for connection in self.model.connections() {
-            let (id, _) = connection.identity();
+        for connection in &self.model.connections {
+            let id = &connection.id;
             if !connections.insert(case_key(id)) {
                 self.error(
                     "PDBX_CONNECTION_ID_DUPLICATE",
@@ -112,44 +139,44 @@ impl Validator<'_> {
     }
 
     fn components(&mut self) {
-        for component in self.model.components() {
-            if component.resolution() == ComponentResolution::Unresolved {
+        for component in &self.model.components {
+            if component.resolution == ComponentResolution::Unresolved {
                 self.error(
                     "PDBX_COMPONENT_UNRESOLVED",
-                    format!("component {:?} has no embedded, caller, CCD, or minimal-registry definition", component.id()),
+                    format!("component {:?} has no embedded, caller, CCD, or minimal-registry definition", component.id),
                     component_context(component),
                 );
             }
-            if component.component_type().is_none() {
+            if component.component_type.is_none() {
                 self.error(
                     "PDBX_COMPONENT_DEFINITION",
-                    format!("component {:?} has no PDBx component type", component.id()),
+                    format!("component {:?} has no PDBx component type", component.id),
                     component_context(component),
                 );
             }
             let atoms = component
-                .atoms()
+                .atoms
                 .iter()
-                .map(|atom| case_key(atom.atom_id()))
+                .map(|atom| case_key(&atom.atom_id))
                 .collect::<BTreeSet<_>>();
-            if atoms.len() != component.atoms().len() {
+            if atoms.len() != component.atoms.len() {
                 self.error(
                     "PDBX_COMPONENT_ATOM_DUPLICATE",
                     format!(
                         "component {:?} has duplicate atom identifiers",
-                        component.id()
+                        component.id
                     ),
                     component_context(component),
                 );
             }
-            for bond in component.bonds() {
-                let (first, second) = bond.atom_ids();
+            for bond in &component.bonds {
+                let (first, second) = (&bond.first_atom_id, &bond.second_atom_id);
                 if !atoms.contains(&case_key(first)) || !atoms.contains(&case_key(second)) {
                     self.error(
                         "PDBX_COMPONENT_BOND_ENDPOINT",
                         format!(
                             "component {:?} bond {first:?}-{second:?} references an absent atom",
-                            component.id()
+                            component.id
                         ),
                         component_context(component),
                     );
@@ -184,7 +211,7 @@ impl Validator<'_> {
         message: impl Into<String>,
         context: Vec<String>,
     ) {
-        self.push(code, ProfileSeverity::Error, message, context);
+        self.push(code, Severity::Error, message, context);
     }
 
     pub(super) fn warning(
@@ -193,20 +220,20 @@ impl Validator<'_> {
         message: impl Into<String>,
         context: Vec<String>,
     ) {
-        self.push(code, ProfileSeverity::Warning, message, context);
+        self.push(code, Severity::Warning, message, context);
     }
 
     fn push(
         &mut self,
         code: &'static str,
-        severity: ProfileSeverity,
+        severity: Severity,
         message: impl Into<String>,
         context: Vec<String>,
     ) {
         // Retain one overflow finding so the report can prove truncation occurred.
         if self.diagnostics.len() <= MAX_DIAGNOSTICS {
             self.diagnostics
-                .push(ProfileDiagnostic::new(code, severity, message, context));
+                .push(Diagnostic::new(code, severity, message, context));
         }
     }
 }
@@ -223,9 +250,9 @@ pub(super) fn equal(left: &str, right: &str) -> bool {
 }
 
 fn component_context(component: &ComponentDefinition) -> Vec<String> {
-    vec![format!("component={}", component.id())]
+    vec![format!("component={}", component.id)]
 }
 
 pub(super) fn atom_context(atom: &AtomSite) -> Vec<String> {
-    vec![format!("atom_site={}", atom.id())]
+    vec![format!("atom_site={}", atom.id)]
 }

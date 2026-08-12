@@ -140,7 +140,7 @@ fn load(
     sha256: &str,
 ) -> Result<LoadedSchema, SchemaError> {
     let dictionary = decode_dictionary(artifact)
-        .map_err(|error| SchemaError::new("CIF_SCHEMA_ARTIFACT", error.to_string()))?;
+        .map_err(|error| SchemaError::new("CIF_SCHEMA_ARTIFACT", error))?;
     let metadata = dictionary.metadata();
     if metadata.schema_name() != name.as_str()
         || metadata.version() != version

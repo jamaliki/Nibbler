@@ -46,6 +46,7 @@ pub use dictionary::{
     TypeDefinition,
 };
 pub use dictionary_compiler::compile_dictionary;
+pub(crate) use dictionary_source::{CategoryColumn, CategoryOccurrence, CategoryView, split_tag};
 pub use document::{
     BlockKind, CifBlock, CifDocument, CifEntry, CifFrame, CifItem, CifLoop, CifRow, CifValue,
     CifValueRef, CifValues, OriginalLexeme, QuoteStyle, StandardUncertainty, TextValue,
@@ -63,7 +64,7 @@ pub use projection::{
     project_source_with_options, project_with_options,
 };
 pub use schema::{SchemaError, SchemaName};
-pub use schema_artifact::{SchemaArtifactError, decode_dictionary, encode_dictionary};
+pub use schema_artifact::encode_dictionary;
 pub use source::SourceBuffer;
 pub use table::{CifCell, CifCellRef, CifColumn, CifTable, ColumnType, MissingKind, RowProvenance};
 pub use validation::{Diagnostic, Severity, ValidationReport, validate_document};

@@ -62,7 +62,7 @@ def test_projection_filters_on_unreturned_columns() -> None:
     )
     assert isinstance(atoms, CifTable)
     assert atoms.category == "atom_site"
-    assert atoms.columns == ("label_comp_id", "Cartn_x")
+    assert atoms.columns == ["label_comp_id", "Cartn_x"]
     assert len(atoms) == 2
 
 
@@ -98,27 +98,31 @@ def test_arrow_missing_policies() -> None:
     table = nibbler.chomp(MISSING, category="nibbler_missing")
     assert isinstance(table, CifTable)
 
-    collapsed = table.to_pyarrow(missing="collapse")
+    collapsed = pyarrow.RecordBatchReader.from_stream(table).read_all()
     assert isinstance(collapsed, pyarrow.Table)
     assert collapsed.column("unknown_value").null_count == 2
     metadata = collapsed.schema.field("unknown_value").metadata
     assert metadata[b"nibbler:cif_unknown_count"] == b"1"
     assert metadata[b"nibbler:cif_not_applicable_count"] == b"1"
 
-    columns = table.to_pyarrow(missing="columns")
+    columns = pyarrow.RecordBatchReader.from_stream(
+        table.with_missing("columns")
+    ).read_all()
     assert columns.column("unknown_value__missing_kind").to_pylist() == [1, 2]
 
-    extension = table.to_pyarrow(missing="extension")
+    extension = pyarrow.RecordBatchReader.from_stream(
+        table.with_missing("extension")
+    ).read_all()
     assert extension.column("unknown_value").to_pylist() == [
         {"value": None, "kind": 1},
         {"value": None, "kind": 2},
     ]
 
-    polars_frame = table.to_polars(missing="columns")
+    polars_frame = polars.DataFrame(table.with_missing("columns"))
     assert isinstance(polars_frame, polars.DataFrame)
     assert polars_frame["unknown_value__missing_kind"].to_list() == [1, 2]
 
-    pandas_frame = table.to_pandas()
+    pandas_frame = collapsed.to_pandas()
     assert isinstance(pandas_frame, pandas.DataFrame)
     assert pandas_frame["unknown_value"].isna().all()
 
@@ -158,7 +162,7 @@ def test_feast_collects_errors_without_silent_skips() -> None:
     assert result.errors.to_polars()["source_index"].to_list() == [1]
 
     pyarrow = pytest.importorskip("pyarrow")
-    first = batches[0].to_pyarrow()
+    first = pyarrow.RecordBatchReader.from_stream(batches[0]).read_all()
     assert isinstance(first, pyarrow.Table)
     assert "_nibbler_source" in first.column_names
     assert "_nibbler_block" in first.column_names

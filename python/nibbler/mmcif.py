@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Literal, cast
+from typing import Literal
 
 from . import _core, cif
+from ._core import CifDocument, MmcifModel
 from ._input import Source
-from ._native import raise_chemistry_error, raise_schema_error, validation_report
-from ._objects import CifDocument, MmcifModel
+from ._native import (
+    raise_chemistry_error,
+    raise_schema_error,
+    raise_write_error,
+    validation_report,
+)
 from .cif import Destination
 from .components import Registry
 from .contracts import Profile, ValidationReport
@@ -24,14 +29,10 @@ def read(
     document = (
         source
         if isinstance(source, CifDocument)
-        else cast(CifDocument, cif.read(source, schema=selected.value))
+        else cif.read(source, schema=selected.value)
     )
     try:
-        native_registry = None if registry is None else registry._native
-        native = _core.build_mmcif_model(
-            document._native, selected.value, native_registry
-        )
-        return MmcifModel(native)
+        return _core.build_mmcif_model(document, selected.value, registry)
     except ValueError as error:
         raise_chemistry_error(error)
 
@@ -53,9 +54,9 @@ def _validate_value(value: object, profile: Profile) -> ValidationReport:
                 raise ValueError(
                     f"model profile is {value.profile!r}, not {profile.value!r}"
                 )
-            fields = _core.validate_mmcif_model(value._native)
+            fields = _core.validate_mmcif_model(value)
         elif isinstance(value, CifDocument):
-            fields = _core.validate_mmcif_document(value._native, profile.value)
+            fields = _core.validate_mmcif_document(value, profile.value)
         else:
             raise TypeError(
                 "nibbler.mmcif.validate() requires CifDocument or MmcifModel"
@@ -104,11 +105,14 @@ def write(
         generic_validation = "dictionary"
     else:
         generic_validation = validate
-    document = (
-        CifDocument(value._native.source_document(), value.profile)
-        if mode == "preserve"
-        else value.to_document(mirror_local_qa_metric=mirror_local_qa_metric)
-    )
+    try:
+        document = (
+            value.source_document()
+            if mode == "preserve"
+            else _core._model_document(value, mirror_local_qa_metric)
+        )
+    except ValueError as error:
+        raise_write_error(error)
     cif.write(
         document,
         destination,

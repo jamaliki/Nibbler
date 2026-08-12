@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::pdbx::category::case_key;
+use crate::pdbx::fields::case_key;
 
 use super::qa::{QaValue, ResidueSite};
 use super::validation::Validator;
@@ -17,18 +17,14 @@ impl Validator<'_> {
         let sites = self
             .model
             .coordinates
-            .atom_sites()
-            .iter()
-            .filter_map(|atom| {
-                let (_, component_id, asym_id, _) = atom.label_ids();
-                atom.label_seq_id().map(|sequence_id| {
-                    (
-                        atom.model_number(),
-                        case_key(asym_id),
-                        sequence_id,
-                        case_key(component_id),
-                    )
-                })
+            .polymer_sites()
+            .map(|(model, asym_id, sequence_id, component_id)| {
+                (
+                    model,
+                    case_key(asym_id),
+                    sequence_id,
+                    case_key(component_id),
+                )
             })
             .collect::<BTreeSet<_>>();
         for metric in &self.model.qa_metrics {

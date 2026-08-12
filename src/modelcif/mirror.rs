@@ -5,22 +5,13 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use crate::cif::{
-    BlockKind, CifBlock, CifDocument, CifEntry, CifLoop, CifRow, CifValue, CifValueRef,
+    BlockKind, CifBlock, CifDocument, CifEntry, CifLoop, CifRow, CifValue, CifValueRef, split_tag,
 };
-use crate::pdbx::category::{case_key, category_name, item_name};
+use crate::pdbx::fields::case_key;
 
 use super::aggregate::ModelCifModel;
 use super::qa::QaValue;
 use super::writer::canonical_document;
-
-/// Explicit policy for the viewer-compatibility B-factor view.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum MirrorPolicy {
-    /// Preserve `_atom_site.B_iso_or_equiv` exactly as supplied.
-    Disabled,
-    /// Copy one explicitly selected local QA metric into B-factor output values.
-    LocalMetric(i64),
-}
 
 /// A failure to construct the requested ModelCIF compatibility view.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -58,7 +49,7 @@ impl Display for WriteError {
 
 impl Error for WriteError {}
 
-/// Construct canonical ModelCIF output with an explicit compatibility policy.
+/// Copy one local QA metric into canonical output B-factor values.
 ///
 /// The selected metric remains present in `_ma_qa_metric*`; mirroring never changes its
 /// definition or claims that confidence is an experimental displacement parameter.
@@ -67,43 +58,32 @@ impl Error for WriteError {}
 ///
 /// Returns an error if the selected metric is absent, is not local, or has duplicate
 /// values for one model/residue identity.
-pub fn canonical_document_with_mirror(
-    model: &ModelCifModel,
-    policy: MirrorPolicy,
-) -> Result<CifDocument, WriteError> {
-    let document = canonical_document(model);
-    match policy {
-        MirrorPolicy::Disabled => Ok(document),
-        MirrorPolicy::LocalMetric(metric_id) => mirror_local_metric(document, model, metric_id),
-    }
-}
-
-fn mirror_local_metric(
-    document: CifDocument,
+pub fn canonical_document_with_local_metric(
     model: &ModelCifModel,
     metric_id: i64,
 ) -> Result<CifDocument, WriteError> {
+    let document = canonical_document(model);
     let Some(metric) = model
-        .qa_metrics()
+        .qa_metrics
         .iter()
-        .find(|metric| metric.id() == metric_id)
+        .find(|metric| metric.id == metric_id)
     else {
         return Err(WriteError::new(
             "MODELCIF_MIRROR_METRIC",
             format!("QA metric {metric_id} does not exist"),
         ));
     };
-    if !metric.mode().eq_ignore_ascii_case("local") {
+    if !metric.mode.eq_ignore_ascii_case("local") {
         return Err(WriteError::new(
             "MODELCIF_MIRROR_MODE",
             format!(
                 "QA metric {metric_id} has mode {:?}, not local",
-                metric.mode()
+                metric.mode
             ),
         ));
     }
     let mut values = BTreeMap::new();
-    for qa in model.qa_values() {
+    for qa in &model.qa_values {
         let QaValue::Local {
             model_id,
             site,
@@ -119,9 +99,9 @@ fn mirror_local_metric(
         }
         let key = (
             *model_id,
-            case_key(site.asym_id()),
-            site.sequence_id(),
-            case_key(site.component_id()),
+            case_key(&site.asym_id),
+            site.sequence_id,
+            case_key(&site.component_id),
         );
         if values.insert(key, *value).is_some() {
             return Err(WriteError::new(
@@ -232,10 +212,11 @@ fn column(cif_loop: &CifLoop, item: &str) -> Result<usize, WriteError> {
 }
 
 fn optional_column(cif_loop: &CifLoop, item: &str) -> Option<usize> {
-    cif_loop
-        .tags()
-        .iter()
-        .position(|tag| item_name(tag).is_some_and(|value| value.eq_ignore_ascii_case(item)))
+    cif_loop.tags().iter().position(|tag| {
+        split_tag(tag)
+            .map(|(_, item)| item)
+            .is_some_and(|value| value.eq_ignore_ascii_case(item))
+    })
 }
 
 fn row_value(row: CifRow<'_>, column: usize) -> Result<CifValueRef<'_>, WriteError> {
@@ -282,5 +263,5 @@ fn text_value<'a>(value: CifValueRef<'a>, tag: &str) -> Result<&'a str, WriteErr
 }
 
 fn loop_category(cif_loop: &CifLoop) -> Option<&str> {
-    category_name(cif_loop.tags().first()?.as_str())
+    split_tag(cif_loop.tags().first()?.as_str()).map(|(category, _)| category)
 }

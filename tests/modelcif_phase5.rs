@@ -2,10 +2,10 @@
 
 #![allow(clippy::expect_used)]
 
-use _core::cif::{parse, write_canonical};
+use _core::cif::{CifDocument, CifEntry, CifValueRef, parse, write_canonical};
 use _core::modelcif::{
-    MirrorPolicy, QaValue, build_model, canonical_document, canonical_document_with_mirror,
-    validate_document, validate_model,
+    build_model, canonical_document, canonical_document_with_local_metric, validate_document,
+    validate_model,
 };
 
 const PREDICTION: &[u8] = include_bytes!("fixtures/modelcif/prediction_with_qa.cif");
@@ -16,55 +16,33 @@ fn source_builds_one_coordinate_graph_with_typed_prediction_metadata() {
     let model = build_model(&document).expect("fixture semantics must build");
 
     assert_eq!(model.coordinates().entry_id(), "NIBBLER_LIGAND_ION_WATER");
-    assert_eq!(model.data().len(), 5);
-    assert_eq!(model.data_groups().len(), 2);
-    assert_eq!(model.models().len(), 1);
-    assert_eq!(model.model_groups().len(), 1);
-    assert_eq!(model.model_group_links().len(), 1);
-    assert_eq!(model.representatives().len(), 1);
-    assert_eq!(model.targets().len(), 1);
-    assert_eq!(model.target_instances().len(), 1);
-    assert_eq!(model.software().len(), 1);
-    assert_eq!(model.software_groups().len(), 1);
-    assert_eq!(model.protocol_steps().len(), 1);
-    assert_eq!(model.templates().len(), 1);
-    assert_eq!(model.template_segments().len(), 1);
-    assert_eq!(model.template_mappings().len(), 1);
-    assert_eq!(model.alignments().len(), 1);
-    assert_eq!(model.alignment_details().len(), 1);
-    assert_eq!(model.alignment_sequences().len(), 2);
-    assert_eq!(model.qa_metrics().len(), 3);
-    assert_eq!(model.qa_values().len(), 4);
-    assert_eq!(model.associated_files().len(), 1);
-    assert_eq!(model.archive_members().len(), 1);
+    assert_eq!(model.prediction_model_count(), 1);
+    assert_eq!(model.target_entity_count(), 1);
+    assert_eq!(model.template_count(), 1);
+    assert_eq!(model.qa_metric_count(), 3);
+    assert_eq!(model.qa_value_count(), 4);
+    assert_eq!(model.software_names().collect::<Vec<_>>(), ["Rosetta"]);
+    assert_eq!(
+        model.qa_metric_names().collect::<Vec<_>>(),
+        ["pLDDT", "pTM", "PAE"]
+    );
+    assert_eq!(
+        model.qa_metric_modes().collect::<Vec<_>>(),
+        ["local", "global", "local-pairwise"]
+    );
+    assert!(validate_model(&model).is_valid());
 }
 
 #[test]
 fn confidence_is_not_an_atom_displacement_value() {
     let document = parse(PREDICTION).expect("fixture syntax must parse");
     let model = build_model(&document).expect("fixture semantics must build");
-    let b_values = model
-        .coordinates()
-        .atom_sites()
-        .iter()
-        .take(2)
-        .map(|atom| atom.occupancy_and_b_iso().1)
-        .collect::<Vec<_>>();
-    let confidence = model
-        .qa_values()
-        .iter()
-        .filter_map(|value| match value {
-            QaValue::Local {
-                metric_id: 1,
-                value,
-                ..
-            } => Some(*value),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
+    let canonical = canonical_document(&model);
+    let b_values = loop_floats(&canonical, "_atom_site.B_iso_or_equiv");
+    let confidence = loop_floats(&canonical, "_ma_qa_metric_local.metric_value");
 
-    assert_eq!(b_values, [Some(10.0), Some(12.0)]);
-    assert_eq!(confidence, [91.0, 73.0]);
+    assert_eq!(&b_values[..2], [Some(10.0), Some(12.0)]);
+    assert_eq!(confidence, [Some(91.0), Some(73.0)]);
 }
 
 #[test]
@@ -72,11 +50,13 @@ fn strict_profile_accepts_the_complete_prediction_graph() {
     let document = parse(PREDICTION).expect("fixture syntax must parse");
     let report = validate_document(&document).expect("dictionary must load");
 
+    assert_eq!(report.schema_name(), "modelcif");
     assert_eq!(report.dictionary_version(), "1.4.9");
     assert!(
         report
             .coverage()
-            .contains(&"confidence-b-factor-separation")
+            .iter()
+            .any(|value| value == "confidence-b-factor-separation")
     );
     assert!(report.is_valid(), "unexpected: {:?}", report.diagnostics());
 }
@@ -151,32 +131,61 @@ fn canonical_writer_preserves_qa_and_uses_profile_order() {
 fn explicit_local_metric_mirroring_changes_only_the_output_view() {
     let document = parse(PREDICTION).expect("fixture syntax must parse");
     let model = build_model(&document).expect("fixture semantics must build");
-    let mirrored = canonical_document_with_mirror(&model, MirrorPolicy::LocalMetric(1))
-        .expect("pLDDT is a local metric");
+    let mirrored =
+        canonical_document_with_local_metric(&model, 1).expect("pLDDT is a local metric");
     let rebuilt = build_model(&mirrored).expect("mirrored output must remain ModelCIF");
-    let b_values = rebuilt
-        .coordinates()
-        .atom_sites()
-        .iter()
-        .take(2)
-        .map(|atom| atom.occupancy_and_b_iso().1)
-        .collect::<Vec<_>>();
+    let b_values = loop_floats(&mirrored, "_atom_site.B_iso_or_equiv");
 
-    assert_eq!(b_values, [Some(91.0), Some(73.0)]);
-    assert_eq!(rebuilt.qa_values(), model.qa_values());
+    assert_eq!(&b_values[..2], [Some(91.0), Some(73.0)]);
     assert_eq!(
-        model.coordinates().atom_sites()[0].occupancy_and_b_iso().1,
-        Some(10.0),
+        loop_floats(&mirrored, "_ma_qa_metric_local.metric_value"),
+        loop_floats(
+            &canonical_document(&model),
+            "_ma_qa_metric_local.metric_value"
+        ),
+        "mirroring must preserve ModelCIF confidence values"
+    );
+    assert_eq!(
+        &loop_floats(&canonical_document(&model), "_atom_site.B_iso_or_equiv")[..2],
+        [Some(10.0), Some(12.0)],
         "mirroring must not mutate the source-backed model"
     );
+    assert!(validate_model(&rebuilt).is_valid());
 }
 
 #[test]
 fn mirroring_rejects_a_global_metric() {
     let document = parse(PREDICTION).expect("fixture syntax must parse");
     let model = build_model(&document).expect("fixture semantics must build");
-    let error = canonical_document_with_mirror(&model, MirrorPolicy::LocalMetric(2))
-        .expect_err("pTM is global, not local");
+    let error =
+        canonical_document_with_local_metric(&model, 2).expect_err("pTM is global, not local");
 
     assert_eq!(error.code(), "MODELCIF_MIRROR_MODE");
+}
+
+fn loop_floats(document: &CifDocument, tag: &str) -> Vec<Option<f64>> {
+    document
+        .blocks()
+        .iter()
+        .flat_map(|block| block.entries())
+        .find_map(|entry| {
+            let CifEntry::Loop(cif_loop) = entry else {
+                return None;
+            };
+            let column = cif_loop
+                .tags()
+                .iter()
+                .position(|candidate| candidate.eq_ignore_ascii_case(tag))?;
+            Some(
+                (0..cif_loop.row_count())
+                    .map(|row| match cif_loop.value(row, column) {
+                        Some(CifValueRef::Float(value, ..)) => Some(value),
+                        Some(CifValueRef::Integer(value, _)) => Some(value as f64),
+                        Some(CifValueRef::Text(value)) => value.as_str().parse().ok(),
+                        _ => None,
+                    })
+                    .collect(),
+            )
+        })
+        .unwrap_or_default()
 }

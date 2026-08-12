@@ -99,7 +99,7 @@ def main() -> int:
         validate_pdbe(schemas["pdbx"], generated_pdbx)
         local_ccd_output = Path(temporary_dir) / "local_ccd.cif"
         coordinate_source = PDBX_FIXTURES[0].read_text().replace(ATP_ROW, "")
-        registry = nibbler.components.Registry.from_ccd_cache(ATP_CCD)
+        registry = nibbler.components.read(ATP_CCD)
         model = nibbler.mmcif.read(coordinate_source.encode(), registry=registry)
         nibbler.dump(model, local_ccd_output, profile="pdbx")
         validate_gemmi(schemas["pdbx"], (local_ccd_output,))

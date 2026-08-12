@@ -1,8 +1,8 @@
-//! Aggregate source-backed ModelCIF model.
+//! Source-backed ModelCIF prediction model.
 
 use crate::pdbx::PdbxModel;
 
-use super::model::{
+use super::prediction::{
     Data, ModelGroup, ModelGroupLink, ModelRepresentative, PredictionModel, TargetEntity,
     TargetInstance,
 };
@@ -43,136 +43,55 @@ pub struct ModelCifModel {
 }
 
 impl ModelCifModel {
-    /// Return the shared PDBx coordinate and chemistry graph.
+    /// Return the shared PDBx coordinate and chemistry model.
     #[must_use]
     pub const fn coordinates(&self) -> &PdbxModel {
         &self.coordinates
     }
 
-    /// Return the typed modeling data records.
+    /// Return the number of deposited prediction models.
     #[must_use]
-    pub fn data(&self) -> &[Data] {
-        &self.data
+    pub fn prediction_model_count(&self) -> usize {
+        self.models.len()
     }
 
-    /// Return membership edges in protocol data groups.
+    /// Return the number of modeled target entities.
     #[must_use]
-    pub fn data_groups(&self) -> &[DataGroupMember] {
-        &self.data_groups
+    pub fn target_entity_count(&self) -> usize {
+        self.targets.len()
     }
 
-    /// Return modeled target entities.
+    /// Return the number of structural templates.
     #[must_use]
-    pub fn targets(&self) -> &[TargetEntity] {
-        &self.targets
+    pub fn template_count(&self) -> usize {
+        self.templates.len()
     }
 
-    /// Return label-space target instances.
+    /// Return the number of QA metric definitions.
     #[must_use]
-    pub fn target_instances(&self) -> &[TargetInstance] {
-        &self.target_instances
+    pub fn qa_metric_count(&self) -> usize {
+        self.qa_metrics.len()
     }
 
-    /// Return deposited prediction models.
+    /// Return the number of global, local, and pairwise QA values.
     #[must_use]
-    pub fn models(&self) -> &[PredictionModel] {
-        &self.models
+    pub fn qa_value_count(&self) -> usize {
+        self.qa_values.len()
     }
 
-    /// Return named groups of prediction models.
-    #[must_use]
-    pub fn model_groups(&self) -> &[ModelGroup] {
-        &self.model_groups
+    /// Iterate over deposited software names in source order.
+    pub fn software_names(&self) -> impl ExactSizeIterator<Item = &str> {
+        self.software.iter().map(|software| software.name.as_str())
     }
 
-    /// Return explicit model-to-group membership edges.
-    #[must_use]
-    pub fn model_group_links(&self) -> &[ModelGroupLink] {
-        &self.model_group_links
+    /// Iterate over QA metric names in source order.
+    pub fn qa_metric_names(&self) -> impl ExactSizeIterator<Item = &str> {
+        self.qa_metrics.iter().map(|metric| metric.name.as_str())
     }
 
-    /// Return declared representatives of model groups.
-    #[must_use]
-    pub fn representatives(&self) -> &[ModelRepresentative] {
-        &self.representatives
-    }
-
-    /// Return software records referenced by prediction provenance.
-    #[must_use]
-    pub fn software(&self) -> &[Software] {
-        &self.software
-    }
-
-    /// Return membership edges in ModelCIF software groups.
-    #[must_use]
-    pub fn software_groups(&self) -> &[SoftwareGroupMember] {
-        &self.software_groups
-    }
-
-    /// Return ordered modeling-protocol steps.
-    #[must_use]
-    pub fn protocol_steps(&self) -> &[ProtocolStep] {
-        &self.protocol_steps
-    }
-
-    /// Return structural templates used by the prediction.
-    #[must_use]
-    pub fn templates(&self) -> &[Template] {
-        &self.templates
-    }
-
-    /// Return contiguous polymer segments declared on templates.
-    #[must_use]
-    pub fn template_segments(&self) -> &[TemplateSegment] {
-        &self.template_segments
-    }
-
-    /// Return target-to-template segment mappings.
-    #[must_use]
-    pub fn template_mappings(&self) -> &[TemplateMapping] {
-        &self.template_mappings
-    }
-
-    /// Return target-template alignment declarations.
-    #[must_use]
-    pub fn alignments(&self) -> &[Alignment] {
-        &self.alignments
-    }
-
-    /// Return target-template participant and score records for alignments.
-    #[must_use]
-    pub fn alignment_details(&self) -> &[AlignmentDetail] {
-        &self.alignment_details
-    }
-
-    /// Return target and template sequences participating in alignments.
-    #[must_use]
-    pub fn alignment_sequences(&self) -> &[AlignmentSequence] {
-        &self.alignment_sequences
-    }
-
-    /// Return QA metric definitions.
-    #[must_use]
-    pub fn qa_metrics(&self) -> &[QaMetric] {
-        &self.qa_metrics
-    }
-
-    /// Return global, local, and pairwise QA values.
-    #[must_use]
-    pub fn qa_values(&self) -> &[QaValue] {
-        &self.qa_values
-    }
-
-    /// Return files associated with the ModelCIF entry.
-    #[must_use]
-    pub fn associated_files(&self) -> &[AssociatedFile] {
-        &self.associated_files
-    }
-
-    /// Return files contained in associated archives.
-    #[must_use]
-    pub fn archive_members(&self) -> &[ArchiveMember] {
-        &self.archive_members
+    /// Iterate over QA metric modes in source order.
+    pub fn qa_metric_modes(&self) -> impl ExactSizeIterator<Item = &str> {
+        self.qa_metrics.iter().map(|metric| metric.mode.as_str())
     }
 
     pub(crate) fn audit_conform(&self) -> &[(String, String)] {

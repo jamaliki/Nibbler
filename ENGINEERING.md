@@ -31,7 +31,7 @@ not.
 - `DocumentSink` and `TableSink` share that grammar owner.
 - Canonical and preserving text output share syntax and value-formatting rules.
 - BinaryCIF converges on the same document and table models.
-- Python wrappers delegate to Rust and must not implement a second parser, validator,
+- Python entry points delegate to Rust and must not implement a second parser, validator,
   chemistry model, or writer.
 - Reference algorithms may exist in tests, never as alternate production paths.
 
@@ -59,7 +59,7 @@ network access.
 - `ParseSink` separates grammar from document retention and projection.
 - `CifDocument` and `CifTable` are the common text/BinaryCIF boundary.
 - compiled dictionaries isolate DDL2 loading from validation and projection.
-- PDBx and ModelCIF types name domain records and protect invariants.
+- opaque PDBx and ModelCIF models keep domain records private and protect invariants.
 - the PyO3 layer translates native values and failures once.
 
 A new trait, generic framework, crate, registry, service layer, or callback system needs
@@ -83,9 +83,9 @@ an explicit `ComponentResolution`; residue-name sets are not a general chemistry
 system.
 
 Values are immutable after construction. Temporary mutation is local to an owning
-builder. Shared ownership is explicit through `Arc` or immutable Python wrappers; no
-global mutable model or cache is allowed. The one process-wide parallel-worker counter
-is an atomic resource lease, not application state.
+builder. Shared ownership is explicit through `Arc` or frozen native Python objects;
+no global mutable model or cache is allowed. The one process-wide parallel-worker
+counter is an atomic resource lease, not application state.
 
 ## 4. Rust rules
 
@@ -132,7 +132,8 @@ names the guardrail or benchmark that justifies the shape.
   write paths.
 - Public functions and classes have complete annotations; `py.typed` and `_core.pyi`
   ship with the package.
-- pandas, Polars, and PyArrow remain optional imports at the method that needs them.
+- `CifTable` implements the Arrow C Stream protocol; optional dataframe libraries
+  consume that protocol directly and are not imported by Nibbler.
 - Public dispatch is explicit. No monkey patching, metaclass registry, or dynamic
   attribute protocol defines behavior.
 - Validate external Python inputs once at the facade, then pass normalized plain values
@@ -161,7 +162,7 @@ Current native dependencies are:
 | `memchr` | byte scanning in lexer and loop-boundary kernels |
 | `pyo3` | optional Python extension boundary |
 | `regex` | compiled DDL2 type-pattern validation |
-| `rmp-serde`, `serde`, `serde_bytes` | BinaryCIF MessagePack model |
+| `rmp-serde`, `serde`, `serde_bytes` | BinaryCIF and compiled-dictionary MessagePack |
 | `proptest` (development) | property tests |
 
 There is one Rust crate and one Python package. Cargo and Python lock inputs must remain

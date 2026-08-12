@@ -18,9 +18,10 @@ def test_modelcif_read_exposes_prediction_metadata() -> None:
     assert model.template_count == 1
     assert model.qa_metric_count == 3
     assert model.qa_value_count == 4
-    assert model.software_names == ("Rosetta",)
-    assert model.qa_metric_names == ("pLDDT", "pTM", "PAE")
-    assert model.qa_metric_modes == ("local", "global", "local-pairwise")
+    assert model.software_names == ["Rosetta"]
+    assert model.qa_metric_names == ["pLDDT", "pTM", "PAE"]
+    assert model.qa_metric_modes == ["local", "global", "local-pairwise"]
+    assert model.source_document().schema == "modelcif"
 
 
 def test_modelcif_sniff_reports_pinned_profile_coverage() -> None:
@@ -43,17 +44,19 @@ def test_model_profile_cannot_be_silently_changed() -> None:
 def test_modelcif_dump_round_trips_and_defaults_to_unmirrored_b_values(
     tmp_path: Path,
 ) -> None:
+    pyarrow = pytest.importorskip("pyarrow")
     model = nibbler.mmcif.read(FIXTURE, profile="modelcif")
     output = tmp_path / "prediction.cif"
 
     nibbler.dump(model, output, profile="modelcif")
     rebuilt = nibbler.mmcif.read(output, profile="modelcif")
-    atoms = nibbler.chomp(
+    projected = nibbler.chomp(
         output,
         category="atom_site",
         columns=["id", "B_iso_or_equiv"],
         schema="modelcif",
-    ).to_pyarrow()
+    )
+    atoms = pyarrow.RecordBatchReader.from_stream(projected).read_all()
 
     assert rebuilt.qa_metric_names == model.qa_metric_names
     assert atoms.column("B_iso_or_equiv").to_pylist()[:2] == [10.0, 12.0]
@@ -62,6 +65,7 @@ def test_modelcif_dump_round_trips_and_defaults_to_unmirrored_b_values(
 def test_local_qa_mirroring_is_explicit_and_preserves_qa(
     tmp_path: Path,
 ) -> None:
+    pyarrow = pytest.importorskip("pyarrow")
     model = nibbler.mmcif.read(FIXTURE, profile="modelcif")
     output = tmp_path / "mirrored.cif"
 
@@ -72,15 +76,16 @@ def test_local_qa_mirroring_is_explicit_and_preserves_qa(
         mirror_local_qa_metric=1,
     )
     rebuilt = nibbler.mmcif.read(output, profile="modelcif")
-    atoms = nibbler.chomp(
+    projected = nibbler.chomp(
         output,
         category="atom_site",
         columns=["id", "B_iso_or_equiv"],
         schema="modelcif",
-    ).to_pyarrow()
+    )
+    atoms = pyarrow.RecordBatchReader.from_stream(projected).read_all()
 
     assert atoms.column("B_iso_or_equiv").to_pylist()[:2] == [91.0, 73.0]
-    assert rebuilt.qa_metric_names == ("pLDDT", "pTM", "PAE")
+    assert rebuilt.qa_metric_names == ["pLDDT", "pTM", "PAE"]
     assert rebuilt.qa_value_count == 4
 
 

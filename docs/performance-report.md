@@ -30,45 +30,45 @@ fields.
 ## 2. Qualified checkpoint
 
 Medians below use the corpus-trained, fingerprinted PGO wheel on the reference host.
-Large projections use two warmups and seven samples; large full documents use one
-warmup and three samples in isolated processes; `1crn` uses three warmups and eleven
-samples. They are workload-specific measurements, not portable thresholds.
+Large projection ranges are two independent runs with two warmups and nine samples;
+full documents use one warmup and three samples in isolated processes. They are
+workload-specific measurements, not portable thresholds.
 
 Measured artifact and toolchain:
 
 - package: `nibbler-cif 0.1.0`;
 - wheel: `nibbler_cif-0.1.0-cp312-cp312-macosx_11_0_arm64.whl`, SHA-256
-  `f5043697ec45f7ac73c4ce5a208c654e77e3e7b73848b1b1135baf1a6c15d19f`;
+  `414bd016c3c940cfdaa0897918582f82a3fcec8489d973095712c009fe98b480`;
 - native extension SHA-256:
-  `2cd5f645d18131f7e9bc732ae3d8f16654383245d41f87f9f2d05f6a8f721b04`;
+  `aead9eb91525f3de6b439414f1460ec9e5bdcf927582f3fe51c193e262188099`;
 - Python/platform: CPython 3.12.13 on `macOS-26.5.2-arm64-arm-64bit`;
 - compiler: `rustc 1.97.1` commit `8bab26f4f68e0e26f0bb7960be334d5b520ea452`,
   LLVM 22.1.6, target `aarch64-apple-darwin`; and
 - PGO input fingerprint:
-  `a4dc014fc5c91ac98048f9cdb4892aa21a2f416171bbf8a85756fc43d8962564`.
+  `64da60b77304b44b16324b0d38fdaa8bc935d147f871bba409f6b1d6716515cd`.
 
 | Workload | PDB | Throughput |
 | --- | --- | ---: |
-| text projection | `6qnr` | 1,435 MB/s |
-| text projection | `3j3q` | 1,813 MB/s |
-| text full document | `6qnr` | 934 MB/s |
-| text full document | `3j3q` | 1,407 MB/s |
-| BinaryCIF projection | `6qnr` | 1,818 MB/s |
-| BinaryCIF projection | `3j3q` | 1,934 MB/s |
-| BinaryCIF full document | `6qnr` | 693 MB/s |
-| BinaryCIF full document | `3j3q` | 885 MB/s |
-| gzip text projection | `6qnr` | 662 MB/s logical CIF |
-| gzip text projection | `3j3q` | 752 MB/s logical CIF |
+| text projection | `6qnr` | 1,473-1,475 MB/s |
+| text projection | `3j3q` | 1,851-1,859 MB/s |
+| text full document | `6qnr` | 923 MB/s |
+| text full document | `3j3q` | 1,376 MB/s |
+| BinaryCIF projection | `6qnr` | 1,818-1,941 MB/s |
+| BinaryCIF projection | `3j3q` | 1,855-1,857 MB/s |
+| BinaryCIF full document | `6qnr` | 730 MB/s |
+| BinaryCIF full document | `3j3q` | 810 MB/s |
+| gzip text projection | `6qnr` | 657-667 MB/s logical CIF |
+| gzip text projection | `3j3q` | 757-764 MB/s logical CIF |
 
-Small `1crn` latency is 0.31 ms for text projection, 0.29 ms for a text document,
-0.80 ms for BinaryCIF projection, and 0.94 ms for a BinaryCIF document.
+Small `1crn` latency is 0.30 ms for text projection and a text document, 0.66 ms for
+BinaryCIF projection, and 1.12 ms for a BinaryCIF document.
 
 Peak RSS for full documents is:
 
 | Format | `6qnr` | `3j3q` |
 | --- | ---: | ---: |
-| text CIF | 266 MB | 1.49 GB |
-| BinaryCIF | 233 MB | 0.93 GB |
+| text CIF | 263 MiB | 1.43 GiB |
+| BinaryCIF | 186 MiB | 0.86 GiB |
 
 Arrow import of the already projected table takes 0.7 ms for `6qnr` and 5.0 ms for
 `3j3q`.
@@ -87,6 +87,17 @@ all cells into a second contiguous vector.
 
 BinaryCIF keeps decoded typed/dictionary columns. It does not expand every cell into a
 row-major enum.
+
+Semantic construction uses the same borrowed category-occurrence view as dictionary
+validation. A decoder resolves its fixed set of columns once per occurrence and reads
+rows lazily, so the `_atom_site` path creates neither a map nor an intermediate row
+object per atom.
+
+An isolated plain-release A/B against the preceding pushed implementation, with the
+document parsed before timing, measured PDBx model construction at 312 to 224 ms for
+`6qnr` and 2,449 to 1,748 ms for `3j3q`: 28.3% and 28.6% faster. One-shot `3j3q`
+parse-plus-model peak RSS fell from 2.366 to 2.259 GB. Full dictionary validation was
+neutral within 1.1%.
 
 ## 4. Lexer
 
@@ -195,11 +206,13 @@ The current implementation is gated by:
 
 ```console
 make check
-micromamba run -p .mamba/nibbler-dev python -m benchmarks.pdb_stress \
-  --formats all --warmups 2 --samples 7 --json
-micromamba run -p .mamba/nibbler-dev python -m benchmarks.pdb_stress \
-  --ids 6qnr 3j3q --formats cif --full-document --warmups 1 --samples 3 --json
 micromamba run -p .mamba/nibbler-dev python -m tools.build_pgo
+# Run against an isolated installation of the wheel in dist-pgo/.
+micromamba run -p .mamba/nibbler-dev python -m benchmarks.pdb_stress \
+  --ids 1crn 6qnr 3j3q --formats all --warmups 2 --samples 9 --json
+# Run the projection command twice.
+micromamba run -p .mamba/nibbler-dev python -m benchmarks.pdb_stress \
+  --ids 1crn 6qnr 3j3q --formats both --full-document --warmups 1 --samples 3 --json
 ```
 
 Qualification covers the Rust and Python suites, Clippy, rustdoc, Ruff, strict mypy,

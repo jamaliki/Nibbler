@@ -41,7 +41,10 @@ def test_binary_cif_content_detection_and_projection_equality() -> None:
     decoded = nibbler.chomp(binary)
     assert isinstance(decoded, CifDocument)
     assert decoded.block_count == document.block_count
-    assert _project(binary).to_pyarrow().equals(_project(SOURCE).to_pyarrow())
+    pyarrow = pytest.importorskip("pyarrow")
+    binary_table = pyarrow.RecordBatchReader.from_stream(_project(binary)).read_all()
+    source_table = pyarrow.RecordBatchReader.from_stream(_project(SOURCE)).read_all()
+    assert binary_table.equals(source_table)
 
 
 def test_dump_infers_binary_cif_and_gzip_from_destination(tmp_path: Path) -> None:
@@ -53,7 +56,12 @@ def test_dump_infers_binary_cif_and_gzip_from_destination(tmp_path: Path) -> Non
     payload = destination.read_bytes()
     assert payload.startswith(b"\x1f\x8b")
     assert gzip.decompress(payload).startswith(b"\x83")
-    assert _project(destination).to_pyarrow().equals(_project(SOURCE).to_pyarrow())
+    pyarrow = pytest.importorskip("pyarrow")
+    destination_table = pyarrow.RecordBatchReader.from_stream(
+        _project(destination)
+    ).read_all()
+    source_table = pyarrow.RecordBatchReader.from_stream(_project(SOURCE)).read_all()
+    assert destination_table.equals(source_table)
 
 
 def test_binary_stream_is_explicit_and_preserve_mode_retains_lexemes() -> None:

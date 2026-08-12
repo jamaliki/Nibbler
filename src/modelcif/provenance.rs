@@ -1,271 +1,234 @@
-//! Modeling provenance, data-flow, and associated-file records.
+//! Provenance and associated-file records and row decoding.
 
-/// One membership edge in a protocol data group.
+use crate::cif::CategoryView;
+use crate::pdbx::SemanticError;
+use crate::pdbx::fields::category_rows;
+
+use super::fields::{optional_integer, optional_text, required_integer, required_text};
+
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DataGroupMember {
-    pub(super) ordinal_id: i64,
-    pub(super) group_id: i64,
-    pub(super) data_id: i64,
+pub(super) struct DataGroupMember {
+    pub ordinal_id: i64,
+    pub group_id: i64,
+    pub data_id: i64,
 }
 
-impl DataGroupMember {
-    /// Return the stable membership-row identifier.
-    #[must_use]
-    pub const fn ordinal_id(&self) -> i64 {
-        self.ordinal_id
-    }
-    /// Return the containing data-group identifier.
-    #[must_use]
-    pub const fn group_id(&self) -> i64 {
-        self.group_id
-    }
-    /// Return the member data identifier.
-    #[must_use]
-    pub const fn data_id(&self) -> i64 {
-        self.data_id
-    }
-}
-
-/// One software package named by the prediction provenance.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Software {
-    pub(super) id: i64,
-    pub(super) name: String,
-    pub(super) classification: String,
-    pub(super) version: Option<String>,
-    pub(super) description: Option<String>,
-    pub(super) location: Option<String>,
+pub(super) struct Software {
+    pub id: i64,
+    pub name: String,
+    pub classification: String,
+    pub version: Option<String>,
+    pub description: Option<String>,
+    pub location: Option<String>,
 }
 
-impl Software {
-    /// Return the stable software identifier.
-    #[must_use]
-    pub const fn id(&self) -> i64 {
-        self.id
-    }
-    /// Return the software name.
-    #[must_use]
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-    /// Return the ModelCIF software-classification value.
-    #[must_use]
-    pub fn classification(&self) -> &str {
-        &self.classification
-    }
-    /// Return the deposited software version, when present.
-    #[must_use]
-    pub fn version(&self) -> Option<&str> {
-        self.version.as_deref()
-    }
-    /// Return the optional software description.
-    #[must_use]
-    pub fn description(&self) -> Option<&str> {
-        self.description.as_deref()
-    }
-    /// Return the optional software location.
-    #[must_use]
-    pub fn location(&self) -> Option<&str> {
-        self.location.as_deref()
-    }
-}
-
-/// One software membership edge in a ModelCIF software group.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SoftwareGroupMember {
-    pub(super) ordinal_id: i64,
-    pub(super) group_id: i64,
-    pub(super) software_id: i64,
-    pub(super) parameter_group_id: Option<i64>,
+pub(super) struct SoftwareGroupMember {
+    pub ordinal_id: i64,
+    pub group_id: i64,
+    pub software_id: i64,
+    pub parameter_group_id: Option<i64>,
 }
 
-impl SoftwareGroupMember {
-    /// Return the stable membership-row identifier.
-    #[must_use]
-    pub const fn ordinal_id(&self) -> i64 {
-        self.ordinal_id
-    }
-    /// Return the containing software-group identifier.
-    #[must_use]
-    pub const fn group_id(&self) -> i64 {
-        self.group_id
-    }
-    /// Return the member software identifier.
-    #[must_use]
-    pub const fn software_id(&self) -> i64 {
-        self.software_id
-    }
-    /// Return the associated parameter-group identifier, when present.
-    #[must_use]
-    pub const fn parameter_group_id(&self) -> Option<i64> {
-        self.parameter_group_id
-    }
-}
-
-/// One explicit step in the prediction protocol and its data dependencies.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ProtocolStep {
-    pub(super) ordinal_id: i64,
-    pub(super) protocol_id: i64,
-    pub(super) step_id: i64,
-    pub(super) method_type: String,
-    pub(super) name: Option<String>,
-    pub(super) details: Option<String>,
-    pub(super) software_group_id: Option<i64>,
-    pub(super) input_data_group_id: Option<i64>,
-    pub(super) output_data_group_id: Option<i64>,
+pub(super) struct ProtocolStep {
+    pub ordinal_id: i64,
+    pub protocol_id: i64,
+    pub step_id: i64,
+    pub method_type: String,
+    pub name: Option<String>,
+    pub details: Option<String>,
+    pub software_group_id: Option<i64>,
+    pub input_data_group_id: Option<i64>,
+    pub output_data_group_id: Option<i64>,
 }
 
-impl ProtocolStep {
-    /// Return the stable protocol-step row identifier.
-    #[must_use]
-    pub const fn ordinal_id(&self) -> i64 {
-        self.ordinal_id
-    }
-    /// Return the containing protocol identifier.
-    #[must_use]
-    pub const fn protocol_id(&self) -> i64 {
-        self.protocol_id
-    }
-    /// Return the step number within the protocol.
-    #[must_use]
-    pub const fn step_id(&self) -> i64 {
-        self.step_id
-    }
-    /// Return the ModelCIF method-type enumeration value.
-    #[must_use]
-    pub fn method_type(&self) -> &str {
-        &self.method_type
-    }
-    /// Return the optional step name.
-    #[must_use]
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
-    }
-    /// Return optional free-text step details.
-    #[must_use]
-    pub fn details(&self) -> Option<&str> {
-        self.details.as_deref()
-    }
-    /// Return the software group used by this step, when present.
-    #[must_use]
-    pub const fn software_group_id(&self) -> Option<i64> {
-        self.software_group_id
-    }
-    /// Return the input data-group identifier, when present.
-    #[must_use]
-    pub const fn input_data_group_id(&self) -> Option<i64> {
-        self.input_data_group_id
-    }
-    /// Return the output data-group identifier, when present.
-    #[must_use]
-    pub const fn output_data_group_id(&self) -> Option<i64> {
-        self.output_data_group_id
-    }
-}
-
-/// A file associated directly with the ModelCIF entry.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AssociatedFile {
-    pub(super) id: i64,
-    pub(super) entry_id: String,
-    pub(super) file_url: String,
-    pub(super) file_type: Option<String>,
-    pub(super) file_format: Option<String>,
-    pub(super) file_content: Option<String>,
-    pub(super) details: Option<String>,
-    pub(super) data_id: Option<i64>,
+pub(super) struct AssociatedFile {
+    pub id: i64,
+    pub entry_id: String,
+    pub file_url: String,
+    pub file_type: Option<String>,
+    pub file_format: Option<String>,
+    pub file_content: Option<String>,
+    pub details: Option<String>,
+    pub data_id: Option<i64>,
 }
 
-impl AssociatedFile {
-    /// Return the stable associated-file identifier.
-    #[must_use]
-    pub const fn id(&self) -> i64 {
-        self.id
-    }
-    /// Return the entry identifier owning this file.
-    #[must_use]
-    pub fn entry_id(&self) -> &str {
-        &self.entry_id
-    }
-    /// Return the deposited file URL.
-    #[must_use]
-    pub fn file_url(&self) -> &str {
-        &self.file_url
-    }
-    /// Return the ModelCIF file-type value, when present.
-    #[must_use]
-    pub fn file_type(&self) -> Option<&str> {
-        self.file_type.as_deref()
-    }
-    /// Return the ModelCIF file-format value, when present.
-    #[must_use]
-    pub fn file_format(&self) -> Option<&str> {
-        self.file_format.as_deref()
-    }
-    /// Return the ModelCIF file-content value, when present.
-    #[must_use]
-    pub fn file_content(&self) -> Option<&str> {
-        self.file_content.as_deref()
-    }
-    /// Return optional free-text file details.
-    #[must_use]
-    pub fn details(&self) -> Option<&str> {
-        self.details.as_deref()
-    }
-    /// Return the data record represented by this file, when present.
-    #[must_use]
-    pub const fn data_id(&self) -> Option<i64> {
-        self.data_id
-    }
-}
-
-/// One file contained in an associated archive.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ArchiveMember {
-    pub(super) id: i64,
-    pub(super) archive_file_id: i64,
-    pub(super) file_path: String,
-    pub(super) file_format: Option<String>,
-    pub(super) file_content: Option<String>,
-    pub(super) description: Option<String>,
-    pub(super) data_id: Option<i64>,
+pub(super) struct ArchiveMember {
+    pub id: i64,
+    pub archive_file_id: i64,
+    pub file_path: String,
+    pub file_format: Option<String>,
+    pub file_content: Option<String>,
+    pub description: Option<String>,
+    pub data_id: Option<i64>,
 }
 
-impl ArchiveMember {
-    /// Return the stable archive-member identifier.
-    #[must_use]
-    pub const fn id(&self) -> i64 {
-        self.id
-    }
-    /// Return the containing associated archive-file identifier.
-    #[must_use]
-    pub const fn archive_file_id(&self) -> i64 {
-        self.archive_file_id
-    }
-    /// Return the member's path inside the archive.
-    #[must_use]
-    pub fn file_path(&self) -> &str {
-        &self.file_path
-    }
-    /// Return the member file format, when present.
-    #[must_use]
-    pub fn file_format(&self) -> Option<&str> {
-        self.file_format.as_deref()
-    }
-    /// Return the member content classification, when present.
-    #[must_use]
-    pub fn file_content(&self) -> Option<&str> {
-        self.file_content.as_deref()
-    }
-    /// Return the optional member description.
-    #[must_use]
-    pub fn description(&self) -> Option<&str> {
-        self.description.as_deref()
-    }
-    /// Return the data record represented by this member, when present.
-    #[must_use]
-    pub const fn data_id(&self) -> Option<i64> {
-        self.data_id
-    }
+pub(super) fn software(categories: CategoryView<'_>) -> Result<Vec<Software>, SemanticError> {
+    category_rows(
+        categories,
+        "software",
+        [
+            "pdbx_ordinal",
+            "name",
+            "classification",
+            "version",
+            "description",
+            "location",
+        ],
+    )
+    .map(|row| {
+        Ok(Software {
+            id: required_integer(&row, "software", "pdbx_ordinal", 0)?,
+            name: required_text(&row, "software", "name", 1)?,
+            classification: required_text(&row, "software", "classification", 2)?,
+            version: optional_text(&row, 3),
+            description: optional_text(&row, 4),
+            location: optional_text(&row, 5),
+        })
+    })
+    .collect()
+}
+
+pub(super) fn software_groups(
+    categories: CategoryView<'_>,
+) -> Result<Vec<SoftwareGroupMember>, SemanticError> {
+    category_rows(
+        categories,
+        "ma_software_group",
+        [
+            "ordinal_id",
+            "group_id",
+            "software_id",
+            "parameter_group_id",
+        ],
+    )
+    .map(|row| {
+        Ok(SoftwareGroupMember {
+            ordinal_id: required_integer(&row, "ma_software_group", "ordinal_id", 0)?,
+            group_id: required_integer(&row, "ma_software_group", "group_id", 1)?,
+            software_id: required_integer(&row, "ma_software_group", "software_id", 2)?,
+            parameter_group_id: optional_integer(
+                &row,
+                "ma_software_group",
+                "parameter_group_id",
+                3,
+            )?,
+        })
+    })
+    .collect()
+}
+
+pub(super) fn protocol_steps(
+    categories: CategoryView<'_>,
+) -> Result<Vec<ProtocolStep>, SemanticError> {
+    category_rows(
+        categories,
+        "ma_protocol_step",
+        [
+            "ordinal_id",
+            "protocol_id",
+            "step_id",
+            "method_type",
+            "step_name",
+            "details",
+            "software_group_id",
+            "input_data_group_id",
+            "output_data_group_id",
+        ],
+    )
+    .map(|row| {
+        Ok(ProtocolStep {
+            ordinal_id: required_integer(&row, "ma_protocol_step", "ordinal_id", 0)?,
+            protocol_id: required_integer(&row, "ma_protocol_step", "protocol_id", 1)?,
+            step_id: required_integer(&row, "ma_protocol_step", "step_id", 2)?,
+            method_type: required_text(&row, "ma_protocol_step", "method_type", 3)?,
+            name: optional_text(&row, 4),
+            details: optional_text(&row, 5),
+            software_group_id: optional_integer(&row, "ma_protocol_step", "software_group_id", 6)?,
+            input_data_group_id: optional_integer(
+                &row,
+                "ma_protocol_step",
+                "input_data_group_id",
+                7,
+            )?,
+            output_data_group_id: optional_integer(
+                &row,
+                "ma_protocol_step",
+                "output_data_group_id",
+                8,
+            )?,
+        })
+    })
+    .collect()
+}
+
+pub(super) fn associated_files(
+    categories: CategoryView<'_>,
+) -> Result<Vec<AssociatedFile>, SemanticError> {
+    category_rows(
+        categories,
+        "ma_entry_associated_files",
+        [
+            "id",
+            "entry_id",
+            "file_url",
+            "file_type",
+            "file_format",
+            "file_content",
+            "details",
+            "data_id",
+        ],
+    )
+    .map(|row| {
+        Ok(AssociatedFile {
+            id: required_integer(&row, "ma_entry_associated_files", "id", 0)?,
+            entry_id: required_text(&row, "ma_entry_associated_files", "entry_id", 1)?,
+            file_url: required_text(&row, "ma_entry_associated_files", "file_url", 2)?,
+            file_type: optional_text(&row, 3),
+            file_format: optional_text(&row, 4),
+            file_content: optional_text(&row, 5),
+            details: optional_text(&row, 6),
+            data_id: optional_integer(&row, "ma_entry_associated_files", "data_id", 7)?,
+        })
+    })
+    .collect()
+}
+
+pub(super) fn archive_members(
+    categories: CategoryView<'_>,
+) -> Result<Vec<ArchiveMember>, SemanticError> {
+    category_rows(
+        categories,
+        "ma_associated_archive_file_details",
+        [
+            "id",
+            "archive_file_id",
+            "file_path",
+            "file_format",
+            "file_content",
+            "description",
+            "data_id",
+        ],
+    )
+    .map(|row| {
+        Ok(ArchiveMember {
+            id: required_integer(&row, "ma_associated_archive_file_details", "id", 0)?,
+            archive_file_id: required_integer(
+                &row,
+                "ma_associated_archive_file_details",
+                "archive_file_id",
+                1,
+            )?,
+            file_path: required_text(&row, "ma_associated_archive_file_details", "file_path", 2)?,
+            file_format: optional_text(&row, 3),
+            file_content: optional_text(&row, 4),
+            description: optional_text(&row, 5),
+            data_id: optional_integer(&row, "ma_associated_archive_file_details", "data_id", 6)?,
+        })
+    })
+    .collect()
 }

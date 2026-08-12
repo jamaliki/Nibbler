@@ -12,6 +12,7 @@ import sys
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
+from importlib import import_module
 from pathlib import Path
 from typing import Any, Protocol, TypeVar, cast
 
@@ -153,6 +154,8 @@ def run_format(
     samples: int,
     full_document: bool,
 ) -> tuple[FormatResult, object]:
+    pyarrow = import_module("pyarrow")
+
     input_bytes = file.stat().st_size
     content = file.read_bytes()
     digest = hashlib.sha256(content).hexdigest()
@@ -168,11 +171,14 @@ def run_format(
         samples=samples,
         input_bytes=logical_input_bytes,
     )
-    arrow_result, arrow_table = timed(
-        native_table.to_pyarrow,
-        warmups=warmups,
-        samples=samples,
-    )
+
+    def import_arrow() -> ArrowTable:
+        return cast(
+            ArrowTable,
+            pyarrow.RecordBatchReader.from_stream(native_table).read_all(),
+        )
+
+    arrow_result, arrow_table = timed(import_arrow, warmups=warmups, samples=samples)
     read_fraction = read_result.median_ms / native_result.median_ms
     return (
         FormatResult(

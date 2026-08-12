@@ -7,13 +7,13 @@ from importlib import import_module
 from typing import Literal, TypeAlias, overload
 
 from . import _core
+from ._core import CifDocument, CifTable
 from ._input import (
     PredicateSpec,
     Source,
     _normalize_source,
 )
 from ._native import batch_error, raise_read_error
-from ._objects import CifDocument, CifTable
 from .errors import BatchError
 
 ReadResult: TypeAlias = CifDocument | CifTable
@@ -82,7 +82,6 @@ class ScanResult(Iterator[ReadResult]):
         "_inflight",
         "_native",
         "_on_error",
-        "_schema",
         "_sources",
     )
 
@@ -99,7 +98,6 @@ class ScanResult(Iterator[ReadResult]):
     ) -> None:
         self._sources = iter(sources)
         self._on_error = on_error
-        self._schema = schema
         self._errors: list[BatchError] = []
         self._inflight = 0
         self._exhausted = False
@@ -136,10 +134,8 @@ class ScanResult(Iterator[ReadResult]):
             self._inflight -= 1
             self._submit_next()
             if fields is None:
-                if isinstance(native, _core._CifDocument):
-                    return CifDocument(native, self._schema)
-                if isinstance(native, _core._CifTable):
-                    return CifTable(native)
+                if isinstance(native, (CifDocument, CifTable)):
+                    return native
                 self.close()
                 raise RuntimeError("native scan returned an unknown batch type")
 

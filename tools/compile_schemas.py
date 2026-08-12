@@ -48,7 +48,7 @@ def compile_schema(lock: SchemaLock, source: Path) -> Path:
 def compile_all() -> dict[str, Path]:
     """Compile every locked schema from its verified cached source."""
     locks = load_schema_locks()
-    if locks["artifact_format_version"] != 1:
+    if locks["artifact_format_version"] != 2:
         raise RuntimeError(
             f"unsupported artifact format version: {locks['artifact_format_version']}"
         )

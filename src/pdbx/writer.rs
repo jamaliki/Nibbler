@@ -1,9 +1,9 @@
 //! Deterministic PDBx profile ordering over the shared CIF serializer.
 
-use crate::cif::{BlockKind, CifBlock, CifDocument, CifEntry, CifLoop, CifValue};
+use crate::cif::{BlockKind, CifBlock, CifDocument, CifEntry, CifLoop, CifValue, split_tag};
 
-use super::category::{category_name, item_name};
-use super::{ComponentAtom, ComponentBond, ComponentDefinition, ComponentResolution, PdbxModel};
+use super::PdbxModel;
+use super::model::{ComponentAtom, ComponentBond, ComponentDefinition, ComponentResolution};
 
 const CATEGORY_ORDER: &[&str] = &[
     "entry",
@@ -92,11 +92,11 @@ fn reorder_block(block: &CifBlock, model: &PdbxModel, category_order: &[&str]) -
 
 fn append_resolved_components(entries: &mut Vec<CifEntry>, model: &PdbxModel) {
     let missing = model
-        .components()
+        .components
         .iter()
         .filter(|component| {
-            component.resolution() != ComponentResolution::Embedded
-                && component.resolution() != ComponentResolution::Unresolved
+            component.resolution != ComponentResolution::Embedded
+                && component.resolution != ComponentResolution::Unresolved
         })
         .collect::<Vec<_>>();
     if missing.is_empty() {
@@ -107,7 +107,7 @@ fn append_resolved_components(entries: &mut Vec<CifEntry>, model: &PdbxModel) {
     }
     let atoms = missing
         .iter()
-        .flat_map(|component| component.atoms().iter().map(move |atom| (*component, atom)))
+        .flat_map(|component| component.atoms.iter().map(move |atom| (*component, atom)))
         .collect::<Vec<_>>();
     if !atoms.is_empty()
         && !merge_category_rows(entries, "chem_comp_atom", &atoms, component_atom_value)
@@ -116,7 +116,7 @@ fn append_resolved_components(entries: &mut Vec<CifEntry>, model: &PdbxModel) {
     }
     let bonds = missing
         .iter()
-        .flat_map(|component| component.bonds().iter().map(move |bond| (*component, bond)))
+        .flat_map(|component| component.bonds.iter().map(move |bond| (*component, bond)))
         .collect::<Vec<_>>();
     if !bonds.is_empty()
         && !merge_category_rows(entries, "chem_comp_bond", &bonds, component_bond_value)
@@ -132,7 +132,7 @@ fn merge_category_rows<T>(
     value: impl Fn(&T, &str) -> CifValue,
 ) -> bool {
     let loop_index = entries.iter().position(|entry| {
-        matches!(entry, CifEntry::Loop(cif_loop) if cif_loop.tags().first().and_then(|tag| category_name(tag)).is_some_and(|name| name.eq_ignore_ascii_case(selected_category)))
+        matches!(entry, CifEntry::Loop(cif_loop) if cif_loop.tags().first().and_then(|tag| split_tag(tag).map(|(category, _)| category)).is_some_and(|name| name.eq_ignore_ascii_case(selected_category)))
     });
     if let Some(index) = loop_index {
         let CifEntry::Loop(cif_loop) = &entries[index] else {
@@ -146,7 +146,7 @@ fn merge_category_rows<T>(
         for record in records {
             values.extend(
                 tags.iter()
-                    .map(|tag| value(record, item_name(tag).unwrap_or(""))),
+                    .map(|tag| value(record, split_tag(tag).map(|(_, item)| item).unwrap_or(""))),
             );
         }
         entries[index] = CifEntry::Loop(CifLoop::new(tags, values));
@@ -166,7 +166,8 @@ fn merge_scalar_category<T>(
         .enumerate()
         .filter_map(|(index, entry)| match entry {
             CifEntry::Item(item)
-                if category_name(item.tag())
+                if split_tag(item.tag())
+                    .map(|(category, _)| category)
                     .is_some_and(|name| name.eq_ignore_ascii_case(selected_category)) =>
             {
                 Some(index)
@@ -189,7 +190,7 @@ fn merge_scalar_category<T>(
     for record in records {
         values.extend(
             tags.iter()
-                .map(|tag| value(record, item_name(tag).unwrap_or(""))),
+                .map(|tag| value(record, split_tag(tag).map(|(_, item)| item).unwrap_or(""))),
         );
     }
     for &index in indices.iter().rev() {
@@ -211,7 +212,12 @@ fn component_loop(components: &[&ComponentDefinition]) -> CifEntry {
     let values = components
         .iter()
         .flat_map(|component| {
-            tags.map(|tag| component_value(component, item_name(tag).unwrap_or("")))
+            tags.map(|tag| {
+                component_value(
+                    component,
+                    split_tag(tag).map(|(_, item)| item).unwrap_or(""),
+                )
+            })
         })
         .collect();
     CifEntry::Loop(CifLoop::new(tags.map(str::to_owned).to_vec(), values))
@@ -227,7 +233,9 @@ fn component_atom_loop(atoms: &[(&ComponentDefinition, &ComponentAtom)]) -> CifE
     let values = atoms
         .iter()
         .flat_map(|record| {
-            tags.map(|tag| component_atom_value(record, item_name(tag).unwrap_or("")))
+            tags.map(|tag| {
+                component_atom_value(record, split_tag(tag).map(|(_, item)| item).unwrap_or(""))
+            })
         })
         .collect();
     CifEntry::Loop(CifLoop::new(tags.map(str::to_owned).to_vec(), values))
@@ -244,7 +252,9 @@ fn component_bond_loop(bonds: &[(&ComponentDefinition, &ComponentBond)]) -> CifE
     let values = bonds
         .iter()
         .flat_map(|record| {
-            tags.map(|tag| component_bond_value(record, item_name(tag).unwrap_or("")))
+            tags.map(|tag| {
+                component_bond_value(record, split_tag(tag).map(|(_, item)| item).unwrap_or(""))
+            })
         })
         .collect();
     CifEntry::Loop(CifLoop::new(tags.map(str::to_owned).to_vec(), values))
@@ -252,12 +262,12 @@ fn component_bond_loop(bonds: &[(&ComponentDefinition, &ComponentBond)]) -> CifE
 
 fn component_value(component: &&ComponentDefinition, item: &str) -> CifValue {
     match item.to_ascii_lowercase().as_str() {
-        "id" => CifValue::text(component.id()),
-        "type" => optional_text(component.component_type()),
-        "name" => optional_text(component.name()),
-        "formula" => optional_text(component.formula()),
-        "formula_weight" => optional_float(component.formula_weight()),
-        "pdbx_formal_charge" => optional_integer(component.formal_charge().map(i64::from)),
+        "id" => CifValue::text(&component.id),
+        "type" => optional_text(component.component_type.as_deref()),
+        "name" => optional_text(component.name.as_deref()),
+        "formula" => optional_text(component.formula.as_deref()),
+        "formula_weight" => optional_float(component.formula_weight),
+        "pdbx_formal_charge" => optional_integer(component.formal_charge.map(i64::from)),
         _ => CifValue::Unknown,
     }
 }
@@ -267,10 +277,10 @@ fn component_atom_value(
     item: &str,
 ) -> CifValue {
     match item.to_ascii_lowercase().as_str() {
-        "comp_id" => CifValue::text(component.id()),
-        "atom_id" => CifValue::text(atom.atom_id()),
-        "type_symbol" => CifValue::text(atom.element()),
-        "charge" => optional_integer(atom.formal_charge().map(i64::from)),
+        "comp_id" => CifValue::text(&component.id),
+        "atom_id" => CifValue::text(&atom.atom_id),
+        "type_symbol" => CifValue::text(&atom.element),
+        "charge" => optional_integer(atom.formal_charge.map(i64::from)),
         _ => CifValue::Unknown,
     }
 }
@@ -279,13 +289,12 @@ fn component_bond_value(
     (component, bond): &(&ComponentDefinition, &ComponentBond),
     item: &str,
 ) -> CifValue {
-    let (first, second) = bond.atom_ids();
     match item.to_ascii_lowercase().as_str() {
-        "comp_id" => CifValue::text(component.id()),
-        "atom_id_1" => CifValue::text(first),
-        "atom_id_2" => CifValue::text(second),
-        "value_order" => CifValue::text(bond.order()),
-        "pdbx_aromatic_flag" => bond.aromatic().map_or(CifValue::Unknown, |value| {
+        "comp_id" => CifValue::text(&component.id),
+        "atom_id_1" => CifValue::text(&bond.first_atom_id),
+        "atom_id_2" => CifValue::text(&bond.second_atom_id),
+        "value_order" => CifValue::text(&bond.order),
+        "pdbx_aromatic_flag" => bond.aromatic.map_or(CifValue::Unknown, |value| {
             CifValue::text(if value { "y" } else { "n" })
         }),
         _ => CifValue::Unknown,
@@ -310,12 +319,16 @@ fn reorder_columns(entry: &CifEntry) -> CifEntry {
     let CifEntry::Loop(cif_loop) = entry else {
         return entry.clone();
     };
-    if category_name(cif_loop.tags().first().map_or("", String::as_str)) != Some("atom_site") {
+    if split_tag(cif_loop.tags().first().map_or("", String::as_str)).map(|(category, _)| category)
+        != Some("atom_site")
+    {
         return entry.clone();
     }
     let mut columns = (0..cif_loop.column_count()).collect::<Vec<_>>();
     columns.sort_by_key(|column| {
-        let item = item_name(&cif_loop.tags()[*column]).unwrap_or("");
+        let item = split_tag(&cif_loop.tags()[*column])
+            .map(|(_, item)| item)
+            .unwrap_or("");
         ATOM_SITE_ORDER
             .iter()
             .position(|expected| item.eq_ignore_ascii_case(expected))
@@ -345,7 +358,7 @@ fn category_rank(entry: &CifEntry, category_order: &[&str]) -> usize {
         CifEntry::Loop(cif_loop) => cif_loop.tags().first().map_or("", String::as_str),
         CifEntry::Frame(_) => return category_order.len() + 1,
     };
-    let category = category_name(tag).unwrap_or("");
+    let category = split_tag(tag).map(|(category, _)| category).unwrap_or("");
     category_order
         .iter()
         .position(|expected| category.eq_ignore_ascii_case(expected))

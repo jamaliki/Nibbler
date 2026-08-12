@@ -8,9 +8,11 @@ import tempfile
 from collections.abc import Iterable, Mapping, Sequence
 from os import PathLike
 from pathlib import Path
-from typing import BinaryIO, Literal, TypeAlias
+from typing import BinaryIO, Literal, TypeAlias, overload
 
 from . import _core
+from ._core import CifDocument as CifDocument
+from ._core import CifTable as CifTable
 from ._input import (
     Source,
     _normalize_predicates,
@@ -22,15 +24,34 @@ from ._native import (
     raise_write_error,
     validation_report,
 )
-from ._objects import CifDocument as CifDocument
-from ._objects import CifTable as CifTable
-from ._objects import MissingPolicy as MissingPolicy
 from ._scan import BatchDiagnostics as BatchDiagnostics
 from ._scan import ScanResult as ScanResult
 from .contracts import ValidationReport
 from .errors import SchemaError, WriteError
 
 Destination: TypeAlias = str | PathLike[str] | BinaryIO
+
+
+@overload
+def read(
+    source: Source,
+    *,
+    category: None = None,
+    columns: None = None,
+    where: None = None,
+    schema: str | None = None,
+) -> CifDocument: ...
+
+
+@overload
+def read(
+    source: Source,
+    *,
+    category: str,
+    columns: Sequence[str] | None = None,
+    where: Mapping[str, object] | None = None,
+    schema: str | None = None,
+) -> CifTable: ...
 
 
 def read(
@@ -74,9 +95,7 @@ def read(
             )
     except ValueError as error:
         raise_read_error(error)
-    if isinstance(native, _core._CifDocument):
-        return CifDocument(native, normalized_schema)
-    return CifTable(native)
+    return native
 
 
 def scan(
@@ -118,7 +137,7 @@ def validate(value: object, *, schema: str | None = None) -> ValidationReport:
         return ValidationReport(coverage=("cif-1.1-syntax",))
     try:
         schema_name, version, coverage, fields = _core.validate_document(
-            value._native, selected
+            value, selected
         )
     except ValueError as error:
         raise_schema_error(error)

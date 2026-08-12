@@ -2,16 +2,15 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::cif::{CifDocument, SchemaError, SchemaName, validate_document as validate_cif};
-use crate::pdbx::category::case_key;
-use crate::pdbx::profile::dictionary_diagnostics;
-use crate::pdbx::{
-    ProfileDiagnostic, ProfileSeverity, ProfileValidationReport,
-    validate_model as validate_pdbx_model,
+use crate::cif::{
+    CifDocument, Diagnostic, SchemaError, SchemaName, Severity, ValidationReport,
+    validate_document as validate_cif,
 };
+use crate::pdbx::fields::case_key;
+use crate::pdbx::validate_model as validate_pdbx_model;
 
 use super::aggregate::ModelCifModel;
-use super::model::TargetEntity;
+use super::prediction::TargetEntity;
 use super::provenance::Software;
 use super::qa::QaMetric;
 use super::source::build_model;
@@ -21,24 +20,30 @@ use super::source::build_model;
 /// # Errors
 ///
 /// Returns an error only if the embedded dictionary cannot be loaded.
-pub fn validate_document(document: &CifDocument) -> Result<ProfileValidationReport, SchemaError> {
+pub fn validate_document(document: &CifDocument) -> Result<ValidationReport, SchemaError> {
     let dictionary = validate_cif(document, SchemaName::ModelCif)?;
-    let mut diagnostics = dictionary_diagnostics(&dictionary);
+    let mut diagnostics = dictionary.diagnostics().to_vec();
     match build_model(document) {
         Ok(model) => diagnostics.extend(validate_semantics(&model)),
-        Err(error) => diagnostics.push(ProfileDiagnostic::from_semantic(&error)),
+        Err(error) => diagnostics.push(Diagnostic::new(
+            error.code(),
+            Severity::Error,
+            error.message(),
+            error.context().to_vec(),
+        )),
     }
     Ok(report(diagnostics))
 }
 
 /// Validate an already constructed ModelCIF model.
 #[must_use]
-pub fn validate_model(model: &ModelCifModel) -> ProfileValidationReport {
+pub fn validate_model(model: &ModelCifModel) -> ValidationReport {
     report(validate_semantics(model))
 }
 
-fn report(diagnostics: Vec<ProfileDiagnostic>) -> ProfileValidationReport {
-    ProfileValidationReport::new(
+fn report(diagnostics: Vec<Diagnostic>) -> ValidationReport {
+    ValidationReport::semantic_profile(
+        "modelcif",
         "1.4.9",
         &[
             "modelcif-ddl2-1.4.9",
@@ -57,7 +62,7 @@ fn report(diagnostics: Vec<ProfileDiagnostic>) -> ProfileValidationReport {
     )
 }
 
-fn validate_semantics(model: &ModelCifModel) -> Vec<ProfileDiagnostic> {
+fn validate_semantics(model: &ModelCifModel) -> Vec<Diagnostic> {
     let mut validator = Validator::new(model);
     validator.audit_conform();
     validator.coordinates();
@@ -73,7 +78,7 @@ fn validate_semantics(model: &ModelCifModel) -> Vec<ProfileDiagnostic> {
 
 pub(super) struct Validator<'a> {
     pub(super) model: &'a ModelCifModel,
-    pub(super) diagnostics: Vec<ProfileDiagnostic>,
+    pub(super) diagnostics: Vec<Diagnostic>,
     pub(super) data: BTreeSet<i64>,
     pub(super) data_groups: BTreeSet<i64>,
     pub(super) models: BTreeSet<i64>,
@@ -216,11 +221,7 @@ impl<'a> Validator<'a> {
         message: impl Into<String>,
         context: Vec<String>,
     ) {
-        self.diagnostics.push(ProfileDiagnostic::new(
-            code,
-            ProfileSeverity::Error,
-            message,
-            context,
-        ));
+        self.diagnostics
+            .push(Diagnostic::new(code, Severity::Error, message, context));
     }
 }

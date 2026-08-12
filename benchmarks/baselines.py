@@ -35,7 +35,10 @@ def project_with_nibbler(file: Path, columns: tuple[str, ...]) -> ProjectedRows:
     table = nibbler.chomp(file, category="atom_site", columns=columns)
     if not isinstance(table, nibbler.CifTable):
         raise TypeError("projected Nibbler read did not return CifTable")
-    arrow_table = cast(ArrowTable, table.to_pyarrow())
+    pyarrow = import_module("pyarrow")
+    arrow_table = cast(
+        ArrowTable, pyarrow.RecordBatchReader.from_stream(table).read_all()
+    )
     values = [arrow_table.column(column).to_pylist() for column in columns]
     return tuple(
         tuple(str(value) for value in row) for row in zip(*values, strict=True)

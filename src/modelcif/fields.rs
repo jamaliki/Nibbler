@@ -1,66 +1,72 @@
 //! Typed field decoding at the generic-CIF to ModelCIF trust boundary.
 
 use crate::pdbx::SemanticError;
-use crate::pdbx::category::Row;
+use crate::pdbx::fields::Row;
 
-pub(super) fn required_text(
-    row: &Row<'_>,
+pub(super) fn required_text<const N: usize>(
+    row: &Row<'_, N>,
     category: &str,
     item: &str,
-    row_index: usize,
+    field: usize,
 ) -> Result<String, SemanticError> {
-    row.text(item)
-        .ok_or_else(|| missing(category, item, row_index))
+    row.text(field)
+        .ok_or_else(|| missing(category, item, row.row_index()))
 }
 
-pub(super) fn optional_text(row: &Row<'_>, item: &str) -> Option<String> {
-    row.text(item)
+pub(super) fn optional_text<const N: usize>(row: &Row<'_, N>, field: usize) -> Option<String> {
+    row.text(field)
 }
 
-pub(super) fn required_integer(
-    row: &Row<'_>,
+pub(super) fn required_integer<const N: usize>(
+    row: &Row<'_, N>,
     category: &str,
     item: &str,
-    row_index: usize,
+    field: usize,
 ) -> Result<i64, SemanticError> {
-    match row.integer(item) {
+    match row.integer(field) {
         Ok(Some(value)) => Ok(value),
-        Ok(None) => Err(missing(category, item, row_index)),
-        Err(text) => Err(typed(category, item, row_index, &text, "integer")),
+        Ok(None) => Err(missing(category, item, row.row_index())),
+        Err(text) => Err(typed(category, item, row.row_index(), &text, "integer")),
     }
 }
 
-pub(super) fn optional_integer(
-    row: &Row<'_>,
+pub(super) fn optional_integer<const N: usize>(
+    row: &Row<'_, N>,
     category: &str,
     item: &str,
-    row_index: usize,
+    field: usize,
 ) -> Result<Option<i64>, SemanticError> {
-    row.integer(item)
-        .map_err(|text| typed(category, item, row_index, &text, "integer"))
+    row.integer(field)
+        .map_err(|text| typed(category, item, row.row_index(), &text, "integer"))
 }
 
-pub(super) fn required_float(
-    row: &Row<'_>,
+pub(super) fn required_float<const N: usize>(
+    row: &Row<'_, N>,
     category: &str,
     item: &str,
-    row_index: usize,
+    field: usize,
 ) -> Result<f64, SemanticError> {
-    match row.float(item) {
+    match row.float(field) {
         Ok(Some(value)) => Ok(value),
-        Ok(None) => Err(missing(category, item, row_index)),
-        Err(text) => Err(typed(category, item, row_index, &text, "finite float")),
+        Ok(None) => Err(missing(category, item, row.row_index())),
+        Err(text) => Err(typed(
+            category,
+            item,
+            row.row_index(),
+            &text,
+            "finite float",
+        )),
     }
 }
 
-pub(super) fn optional_float(
-    row: &Row<'_>,
+pub(super) fn optional_float<const N: usize>(
+    row: &Row<'_, N>,
     category: &str,
     item: &str,
-    row_index: usize,
+    field: usize,
 ) -> Result<Option<f64>, SemanticError> {
-    row.float(item)
-        .map_err(|text| typed(category, item, row_index, &text, "finite float"))
+    row.float(field)
+        .map_err(|text| typed(category, item, row.row_index(), &text, "finite float"))
 }
 
 fn row_context(category: &str, item: &str, row_index: usize) -> Vec<String> {

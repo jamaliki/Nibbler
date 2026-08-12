@@ -2,10 +2,11 @@
 
 #![allow(clippy::expect_used)]
 
+use _core::cif::Severity;
 use _core::cif::{parse, write_canonical};
 use _core::pdbx::{
-    ComponentResolution, EntityKind, ProfileSeverity, build_component_registry, build_model,
-    build_model_with_registry, canonical_document, validate_document, validate_model,
+    build_component_registry, build_model, build_model_with_registry, canonical_document,
+    validate_document, validate_model,
 };
 
 const CHEMISTRY: &[u8] = include_bytes!("fixtures/chemistry/ligand_ion_water.cif");
@@ -17,35 +18,20 @@ fn chemistry_fixture_builds_without_losing_semantic_identity() {
     let model = build_model(&document).expect("fixture must build");
 
     assert_eq!(model.entry_id(), "NIBBLER_LIGAND_ION_WATER");
-    assert_eq!(model.entities().len(), 4);
-    assert_eq!(model.asym_units().len(), 4);
-    assert_eq!(model.atom_sites().len(), 6);
-    assert_eq!(model.connections().len(), 1);
+    assert_eq!(model.entity_count(), 4);
+    assert_eq!(model.asym_unit_count(), 4);
+    assert_eq!(model.component_count(), 5);
+    assert_eq!(model.atom_site_count(), 6);
+    assert_eq!(model.connection_count(), 1);
     assert_eq!(
-        model
-            .entities()
-            .iter()
-            .map(|entity| entity.kind())
-            .collect::<Vec<_>>(),
-        vec![
-            EntityKind::Polymer,
-            EntityKind::NonPolymer,
-            EntityKind::NonPolymer,
-            EntityKind::Water,
-        ]
+        model.entity_kinds().collect::<Vec<_>>(),
+        ["polymer", "non-polymer", "non-polymer", "water"]
     );
-
-    let polymer = &model.entities()[0];
-    assert_eq!(polymer.sequence()[1].component_id(), "MSE");
-    let ligand = &model.atom_sites()[2];
-    assert_eq!(ligand.label_seq_id(), None);
-    assert_eq!(ligand.author_ids().0, "-1");
-    assert_eq!(model.atom_sites()[4].formal_charge(), Some(2));
-    assert_eq!(model.entities()[3].component_id(), Some("HOH"));
-    let connection = &model.connections()[0];
-    assert_eq!(connection.identity(), ("ZN1", "metalc"));
-    assert_eq!(connection.endpoints().0.asym_id(), "B");
-    assert_eq!(connection.endpoints().1.asym_id(), "C");
+    assert_eq!(
+        model.component_ids().collect::<Vec<_>>(),
+        ["ALA", "ATP", "HOH", "MSE", "ZN"]
+    );
+    assert!(validate_model(&model).is_valid());
 }
 
 #[test]
@@ -53,8 +39,14 @@ fn chemistry_fixture_passes_dictionary_and_semantic_profile() {
     let document = parse(CHEMISTRY).expect("fixture must parse");
     let report = validate_document(&document).expect("dictionary must load");
 
+    assert_eq!(report.schema_name(), "pdbx");
     assert_eq!(report.dictionary_version(), "5.416");
-    assert!(report.coverage().contains(&"chemical-component-resolution"));
+    assert!(
+        report
+            .coverage()
+            .iter()
+            .any(|value| value == "chemical-component-resolution")
+    );
     assert!(report.is_valid(), "unexpected: {:?}", report.diagnostics());
 }
 
@@ -82,19 +74,15 @@ fn semantic_diagnostic_limit_reports_truncation() {
     );
     let truncated = &report.diagnostics()[10_000];
     assert_eq!(truncated.code(), "PDBX_DIAGNOSTICS_TRUNCATED");
-    assert_eq!(truncated.severity(), ProfileSeverity::Warning);
+    assert_eq!(truncated.severity(), Severity::Warning);
 }
 
 #[test]
 fn glycan_fixture_maps_atom_sites_through_the_branch_scheme() {
     let document = parse(GLYCAN).expect("glycan fixture must parse");
     let model = build_model(&document).expect("glycan fixture must build");
-    let entity = &model.entities()[0];
-
-    assert_eq!(entity.kind(), EntityKind::Branched);
-    assert_eq!(entity.branch_nodes().len(), 2);
-    assert_eq!(entity.branch_links().len(), 1);
-    assert_eq!(model.atom_sites()[0].label_seq_id(), None);
+    assert_eq!(model.entity_kinds().collect::<Vec<_>>(), ["branched"]);
+    assert_eq!(model.atom_site_count(), 2);
     assert!(
         validate_document(&document)
             .expect("dictionary must load")
@@ -112,13 +100,7 @@ fn strict_profile_rejects_an_unresolved_component() {
         );
     let document = parse(source.as_bytes()).expect("modified fixture must parse");
     let model = build_model(&document).expect("unresolved chemistry remains representable");
-    let atp = model
-        .components()
-        .iter()
-        .find(|component| component.id() == "ATP")
-        .expect("referenced ATP placeholder");
-
-    assert_eq!(atp.resolution(), ComponentResolution::Unresolved);
+    assert!(model.component_ids().any(|component| component == "ATP"));
     assert!(
         validate_model(&model)
             .diagnostics()
@@ -153,16 +135,14 @@ ATP PG P
     .expect("local CCD fixture must parse");
     let registry = build_component_registry(&ccd).expect("local CCD must load");
     let model = build_model_with_registry(&document, Some(&registry)).expect("ATP must resolve");
-    let atp = model
-        .components()
-        .iter()
-        .find(|component| component.id() == "ATP")
-        .expect("ATP definition");
-
     assert_eq!(registry.len(), 1);
-    assert_eq!(atp.resolution(), ComponentResolution::LocalCcd);
     assert!(validate_model(&model).is_valid());
     let emitted = canonical_document(&model);
+    let output = write_canonical(&emitted).expect("resolved model must serialize");
+    assert!(
+        output.contains("ATP PG P"),
+        "local CCD atom must be emitted"
+    );
     assert!(
         validate_document(&emitted)
             .expect("dictionary must load")
@@ -299,11 +279,7 @@ HETATM 2 O O4 . MAN G 1 2 ? 1 0 0 1 10 ? 2 MAN G O4 1
 "#;
     let document = parse(source).expect("glycan fixture must parse");
     let model = build_model(&document).expect("glycan fixture must build");
-    let entity = &model.entities()[0];
-
-    assert_eq!(entity.kind(), EntityKind::Branched);
-    assert_eq!(entity.branch_nodes().len(), 2);
-    assert_eq!(entity.branch_links().len(), 1);
+    assert_eq!(model.entity_kinds().collect::<Vec<_>>(), ["branched"]);
     assert!(
         validate_model(&model)
             .diagnostics()

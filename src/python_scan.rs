@@ -26,6 +26,7 @@ struct NativeScan {
     completed_by_index: BTreeMap<usize, Result<ReadOutput, ReadFailure>>,
     submitted_count: usize,
     yielded_count: usize,
+    schema: Option<String>,
 }
 
 #[pymethods]
@@ -42,9 +43,9 @@ impl NativeScan {
         if workers == 0 {
             return Err(PyValueError::new_err("workers must be greater than zero"));
         }
-        let plan =
-            build_optional_plan(category, columns, predicates, schema).map_err(error_to_python)?;
-        Self::spawn(workers, plan)
+        let plan = build_optional_plan(category, columns, predicates, schema.clone())
+            .map_err(error_to_python)?;
+        Self::spawn(workers, plan, schema)
             .map_err(|error| PyRuntimeError::new_err(format!("cannot start scan worker: {error}")))
     }
 
@@ -82,7 +83,7 @@ impl NativeScan {
         match result {
             Ok(output) => Ok(Some((
                 index,
-                Some(output_to_python(py, output, true)?),
+                Some(output_to_python(py, output, true, self.schema.clone())?),
                 None,
             ))),
             Err(error) => Ok(Some((index, None, Some(error_fields(&error))))),
@@ -106,7 +107,11 @@ impl NativeScan {
 }
 
 impl NativeScan {
-    fn spawn(worker_count: usize, plan: Option<ProjectionPlan>) -> io::Result<Self> {
+    fn spawn(
+        worker_count: usize,
+        plan: Option<ProjectionPlan>,
+        schema: Option<String>,
+    ) -> io::Result<Self> {
         let (job_sender, job_receiver) = mpsc::sync_channel(worker_count);
         let job_receiver = Arc::new(Mutex::new(job_receiver));
         let (completed_sender, completed_receiver) = mpsc::channel();
@@ -127,6 +132,7 @@ impl NativeScan {
             completed_by_index: BTreeMap::new(),
             submitted_count: 0,
             yielded_count: 0,
+            schema,
         })
     }
 

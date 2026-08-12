@@ -32,6 +32,7 @@ The root facade has four operations: `chomp`, `feast`, `sniff`, and `dump`.
 import io
 
 import nibbler
+import pyarrow
 
 # No category returns an immutable logical document.
 document = nibbler.chomp("structure.cif.gz", schema="pdbx")
@@ -45,7 +46,9 @@ atoms = nibbler.chomp(
     where={"pdbx_PDB_model_num": 1},
     schema="pdbx",
 )
-arrow_table = atoms.to_pyarrow(missing="columns")
+arrow_table = pyarrow.RecordBatchReader.from_stream(
+    atoms.with_missing("columns")
+).read_all()
 
 # Output format is inferred from a path or selected explicitly for a stream.
 nibbler.dump(document, "canonical.cif.gz", validate="dictionary")
@@ -61,7 +64,7 @@ model = nibbler.mmcif.read(document, profile="pdbx")
 nibbler.sniff(model, profile="pdbx").raise_for_errors()
 nibbler.dump(model, "semantic.cif.gz", profile="pdbx")
 
-registry = nibbler.components.Registry.from_ccd_cache("components.cif")
+registry = nibbler.components.read("components.cif")
 model_with_local_ccd = nibbler.mmcif.read(
     "structure.cif", profile="pdbx", registry=registry
 )

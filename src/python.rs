@@ -12,15 +12,14 @@ use crate::cif::{
     validate_document as validate_cif_document, write_canonical, write_preserving,
 };
 use crate::modelcif::{
-    MirrorPolicy, ModelCifModel, build_model_with_registry as build_modelcif_with_registry,
+    ModelCifModel, build_model_with_registry as build_modelcif_with_registry,
     canonical_document as canonical_modelcif_document,
-    canonical_document_with_mirror as canonical_modelcif_document_with_mirror,
+    canonical_document_with_local_metric as canonical_modelcif_document_with_local_metric,
     validate_document as validate_modelcif,
 };
 use crate::pdbx::{
-    ComponentRegistry, PdbxModel, ProfileValidationReport,
-    build_component_registry as load_component_registry, build_model_with_registry,
-    canonical_document, validate_document as validate_pdbx,
+    ComponentRegistry, PdbxModel, build_component_registry as load_component_registry,
+    build_model_with_registry, canonical_document, validate_document as validate_pdbx,
 };
 
 pub(crate) type PredicateSpec = (String, String, Vec<String>);
@@ -50,30 +49,42 @@ enum LoadedSource {
     Binary { source_name: String, bytes: Vec<u8> },
 }
 
-#[pyclass(name = "_CifDocument", frozen)]
+/// An immutable, order-preserving generic CIF document.
+#[pyclass(name = "CifDocument", module = "nibbler", frozen)]
 struct PyCifDocument {
     document: Arc<CifDocument>,
+    schema: Option<String>,
 }
 
 #[pymethods]
 impl PyCifDocument {
     #[getter]
+    /// Return the number of data and global blocks.
     fn block_count(&self) -> usize {
         self.document.blocks().len()
     }
 
+    #[getter]
+    /// Return the dictionary selector requested at read time, if any.
+    fn schema(&self) -> Option<&str> {
+        self.schema.as_deref()
+    }
+
+    /// Serialize the document using Nibbler's canonical CIF policy.
     fn to_canonical(&self, py: Python<'_>) -> PyResult<String> {
         let document = Arc::clone(&self.document);
         py.detach(move || write_canonical(&document))
             .map_err(|error| PyValueError::new_err((error.code_str(), error.message().to_owned())))
     }
 
+    /// Serialize with source ordering and valid original value lexemes.
     fn to_preserving(&self, py: Python<'_>) -> PyResult<String> {
         let document = Arc::clone(&self.document);
         py.detach(move || write_preserving(&document))
             .map_err(|error| PyValueError::new_err((error.code_str(), error.message().to_owned())))
     }
 
+    /// Serialize the document as BinaryCIF 0.3 MessagePack.
     fn to_binary(&self, py: Python<'_>) -> PyResult<Vec<u8>> {
         let document = Arc::clone(&self.document);
         py.detach(move || encode_binary(&document))
@@ -86,7 +97,7 @@ impl PyCifDocument {
     }
 
     fn __repr__(&self) -> String {
-        format!("_CifDocument(block_count={})", self.document.blocks().len())
+        format!("CifDocument(block_count={})", self.document.blocks().len())
     }
 }
 
@@ -105,12 +116,14 @@ impl NativeMmcifModel {
     }
 }
 
-#[pyclass(name = "_MmcifModel", frozen)]
+/// An immutable, source-backed macromolecular coordinate model.
+#[pyclass(name = "MmcifModel", module = "nibbler", frozen)]
 struct PyMmcifModel {
     model: NativeMmcifModel,
 }
 
-#[pyclass(name = "_ComponentRegistry", frozen)]
+/// Immutable chemical component definitions loaded by `nibbler.components.read`.
+#[pyclass(name = "Registry", module = "nibbler.components", frozen)]
 struct PyComponentRegistry {
     registry: Arc<ComponentRegistry>,
 }
@@ -122,13 +135,14 @@ impl PyComponentRegistry {
     }
 
     fn __repr__(&self) -> String {
-        format!("_ComponentRegistry(components={})", self.registry.len())
+        format!("Registry(components={})", self.registry.len())
     }
 }
 
 #[pymethods]
 impl PyMmcifModel {
     #[getter]
+    /// Return the semantic profile used to construct this model.
     fn profile(&self) -> &'static str {
         match self.model {
             NativeMmcifModel::Pdbx(_) => "pdbx",
@@ -137,168 +151,168 @@ impl PyMmcifModel {
     }
 
     #[getter]
+    /// Return the PDBx entry identifier.
     fn entry_id(&self) -> &str {
         self.model.coordinates().entry_id()
     }
 
     #[getter]
+    /// Return the number of semantic entities.
     fn entity_count(&self) -> usize {
-        self.model.coordinates().entities().len()
+        self.model.coordinates().entity_count()
     }
 
     #[getter]
+    /// Return the number of entity instances.
     fn asym_unit_count(&self) -> usize {
-        self.model.coordinates().asym_units().len()
+        self.model.coordinates().asym_unit_count()
     }
 
     #[getter]
+    /// Return the number of resolved or explicitly unresolved components.
     fn component_count(&self) -> usize {
-        self.model.coordinates().components().len()
+        self.model.coordinates().component_count()
     }
 
     #[getter]
+    /// Return the number of coordinate atom sites.
     fn atom_site_count(&self) -> usize {
-        self.model.coordinates().atom_sites().len()
+        self.model.coordinates().atom_site_count()
     }
 
     #[getter]
+    /// Return the number of explicit inter-site connections.
     fn connection_count(&self) -> usize {
-        self.model.coordinates().connections().len()
+        self.model.coordinates().connection_count()
     }
 
     #[getter]
+    /// Return entity kinds in source order.
     fn entity_kinds(&self) -> Vec<&str> {
-        self.model
-            .coordinates()
-            .entities()
-            .iter()
-            .map(|entity| entity.kind().as_str())
-            .collect()
+        self.model.coordinates().entity_kinds().collect()
     }
 
     #[getter]
+    /// Return component identifiers in stable order.
     fn component_ids(&self) -> Vec<&str> {
-        self.model
-            .coordinates()
-            .components()
-            .iter()
-            .map(|component| component.id())
-            .collect()
+        self.model.coordinates().component_ids().collect()
     }
 
     #[getter]
+    /// Return the number of deposited prediction models.
     fn prediction_model_count(&self) -> usize {
         match &self.model {
             NativeMmcifModel::Pdbx(_) => 0,
-            NativeMmcifModel::ModelCif(model) => model.models().len(),
+            NativeMmcifModel::ModelCif(model) => model.prediction_model_count(),
         }
     }
 
     #[getter]
+    /// Return the number of declared prediction targets.
     fn target_entity_count(&self) -> usize {
         match &self.model {
             NativeMmcifModel::Pdbx(_) => 0,
-            NativeMmcifModel::ModelCif(model) => model.targets().len(),
+            NativeMmcifModel::ModelCif(model) => model.target_entity_count(),
         }
     }
 
     #[getter]
+    /// Return the number of structural templates.
     fn template_count(&self) -> usize {
         match &self.model {
             NativeMmcifModel::Pdbx(_) => 0,
-            NativeMmcifModel::ModelCif(model) => model.templates().len(),
+            NativeMmcifModel::ModelCif(model) => model.template_count(),
         }
     }
 
     #[getter]
+    /// Return the number of quality-metric definitions.
     fn qa_metric_count(&self) -> usize {
         match &self.model {
             NativeMmcifModel::Pdbx(_) => 0,
-            NativeMmcifModel::ModelCif(model) => model.qa_metrics().len(),
+            NativeMmcifModel::ModelCif(model) => model.qa_metric_count(),
         }
     }
 
     #[getter]
+    /// Return the number of global, local, and pairwise QA values.
     fn qa_value_count(&self) -> usize {
         match &self.model {
             NativeMmcifModel::Pdbx(_) => 0,
-            NativeMmcifModel::ModelCif(model) => model.qa_values().len(),
+            NativeMmcifModel::ModelCif(model) => model.qa_value_count(),
         }
     }
 
     #[getter]
+    /// Return prediction software names in source order.
     fn software_names(&self) -> Vec<&str> {
         match &self.model {
             NativeMmcifModel::Pdbx(_) => Vec::new(),
-            NativeMmcifModel::ModelCif(model) => model
-                .software()
-                .iter()
-                .map(|software| software.name())
-                .collect(),
+            NativeMmcifModel::ModelCif(model) => model.software_names().collect(),
         }
     }
 
     #[getter]
+    /// Return quality-metric names in source order.
     fn qa_metric_names(&self) -> Vec<&str> {
         match &self.model {
             NativeMmcifModel::Pdbx(_) => Vec::new(),
-            NativeMmcifModel::ModelCif(model) => model
-                .qa_metrics()
-                .iter()
-                .map(|metric| metric.name())
-                .collect(),
+            NativeMmcifModel::ModelCif(model) => model.qa_metric_names().collect(),
         }
     }
 
     #[getter]
+    /// Return quality-metric modes in source order.
     fn qa_metric_modes(&self) -> Vec<&str> {
         match &self.model {
             NativeMmcifModel::Pdbx(_) => Vec::new(),
-            NativeMmcifModel::ModelCif(model) => model
-                .qa_metrics()
-                .iter()
-                .map(|metric| metric.mode())
-                .collect(),
+            NativeMmcifModel::ModelCif(model) => model.qa_metric_modes().collect(),
         }
     }
 
-    #[pyo3(signature = (mirror_local_qa_metric=None))]
-    fn to_document(&self, mirror_local_qa_metric: Option<i64>) -> PyResult<PyCifDocument> {
-        let document = match (&self.model, mirror_local_qa_metric) {
-            (NativeMmcifModel::Pdbx(model), None) => canonical_document(model),
-            (NativeMmcifModel::Pdbx(_), Some(_)) => {
-                return Err(PyValueError::new_err(
-                    "mirror_local_qa_metric requires a ModelCIF model",
-                ));
-            }
-            (NativeMmcifModel::ModelCif(model), Some(metric_id)) => {
-                canonical_modelcif_document_with_mirror(model, MirrorPolicy::LocalMetric(metric_id))
-                    .map_err(|error| {
-                        PyValueError::new_err((error.code().to_owned(), error.message().to_owned()))
-                    })?
-            }
-            (NativeMmcifModel::ModelCif(model), None) => canonical_modelcif_document(model),
-        };
-        Ok(PyCifDocument {
-            document: Arc::new(document),
-        })
-    }
-
+    /// Return the generic document from which this model was built.
     fn source_document(&self) -> PyCifDocument {
         PyCifDocument {
             document: Arc::new(self.model.coordinates().source_document().clone()),
+            schema: Some(self.profile().to_owned()),
         }
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "_MmcifModel(profile={:?}, entry_id={:?}, entities={}, atoms={})",
+            "MmcifModel(profile={:?}, entry_id={:?}, entities={}, atoms={})",
             self.profile(),
             self.entry_id(),
             self.entity_count(),
             self.atom_site_count()
         )
     }
+}
+
+#[pyfunction]
+#[pyo3(signature = (model, mirror_local_qa_metric=None))]
+fn _model_document(
+    model: &PyMmcifModel,
+    mirror_local_qa_metric: Option<i64>,
+) -> PyResult<PyCifDocument> {
+    let document = match (&model.model, mirror_local_qa_metric) {
+        (NativeMmcifModel::Pdbx(model), None) => canonical_document(model),
+        (NativeMmcifModel::Pdbx(_), Some(_)) => {
+            return Err(PyValueError::new_err(
+                "mirror_local_qa_metric requires a ModelCIF model",
+            ));
+        }
+        (NativeMmcifModel::ModelCif(model), Some(metric_id)) => {
+            canonical_modelcif_document_with_local_metric(model, metric_id).map_err(|error| {
+                PyValueError::new_err((error.code().to_owned(), error.message().to_owned()))
+            })?
+        }
+        (NativeMmcifModel::ModelCif(model), None) => canonical_modelcif_document(model),
+    };
+    Ok(PyCifDocument {
+        document: Arc::new(document),
+        schema: Some(model.profile().to_owned()),
+    })
 }
 
 type DiagnosticFields = (String, String, String, Vec<String>);
@@ -317,24 +331,7 @@ fn validate_document(
     let report = py
         .detach(move || validate_cif_document(&document, schema))
         .map_err(|error| PyValueError::new_err((error.code(), error.message().to_owned())))?;
-    let diagnostics = report
-        .diagnostics()
-        .iter()
-        .map(|diagnostic| {
-            (
-                diagnostic.code().to_owned(),
-                diagnostic.severity().as_str().to_owned(),
-                diagnostic.message().to_owned(),
-                diagnostic.context().to_vec(),
-            )
-        })
-        .collect();
-    Ok((
-        report.schema_name().to_owned(),
-        report.dictionary_version().to_owned(),
-        report.coverage().to_vec(),
-        diagnostics,
-    ))
+    Ok(validation_fields(&report))
 }
 
 #[pyfunction]
@@ -406,7 +403,7 @@ fn validate_mmcif_document(
                 .map_err(|error| {
                     PyValueError::new_err((error.code(), error.message().to_owned()))
                 })?;
-            Ok(profile_fields("pdbx", &report))
+            Ok(validation_fields(&report))
         }
         SchemaName::ModelCif => {
             let report = py
@@ -414,7 +411,7 @@ fn validate_mmcif_document(
                 .map_err(|error| {
                     PyValueError::new_err((error.code(), error.message().to_owned()))
                 })?;
-            Ok(profile_fields("modelcif", &report))
+            Ok(validation_fields(&report))
         }
     }
 }
@@ -429,7 +426,7 @@ fn validate_mmcif_model(py: Python<'_>, model: &PyMmcifModel) -> PyResult<Valida
                 .map_err(|error| {
                     PyValueError::new_err((error.code(), error.message().to_owned()))
                 })?;
-            Ok(profile_fields("pdbx", &report))
+            Ok(validation_fields(&report))
         }
         NativeMmcifModel::ModelCif(model) => {
             let report = py
@@ -437,12 +434,12 @@ fn validate_mmcif_model(py: Python<'_>, model: &PyMmcifModel) -> PyResult<Valida
                 .map_err(|error| {
                     PyValueError::new_err((error.code(), error.message().to_owned()))
                 })?;
-            Ok(profile_fields("modelcif", &report))
+            Ok(validation_fields(&report))
         }
     }
 }
 
-fn profile_fields(profile: &str, report: &ProfileValidationReport) -> ValidationFields {
+fn validation_fields(report: &crate::cif::ValidationReport) -> ValidationFields {
     let diagnostics = report
         .diagnostics()
         .iter()
@@ -456,18 +453,15 @@ fn profile_fields(profile: &str, report: &ProfileValidationReport) -> Validation
         })
         .collect();
     (
-        profile.to_owned(),
+        report.schema_name().to_owned(),
         report.dictionary_version().to_owned(),
-        report
-            .coverage()
-            .iter()
-            .map(|value| (*value).to_owned())
-            .collect(),
+        report.coverage().to_vec(),
         diagnostics,
     )
 }
 
-#[pyclass(name = "_CifTable", frozen)]
+/// A projected CIF category with lossless internal missing states.
+#[pyclass(name = "CifTable", module = "nibbler", frozen)]
 struct PyCifTable {
     table: Arc<CifTable>,
     missing: ArrowMissingPolicy,
@@ -477,11 +471,13 @@ struct PyCifTable {
 #[pymethods]
 impl PyCifTable {
     #[getter]
+    /// Return the category name without a leading underscore.
     fn category(&self) -> &str {
         self.table.category()
     }
 
     #[getter]
+    /// Return projected item names in output order.
     fn columns(&self) -> Vec<String> {
         self.table
             .columns()
@@ -494,7 +490,8 @@ impl PyCifTable {
         self.table.row_count()
     }
 
-    fn _with_missing(&self, missing: &str) -> PyResult<Self> {
+    /// Return a view with the selected missing-value Arrow representation.
+    fn with_missing(&self, missing: &str) -> PyResult<Self> {
         Ok(Self {
             table: Arc::clone(&self.table),
             missing: parse_missing_policy(missing)?,
@@ -503,6 +500,7 @@ impl PyCifTable {
     }
 
     #[pyo3(signature = (requested_schema=None))]
+    /// Export this table through the zero-copy Arrow C Stream protocol.
     fn __arrow_c_stream__<'py>(
         &self,
         py: Python<'py>,
@@ -520,7 +518,7 @@ impl PyCifTable {
 
     fn __repr__(&self) -> String {
         format!(
-            "_CifTable(category={:?}, rows={}, columns={})",
+            "CifTable(category={:?}, rows={}, columns={})",
             self.table.category(),
             self.table.row_count(),
             self.table.columns().len()
@@ -577,12 +575,12 @@ fn read_input(
     predicates: Vec<PredicateSpec>,
     schema: Option<String>,
 ) -> PyResult<Py<PyAny>> {
-    let plan =
-        build_optional_plan(category, columns, predicates, schema).map_err(error_to_python)?;
+    let plan = build_optional_plan(category, columns, predicates, schema.clone())
+        .map_err(error_to_python)?;
     let output = py
         .detach(move || execute_read(input, plan))
         .map_err(error_to_python)?;
-    output_to_python(py, output, false)
+    output_to_python(py, output, false, schema)
 }
 
 pub(crate) fn execute_read(
@@ -701,12 +699,14 @@ pub(crate) fn output_to_python(
     py: Python<'_>,
     output: ReadOutput,
     include_provenance: bool,
+    schema: Option<String>,
 ) -> PyResult<Py<PyAny>> {
     match output {
         ReadOutput::Document(document) => Ok(Py::new(
             py,
             PyCifDocument {
                 document: Arc::new(document),
+                schema,
             },
         )?
         .into_any()),
@@ -807,6 +807,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(read_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(validate_document, module)?)?;
     module.add_function(wrap_pyfunction!(build_mmcif_model, module)?)?;
+    module.add_function(wrap_pyfunction!(_model_document, module)?)?;
     module.add_function(wrap_pyfunction!(build_component_registry, module)?)?;
     module.add_function(wrap_pyfunction!(validate_mmcif_document, module)?)?;
     module.add_function(wrap_pyfunction!(validate_mmcif_model, module)?)?;

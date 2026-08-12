@@ -157,9 +157,9 @@ mechanisms and qualification results are documented in
 ## 7. Dictionaries and validation
 
 The repository pins exact PDBx 5.416 and ModelCIF 1.4.9 dictionary inputs in
-`schemas/locks.toml`. Deterministic compiled `.nbs` artifacts are embedded in the
-extension, digest-checked, and initialized lazily. Parsing and validation never fetch
-schemas.
+`schemas/locks.toml`. Deterministic, size-bounded MessagePack dictionary artifacts are
+embedded in the extension, version- and digest-checked, and initialized lazily. Parsing
+and validation never fetch schemas.
 
 Validation levels are deliberately distinct:
 
@@ -183,9 +183,18 @@ immutable, source-backed coordinate model. It represents:
 - atom sites with label and author identifiers; and
 - explicit `struct_conn` endpoints.
 
-Category rows borrow document values. Loop rows share one per-loop item-to-column map,
-so semantic construction does not allocate a dictionary for every row. The semantic
-model retains an inexpensive shared clone of its source document.
+The public model is opaque: callers use stable summaries, profile validation, source
+access, and canonical writing rather than mutating or depending on Nibbler's internal
+record layout. Complete typed records remain inside the semantic layer for profile
+cross-reference checks. Lossless writing comes from the retained source document;
+canonical writers reorder its categories and add resolved component definitions when
+needed.
+
+Semantic decoders use one shared, borrowed category-occurrence view over the generic
+document. Each decoder resolves its requested columns once per scalar or loop
+occurrence, then reads rows lazily by index; it does not build per-row dictionaries or
+copy values. The semantic model retains an inexpensive shared clone of its source
+document.
 
 Referenced components resolve deterministically in this order:
 
@@ -251,6 +260,7 @@ The root facade is intentionally four operations:
 
 ```python
 import nibbler
+import polars
 
 atoms = nibbler.chomp(
     "structure.cif.gz",
@@ -259,7 +269,7 @@ atoms = nibbler.chomp(
     where={"pdbx_PDB_model_num": 1},
     schema="pdbx",
 )
-frame = atoms.to_polars(missing="columns")
+frame = polars.DataFrame(atoms.with_missing("columns"))
 
 document = nibbler.chomp("structure.bcif", schema="pdbx")
 nibbler.sniff(document).raise_for_errors()
@@ -308,7 +318,7 @@ src/cif/          syntax, source ownership, projection, Arrow, dictionaries, val
 src/pdbx/         coordinate semantics, component resolution, profile checks, writer
 src/modelcif/     prediction semantics, profile checks, writer
 src/python*.rs    PyO3 conversion and native scan orchestration
-python/nibbler/   typed public Python facade and optional dataframe adapters
+python/nibbler/   source normalization, public dispatch, errors, and typed contracts
 schemas/          pinned dictionary locks and compiled artifacts
 benchmarks/       correctness-qualified benchmark adapters and corpus manifest
 tools/            schema, corpus, fixture, and PGO workflows

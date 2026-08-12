@@ -31,7 +31,7 @@ def test_schema_guided_projection_uses_dictionary_arrow_types() -> None:
     )
     assert isinstance(atoms, CifTable)
 
-    table = atoms.to_pyarrow()
+    table = pyarrow.RecordBatchReader.from_stream(atoms).read_all()
     assert table.schema.field("pdbx_PDB_model_num").type == pyarrow.int64()
     assert table.schema.field("label_comp_id").type == pyarrow.string()
     assert table.schema.field("Cartn_x").type == pyarrow.float64()
@@ -47,10 +47,13 @@ def test_schema_guided_scan_retains_types_and_document_schema() -> None:
         schema="mmcif",
         workers=2,
     )
-    assert [batch.to_pyarrow().schema.field("Cartn_x").type for batch in projected] == [
-        pyarrow.float64(),
-        pyarrow.float64(),
-    ]
+    assert [
+        pyarrow.RecordBatchReader.from_stream(batch)
+        .read_all()
+        .schema.field("Cartn_x")
+        .type
+        for batch in projected
+    ] == [pyarrow.float64(), pyarrow.float64()]
 
     documents = list(nibbler.feast([CHEMISTRY], schema="pdbx", workers=1))
     assert len(documents) == 1
@@ -89,6 +92,7 @@ def test_schema_projection_rejects_unknown_items_and_bad_numerics() -> None:
 
 
 def test_schema_numeric_missing_values_remain_distinct() -> None:
+    pyarrow = pytest.importorskip("pyarrow")
     table = nibbler.chomp(
         b"data_missing\nloop_\n_atom_site.Cartn_x\n?\n.\n",
         category="atom_site",
@@ -96,7 +100,9 @@ def test_schema_numeric_missing_values_remain_distinct() -> None:
         schema="pdbx",
     )
     assert isinstance(table, CifTable)
-    arrow = table.to_pyarrow(missing="columns")
+    arrow = pyarrow.RecordBatchReader.from_stream(
+        table.with_missing("columns")
+    ).read_all()
     assert arrow.column("Cartn_x").to_pylist() == [None, None]
     assert arrow.column("Cartn_x__missing_kind").to_pylist() == [1, 2]
 

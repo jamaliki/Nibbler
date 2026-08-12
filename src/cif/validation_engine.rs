@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use super::dictionary::{CategoryDefinition, Dictionary, ItemDefinition};
+use super::dictionary_source::{CategoryColumn, CategoryView, split_tag};
 use super::document::{BlockKind, CifDocument, CifEntry, CifValueRef};
 use super::numeric::parse_float;
 use super::schema::LoadedSchema;
@@ -47,8 +48,7 @@ struct Occurrence<'a> {
 
 struct Column<'a> {
     item: &'a ItemDefinition,
-    source_tag: &'a str,
-    values: Vec<CifValueRef<'a>>,
+    source: CategoryColumn<'a>,
 }
 
 impl<'a> Validator<'a> {
@@ -81,61 +81,43 @@ impl<'a> Validator<'a> {
         let dictionary = self.schema.dictionary();
         let mut scalar_columns: BTreeMap<String, BTreeMap<String, Column<'a>>> = BTreeMap::new();
         let mut occurrences = Vec::new();
-        for entry in entries {
-            match entry {
-                CifEntry::Item(item) => {
-                    let Some(definition) = dictionary.item(item.tag()) else {
-                        self.unknown_item(item.tag(), block, frame);
-                        continue;
-                    };
-                    let category_key = definition.category().to_ascii_lowercase();
-                    let columns = scalar_columns.entry(category_key).or_default();
-                    self.insert_column(
+        for source in CategoryView::new(entries).occurrences() {
+            let mut by_category: BTreeMap<String, BTreeMap<String, Column<'a>>> = BTreeMap::new();
+            for column in source.columns() {
+                let Some(definition) = dictionary.item(column.tag()) else {
+                    self.unknown_item(column.tag(), block, frame);
+                    continue;
+                };
+                let columns = if source.is_scalar() {
+                    scalar_columns
+                        .entry(definition.category().to_ascii_lowercase())
+                        .or_default()
+                } else {
+                    by_category
+                        .entry(definition.category().to_ascii_lowercase())
+                        .or_default()
+                };
+                self.insert_column(columns, definition, column, block, frame);
+            }
+            if source.is_scalar() {
+                continue;
+            }
+            if by_category.len() > 1 {
+                self.push(
+                    "CIF_SCHEMA_LOOP_CATEGORY",
+                    Severity::Error,
+                    "a dictionary loop must contain items from one category".to_owned(),
+                    context(block, frame, None, None, None, dictionary),
+                );
+            }
+            for (category_key, columns) in by_category {
+                if let Some(category) = dictionary.category(&category_key) {
+                    occurrences.push(Occurrence {
+                        category,
                         columns,
-                        definition,
-                        item.tag(),
-                        vec![item.value().as_ref()],
-                        block,
-                        frame,
-                    );
+                        row_count: source.row_count(),
+                    });
                 }
-                CifEntry::Loop(cif_loop) => {
-                    let mut by_category: BTreeMap<String, BTreeMap<String, Column<'a>>> =
-                        BTreeMap::new();
-                    for (column_index, tag) in cif_loop.tags().iter().enumerate() {
-                        let Some(definition) = dictionary.item(tag) else {
-                            self.unknown_item(tag, block, frame);
-                            continue;
-                        };
-                        let values = (0..cif_loop.row_count())
-                            .filter_map(|row| {
-                                cif_loop.row(row).and_then(|row| row.get(column_index))
-                            })
-                            .collect();
-                        let columns = by_category
-                            .entry(definition.category().to_ascii_lowercase())
-                            .or_default();
-                        self.insert_column(columns, definition, tag, values, block, frame);
-                    }
-                    if by_category.len() > 1 {
-                        self.push(
-                            "CIF_SCHEMA_LOOP_CATEGORY",
-                            Severity::Error,
-                            "a dictionary loop must contain items from one category".to_owned(),
-                            context(block, frame, None, None, None, dictionary),
-                        );
-                    }
-                    for (category_key, columns) in by_category {
-                        if let Some(category) = dictionary.category(&category_key) {
-                            occurrences.push(Occurrence {
-                                category,
-                                columns,
-                                row_count: cif_loop.row_count(),
-                            });
-                        }
-                    }
-                }
-                CifEntry::Frame(_) => {}
             }
         }
         for (category_key, columns) in scalar_columns {
@@ -155,23 +137,12 @@ impl<'a> Validator<'a> {
         &mut self,
         columns: &mut BTreeMap<String, Column<'a>>,
         item: &'a ItemDefinition,
-        source_tag: &'a str,
-        values: Vec<CifValueRef<'a>>,
+        source: CategoryColumn<'a>,
         block: &str,
         frame: Option<&str>,
     ) {
         let key = item.name().to_ascii_lowercase();
-        if columns
-            .insert(
-                key,
-                Column {
-                    item,
-                    source_tag,
-                    values,
-                },
-            )
-            .is_some()
-        {
+        if columns.insert(key, Column { item, source }).is_some() {
             self.push(
                 "CIF_SCHEMA_ALIAS_DUPLICATE",
                 Severity::Error,
@@ -275,8 +246,8 @@ impl<'a> Validator<'a> {
             return;
         };
         let pattern = self.schema.pattern(item_type.code());
-        for (row_index, value) in column.values.iter().enumerate() {
-            let Some(text) = present_text(*value) else {
+        for (row_index, value) in column.source.values().enumerate() {
+            let Some(text) = present_text(value) else {
                 continue;
             };
             if pattern.is_some_and(|pattern| !pattern.is_match(&text)) {
@@ -292,7 +263,7 @@ impl<'a> Validator<'a> {
                         block,
                         frame,
                         Some(column.item.category()),
-                        Some(column.source_tag),
+                        Some(column.source.tag()),
                         Some(row_index),
                         dictionary,
                     ),
@@ -316,7 +287,7 @@ impl<'a> Validator<'a> {
                         block,
                         frame,
                         Some(column.item.category()),
-                        Some(column.source_tag),
+                        Some(column.source.tag()),
                         Some(row_index),
                         dictionary,
                     ),
@@ -355,7 +326,7 @@ impl<'a> Validator<'a> {
                     block,
                     frame,
                     Some(column.item.category()),
-                    Some(column.source_tag),
+                    Some(column.source.tag()),
                     Some(row_index),
                     self.schema.dictionary(),
                 ),
@@ -375,8 +346,8 @@ impl<'a> Validator<'a> {
                 .iter()
                 .map(|name| {
                     let column = occurrence.columns.get(name)?;
-                    let value = column.values.get(row_index)?;
-                    comparison_text(*value, column.item, self.schema.dictionary())
+                    let value = column.source.value(row_index)?;
+                    comparison_text(value, column.item, self.schema.dictionary())
                 })
                 .collect::<Option<Vec<_>>>();
             let Some(key) = key else {
@@ -429,12 +400,12 @@ impl<'a> Validator<'a> {
             .iter()
             .filter_map(|parent| parent_values.get(parent))
             .collect::<Vec<_>>();
-        for (row_index, value) in column.values.iter().enumerate() {
-            let Some(display_text) = present_text(*value) else {
+        for (row_index, value) in column.source.values().enumerate() {
+            let Some(display_text) = present_text(value) else {
                 continue;
             };
             let Some(comparison_text) =
-                comparison_text(*value, column.item, self.schema.dictionary())
+                comparison_text(value, column.item, self.schema.dictionary())
             else {
                 continue;
             };
@@ -450,7 +421,7 @@ impl<'a> Validator<'a> {
                         block,
                         frame,
                         Some(column.item.category()),
-                        Some(column.source_tag),
+                        Some(column.source.tag()),
                         Some(row_index),
                         self.schema.dictionary(),
                     ),
@@ -493,9 +464,9 @@ fn value_index(
             .or_default();
         values.extend(
             column
-                .values
-                .iter()
-                .filter_map(|value| comparison_text(*value, column.item, dictionary)),
+                .source
+                .values()
+                .filter_map(|value| comparison_text(value, column.item, dictionary)),
         );
     }
     index
@@ -556,7 +527,5 @@ fn context(
 }
 
 fn tag_category(tag: &str) -> Option<&str> {
-    tag.strip_prefix('_')?
-        .split_once('.')
-        .map(|(category, _)| category)
+    split_tag(tag).map(|(category, _)| category)
 }

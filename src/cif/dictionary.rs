@@ -2,8 +2,10 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
+use serde::{Deserialize, Serialize};
+
 /// Metadata that binds a compiled schema to one immutable dictionary input.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DictionaryMetadata {
     pub(crate) schema_name: String,
     pub(crate) dictionary_name: String,
@@ -38,7 +40,7 @@ impl DictionaryMetadata {
 }
 
 /// One named DDL2 value type.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct TypeDefinition {
     pub(crate) code: String,
     pub(crate) primitive: String,
@@ -66,7 +68,7 @@ impl TypeDefinition {
 }
 
 /// One optional inclusive numeric interval from `_item_range`.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ItemRange {
     pub(crate) minimum: Option<String>,
     pub(crate) maximum: Option<String>,
@@ -87,7 +89,7 @@ impl ItemRange {
 }
 
 /// One DDL2 item definition.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ItemDefinition {
     pub(crate) name: String,
     pub(crate) category: String,
@@ -150,7 +152,7 @@ impl ItemDefinition {
 }
 
 /// One DDL2 category definition.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CategoryDefinition {
     pub(crate) id: String,
     pub(crate) mandatory: bool,

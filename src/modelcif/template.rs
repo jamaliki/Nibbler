@@ -1,217 +1,284 @@
-//! Structural-template, mapping, and alignment records.
+//! Template and alignment records and row decoding.
 
-/// One structural template used by a comparative model.
+use crate::cif::CategoryView;
+use crate::pdbx::SemanticError;
+use crate::pdbx::fields::category_rows;
+
+use super::fields::{
+    optional_float, optional_integer, optional_text, required_integer, required_text,
+};
+
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Template {
-    pub(super) ordinal_id: i64,
-    pub(super) id: i64,
-    pub(super) origin: String,
-    pub(super) entity_type: String,
-    pub(super) data_id: i64,
-    pub(super) target_asym_id: String,
-    pub(super) auth_asym_id: String,
-    pub(super) label_asym_id: Option<String>,
-    pub(super) label_entity_id: Option<String>,
-    pub(super) model_number: i64,
-    pub(super) transform_id: i64,
-    pub(super) name: Option<String>,
+pub(super) struct Template {
+    pub ordinal_id: i64,
+    pub id: i64,
+    pub origin: String,
+    pub entity_type: String,
+    pub data_id: i64,
+    pub target_asym_id: String,
+    pub auth_asym_id: String,
+    pub label_asym_id: Option<String>,
+    pub label_entity_id: Option<String>,
+    pub model_number: i64,
+    pub transform_id: i64,
+    pub name: Option<String>,
 }
 
-impl Template {
-    /// Return the stable template identifier.
-    #[must_use]
-    pub const fn id(&self) -> i64 {
-        self.id
-    }
-    /// Return the ModelCIF template-origin enumeration value.
-    #[must_use]
-    pub fn origin(&self) -> &str {
-        &self.origin
-    }
-    /// Return the template entity-type enumeration value.
-    #[must_use]
-    pub fn entity_type(&self) -> &str {
-        &self.entity_type
-    }
-    /// Return the data record representing this template.
-    #[must_use]
-    pub const fn data_id(&self) -> i64 {
-        self.data_id
-    }
-    /// Return the target asymmetric-unit identifier mapped to this template.
-    #[must_use]
-    pub fn target_asym_id(&self) -> &str {
-        &self.target_asym_id
-    }
-    /// Return the template's author asymmetric-unit identifier.
-    #[must_use]
-    pub fn auth_asym_id(&self) -> &str {
-        &self.auth_asym_id
-    }
-    /// Return the template coordinate model number.
-    #[must_use]
-    pub const fn model_number(&self) -> i64 {
-        self.model_number
-    }
-}
-
-/// One contiguous polymer segment in a template.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TemplateSegment {
-    pub(super) id: i64,
-    pub(super) template_id: i64,
-    pub(super) sequence_begin: Option<i64>,
-    pub(super) sequence_end: Option<i64>,
+pub(super) struct TemplateSegment {
+    pub id: i64,
+    pub template_id: i64,
+    pub sequence_begin: Option<i64>,
+    pub sequence_end: Option<i64>,
 }
 
-impl TemplateSegment {
-    /// Return the stable template-segment identifier.
-    #[must_use]
-    pub const fn id(&self) -> i64 {
-        self.id
-    }
-    /// Return the containing template identifier.
-    #[must_use]
-    pub const fn template_id(&self) -> i64 {
-        self.template_id
-    }
-    /// Return the inclusive template sequence range.
-    #[must_use]
-    pub const fn sequence_range(&self) -> (Option<i64>, Option<i64>) {
-        (self.sequence_begin, self.sequence_end)
-    }
-}
-
-/// One target-to-template segment mapping.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TemplateMapping {
-    pub(super) id: i64,
-    pub(super) template_segment_id: i64,
-    pub(super) target_asym_id: String,
-    pub(super) target_begin: Option<i64>,
-    pub(super) target_end: Option<i64>,
+pub(super) struct TemplateMapping {
+    pub id: i64,
+    pub template_segment_id: i64,
+    pub target_asym_id: String,
+    pub target_begin: Option<i64>,
+    pub target_end: Option<i64>,
 }
 
-impl TemplateMapping {
-    /// Return the stable mapping identifier.
-    #[must_use]
-    pub const fn id(&self) -> i64 {
-        self.id
-    }
-    /// Return the referenced template-segment identifier.
-    #[must_use]
-    pub const fn template_segment_id(&self) -> i64 {
-        self.template_segment_id
-    }
-    /// Return the mapped target asymmetric-unit identifier.
-    #[must_use]
-    pub fn target_asym_id(&self) -> &str {
-        &self.target_asym_id
-    }
-    /// Return the inclusive target sequence range.
-    #[must_use]
-    pub const fn target_range(&self) -> (Option<i64>, Option<i64>) {
-        (self.target_begin, self.target_end)
-    }
-}
-
-/// One target-template alignment declaration.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Alignment {
-    pub(super) id: i64,
-    pub(super) data_id: i64,
-    pub(super) software_group_id: Option<i64>,
-    pub(super) length: Option<i64>,
-    pub(super) alignment_type: Option<String>,
-    pub(super) mode: Option<String>,
+pub(super) struct Alignment {
+    pub id: i64,
+    pub data_id: i64,
+    pub software_group_id: Option<i64>,
+    pub length: Option<i64>,
+    pub alignment_type: Option<String>,
+    pub mode: Option<String>,
 }
 
-impl Alignment {
-    /// Return the stable alignment identifier.
-    #[must_use]
-    pub const fn id(&self) -> i64 {
-        self.id
-    }
-    /// Return the data record representing this alignment.
-    #[must_use]
-    pub const fn data_id(&self) -> i64 {
-        self.data_id
-    }
-    /// Return the producing software-group identifier, when present.
-    #[must_use]
-    pub const fn software_group_id(&self) -> Option<i64> {
-        self.software_group_id
-    }
-    /// Return the deposited alignment length, when present.
-    #[must_use]
-    pub const fn length(&self) -> Option<i64> {
-        self.length
-    }
-    /// Return the alignment-type enumeration value, when present.
-    #[must_use]
-    pub fn alignment_type(&self) -> Option<&str> {
-        self.alignment_type.as_deref()
-    }
-    /// Return the alignment-mode enumeration value, when present.
-    #[must_use]
-    pub fn mode(&self) -> Option<&str> {
-        self.mode.as_deref()
-    }
-}
-
-/// One target/template participant and score record for an alignment.
 #[derive(Clone, Debug, PartialEq)]
-pub struct AlignmentDetail {
-    pub(super) ordinal_id: i64,
-    pub(super) alignment_id: i64,
-    pub(super) template_segment_id: i64,
-    pub(super) target_asym_id: String,
-    pub(super) score_type: Option<String>,
-    pub(super) score_value: Option<f64>,
-    pub(super) sequence_identity: Option<f64>,
+pub(super) struct AlignmentDetail {
+    pub ordinal_id: i64,
+    pub alignment_id: i64,
+    pub template_segment_id: i64,
+    pub target_asym_id: String,
+    pub score_type: Option<String>,
+    pub score_value: Option<f64>,
+    pub sequence_identity: Option<f64>,
 }
 
-impl AlignmentDetail {
-    /// Return the containing alignment identifier.
-    #[must_use]
-    pub const fn alignment_id(&self) -> i64 {
-        self.alignment_id
-    }
-    /// Return the referenced template-segment identifier.
-    #[must_use]
-    pub const fn template_segment_id(&self) -> i64 {
-        self.template_segment_id
-    }
-    /// Return the participating target asymmetric-unit identifier.
-    #[must_use]
-    pub fn target_asym_id(&self) -> &str {
-        &self.target_asym_id
-    }
-}
-
-/// One target or template sequence participating in an alignment.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AlignmentSequence {
-    pub(super) ordinal_id: i64,
-    pub(super) alignment_id: i64,
-    pub(super) target_template_flag: String,
-    pub(super) sequence: String,
+pub(super) struct AlignmentSequence {
+    pub ordinal_id: i64,
+    pub alignment_id: i64,
+    pub target_template_flag: String,
+    pub sequence: String,
 }
 
-impl AlignmentSequence {
-    /// Return the containing alignment identifier.
-    #[must_use]
-    pub const fn alignment_id(&self) -> i64 {
-        self.alignment_id
-    }
-    /// Return whether this is the target or template sequence.
-    #[must_use]
-    pub fn target_template_flag(&self) -> &str {
-        &self.target_template_flag
-    }
-    /// Return the deposited aligned sequence, including gaps.
-    #[must_use]
-    pub fn sequence(&self) -> &str {
-        &self.sequence
-    }
+pub(super) fn templates(categories: CategoryView<'_>) -> Result<Vec<Template>, SemanticError> {
+    category_rows(
+        categories,
+        "ma_template_details",
+        [
+            "ordinal_id",
+            "template_id",
+            "template_origin",
+            "template_entity_type",
+            "template_data_id",
+            "target_asym_id",
+            "template_auth_asym_id",
+            "template_label_asym_id",
+            "template_label_entity_id",
+            "template_model_num",
+            "template_trans_matrix_id",
+            "template_name",
+        ],
+    )
+    .map(|row| {
+        Ok(Template {
+            ordinal_id: required_integer(&row, "ma_template_details", "ordinal_id", 0)?,
+            id: required_integer(&row, "ma_template_details", "template_id", 1)?,
+            origin: required_text(&row, "ma_template_details", "template_origin", 2)?,
+            entity_type: required_text(&row, "ma_template_details", "template_entity_type", 3)?,
+            data_id: required_integer(&row, "ma_template_details", "template_data_id", 4)?,
+            target_asym_id: required_text(&row, "ma_template_details", "target_asym_id", 5)?,
+            auth_asym_id: required_text(&row, "ma_template_details", "template_auth_asym_id", 6)?,
+            label_asym_id: optional_text(&row, 7),
+            label_entity_id: optional_text(&row, 8),
+            model_number: required_integer(&row, "ma_template_details", "template_model_num", 9)?,
+            transform_id: required_integer(
+                &row,
+                "ma_template_details",
+                "template_trans_matrix_id",
+                10,
+            )?,
+            name: optional_text(&row, 11),
+        })
+    })
+    .collect()
+}
+
+pub(super) fn template_segments(
+    categories: CategoryView<'_>,
+) -> Result<Vec<TemplateSegment>, SemanticError> {
+    category_rows(
+        categories,
+        "ma_template_poly_segment",
+        [
+            "id",
+            "template_id",
+            "residue_number_begin",
+            "residue_number_end",
+        ],
+    )
+    .map(|row| {
+        Ok(TemplateSegment {
+            id: required_integer(&row, "ma_template_poly_segment", "id", 0)?,
+            template_id: required_integer(&row, "ma_template_poly_segment", "template_id", 1)?,
+            sequence_begin: optional_integer(
+                &row,
+                "ma_template_poly_segment",
+                "residue_number_begin",
+                2,
+            )?,
+            sequence_end: optional_integer(
+                &row,
+                "ma_template_poly_segment",
+                "residue_number_end",
+                3,
+            )?,
+        })
+    })
+    .collect()
+}
+
+pub(super) fn template_mappings(
+    categories: CategoryView<'_>,
+) -> Result<Vec<TemplateMapping>, SemanticError> {
+    category_rows(
+        categories,
+        "ma_target_template_poly_mapping",
+        [
+            "id",
+            "template_segment_id",
+            "target_asym_id",
+            "target_seq_id_begin",
+            "target_seq_id_end",
+        ],
+    )
+    .map(|row| {
+        Ok(TemplateMapping {
+            id: required_integer(&row, "ma_target_template_poly_mapping", "id", 0)?,
+            template_segment_id: required_integer(
+                &row,
+                "ma_target_template_poly_mapping",
+                "template_segment_id",
+                1,
+            )?,
+            target_asym_id: required_text(
+                &row,
+                "ma_target_template_poly_mapping",
+                "target_asym_id",
+                2,
+            )?,
+            target_begin: optional_integer(
+                &row,
+                "ma_target_template_poly_mapping",
+                "target_seq_id_begin",
+                3,
+            )?,
+            target_end: optional_integer(
+                &row,
+                "ma_target_template_poly_mapping",
+                "target_seq_id_end",
+                4,
+            )?,
+        })
+    })
+    .collect()
+}
+
+pub(super) fn alignments(categories: CategoryView<'_>) -> Result<Vec<Alignment>, SemanticError> {
+    category_rows(
+        categories,
+        "ma_alignment_info",
+        [
+            "alignment_id",
+            "data_id",
+            "software_group_id",
+            "alignment_length",
+            "alignment_type",
+            "alignment_mode",
+        ],
+    )
+    .map(|row| {
+        Ok(Alignment {
+            id: required_integer(&row, "ma_alignment_info", "alignment_id", 0)?,
+            data_id: required_integer(&row, "ma_alignment_info", "data_id", 1)?,
+            software_group_id: optional_integer(&row, "ma_alignment_info", "software_group_id", 2)?,
+            length: optional_integer(&row, "ma_alignment_info", "alignment_length", 3)?,
+            alignment_type: optional_text(&row, 4),
+            mode: optional_text(&row, 5),
+        })
+    })
+    .collect()
+}
+
+pub(super) fn alignment_details(
+    categories: CategoryView<'_>,
+) -> Result<Vec<AlignmentDetail>, SemanticError> {
+    category_rows(
+        categories,
+        "ma_alignment_details",
+        [
+            "ordinal_id",
+            "alignment_id",
+            "template_segment_id",
+            "target_asym_id",
+            "score_type",
+            "score_value",
+            "percent_sequence_identity",
+        ],
+    )
+    .map(|row| {
+        Ok(AlignmentDetail {
+            ordinal_id: required_integer(&row, "ma_alignment_details", "ordinal_id", 0)?,
+            alignment_id: required_integer(&row, "ma_alignment_details", "alignment_id", 1)?,
+            template_segment_id: required_integer(
+                &row,
+                "ma_alignment_details",
+                "template_segment_id",
+                2,
+            )?,
+            target_asym_id: required_text(&row, "ma_alignment_details", "target_asym_id", 3)?,
+            score_type: optional_text(&row, 4),
+            score_value: optional_float(&row, "ma_alignment_details", "score_value", 5)?,
+            sequence_identity: optional_float(
+                &row,
+                "ma_alignment_details",
+                "percent_sequence_identity",
+                6,
+            )?,
+        })
+    })
+    .collect()
+}
+
+pub(super) fn alignment_sequences(
+    categories: CategoryView<'_>,
+) -> Result<Vec<AlignmentSequence>, SemanticError> {
+    category_rows(
+        categories,
+        "ma_alignment",
+        [
+            "ordinal_id",
+            "alignment_id",
+            "target_template_flag",
+            "sequence",
+        ],
+    )
+    .map(|row| {
+        Ok(AlignmentSequence {
+            ordinal_id: required_integer(&row, "ma_alignment", "ordinal_id", 0)?,
+            alignment_id: required_integer(&row, "ma_alignment", "alignment_id", 1)?,
+            target_template_flag: required_text(&row, "ma_alignment", "target_template_flag", 2)?,
+            sequence: required_text(&row, "ma_alignment", "sequence", 3)?,
+        })
+    })
+    .collect()
 }

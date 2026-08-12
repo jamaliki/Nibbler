@@ -28,8 +28,8 @@ def test_mmcif_read_builds_source_backed_semantic_model() -> None:
     assert model.component_count == 5
     assert model.atom_site_count == 6
     assert model.connection_count == 1
-    assert model.entity_kinds == ("polymer", "non-polymer", "non-polymer", "water")
-    assert model.component_ids == ("ALA", "ATP", "HOH", "MSE", "ZN")
+    assert model.entity_kinds == ["polymer", "non-polymer", "non-polymer", "water"]
+    assert model.component_ids == ["ALA", "ATP", "HOH", "MSE", "ZN"]
 
 
 def test_model_can_be_built_from_document_and_profile_validated() -> None:
@@ -43,6 +43,7 @@ def test_model_can_be_built_from_document_and_profile_validated() -> None:
     assert model_report.schema == "pdbx"
     assert model_report.dictionary_version == "5.416"
     assert "chemical-component-resolution" in model_report.coverage
+    assert model.source_document().schema == "pdbx"
 
 
 def test_profile_dump_is_canonical_and_transactional(tmp_path: Path) -> None:
@@ -91,7 +92,7 @@ def test_local_ccd_registry_resolves_unknown_ligand_explicitly(
         "ATP non-polymer . \"ADENOSINE-5'-TRIPHOSPHATE\" 'C10 H16 N5 O13 P3' 507.181\n",
         "",
     )
-    registry = nibbler.components.Registry.from_ccd_cache(
+    registry = nibbler.components.read(
         b"data_ATP\n"
         b"_chem_comp.id ATP\n"
         b"_chem_comp.type non-polymer\n"
@@ -114,7 +115,7 @@ def test_local_ccd_registry_resolves_unknown_ligand_explicitly(
 
 
 def test_local_ccd_conflict_is_a_structured_error() -> None:
-    registry = nibbler.components.Registry.from_ccd_cache(
+    registry = nibbler.components.read(
         b"data_ATP\n_chem_comp.id ATP\n_chem_comp.name 'INCOMPATIBLE NAME'\n"
     )
     with pytest.raises(ChemistryError) as raised:

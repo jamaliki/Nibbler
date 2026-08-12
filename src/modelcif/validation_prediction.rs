@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::pdbx::category::case_key;
+use crate::pdbx::fields::case_key;
 
 use super::validation::Validator;
 
@@ -21,16 +21,14 @@ impl Validator<'_> {
         let coordinate_entities = self
             .model
             .coordinates
-            .entities()
-            .iter()
-            .map(|value| case_key(value.id()))
+            .coordinate_entity_ids()
+            .map(case_key)
             .collect::<BTreeSet<_>>();
         let coordinate_asym = self
             .model
             .coordinates
-            .asym_units()
-            .iter()
-            .map(|value| (case_key(value.id()), case_key(value.entity_id())))
+            .asym_entity_ids()
+            .map(|(asym_id, entity_id)| (case_key(asym_id), case_key(entity_id)))
             .collect::<BTreeMap<_, _>>();
         for target in &self.model.targets {
             if !coordinate_entities.contains(&case_key(&target.entity_id)) {
@@ -110,9 +108,7 @@ impl Validator<'_> {
         let coordinate_models = self
             .model
             .coordinates
-            .atom_sites()
-            .iter()
-            .map(|atom| atom.model_number())
+            .coordinate_model_numbers()
             .collect::<BTreeSet<_>>();
         for prediction in &self.model.models {
             self.reference(

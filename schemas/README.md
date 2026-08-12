@@ -18,10 +18,11 @@ make compile-schemas
 ```
 
 The deterministic [`compiled/`](compiled/) `.nbs` files are committed release inputs.
-They contain the definitions needed for projection typing and validation: item and
-category identity, DDL2 type patterns, mandatory flags, enumerations, numeric ranges,
-keys, and parent-child links. The native extension checks each artifact's format
-version and source digest before lazy initialization.
+Each is a versioned, size-bounded MessagePack encoding of Nibbler's immutable compiled
+dictionary. It contains the definitions needed for projection typing and validation:
+item and category identity, DDL2 type patterns, mandatory flags, enumerations, numeric
+ranges, keys, and parent-child links. The native extension checks the envelope version
+and source digest before lazy initialization.
 
 Updating a lock requires an explicit version and digest change, regenerated artifacts,
 and conformance review:
