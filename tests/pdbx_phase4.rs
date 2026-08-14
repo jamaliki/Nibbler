@@ -1,4 +1,4 @@
-//! Source-backed PDBx semantic-model and strict-writer tests for Phase 4.
+//! Source-backed PDBx semantic-model and strict-writer integration tests.
 
 #![allow(clippy::expect_used)]
 

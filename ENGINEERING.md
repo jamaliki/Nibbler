@@ -166,7 +166,9 @@ Current native dependencies are:
 | `proptest` (development) | property tests |
 
 There is one Rust crate and one Python package. Cargo and Python lock inputs must remain
-reproducible. Runtime dependencies may not introduce network access.
+reproducible. The minimum Rust version is 1.88. The Python contract supports CPython
+3.10 through 3.14, while the repository-local development environment pins Python
+3.12.13 and Rust 1.97.1. Runtime dependencies may not introduce network access.
 
 ## 7. Performance work
 
@@ -193,7 +195,8 @@ decline work and fall back to the grammar owner; they must never redefine validi
 Current mechanisms and measurements live in
 [docs/performance-report.md](docs/performance-report.md). Experimental history is
 isolated in [docs/improvement-beam.md](docs/improvement-beam.md), not mixed into current
-architecture documents.
+architecture documents. The exact fast-path proofs and fallbacks are diagrammed beside
+their owners in [src/cif/README.md](src/cif/README.md).
 
 ## 8. Tests
 
@@ -267,24 +270,29 @@ missing states, canonical writing, and Arrow interchange. A source distribution 
 also rebuild successfully through its declared PEP 517 backend. Do not substitute a
 checkout import or an editable install for artifact qualification.
 
-The release workflow builds with `--locked --compatibility pypi`. Wheels are
+Portable release wheels build with `--locked --compatibility pypi`. They are
 interpreter-specific and qualified on their target platform before assembly. Build and
 qualification jobs have read-only repository access and no publication identity. Only
-an exact version tag can reach the protected PyPI environment, and that publish job uses
-trusted publishing rather than a stored token. The release procedure is in
+an exact version tag can reach the configured PyPI environment, and that publish job
+uses trusted publishing rather than a stored token. The release procedure is in
 [docs/releasing.md](docs/releasing.md).
 
 The scheduled PDB regression runs every pinned structure in CIF, BinaryCIF, and gzip.
-It requires equal projections and checks broad hosted-runner throughput and RSS floors
-for large inputs. A changed parser, storage representation, compression backend, Arrow
-builder, or build profile must pass this job before release.
+It requires equal projections and checks the broad hosted-runner throughput and RSS
+floors in `benchmarks/pdb_guardrails.toml` for large inputs. A changed parser, storage
+representation, compression backend, Arrow builder, or build profile must pass this job
+before release.
 
-Release benchmarks require `maturin develop --release`. Native PGO wheels are built
-per target and Python ABI with:
+Release benchmarks require `maturin develop --release`. Optional native PGO wheels are
+built per target and Python ABI with:
 
 ```console
 micromamba run -p .mamba/nibbler-dev python -m tools.build_pgo
 ```
+
+PGO artifacts are fingerprinted performance builds, not portable release-matrix
+artifacts. Do not publish them under the same wheel set unless every target has a native
+training runner and the normal archive qualification gate.
 
 ## 10. Change policy and definition of done
 
@@ -293,6 +301,8 @@ A change is complete only when:
 - the design has one clear owner per invariant;
 - obsolete code and compatibility layers are removed;
 - public types, stubs, docstrings, examples, and design documents agree;
+- [docs/python-api.md](docs/python-api.md) agrees with the public Python signatures and
+  native stubs;
 - formatting, lint, typing, tests, rustdoc, corpus verification, and affected
   interoperability checks pass;
 - performance-sensitive changes include representative A/B evidence; and

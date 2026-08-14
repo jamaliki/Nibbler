@@ -93,7 +93,7 @@ impl PartialEq for TextValue {
 
 impl Eq for TextValue {}
 
-/// A retained numeric spelling for future preserving output.
+/// A retained numeric spelling used by preserving output.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OriginalLexeme(TextValue);
 

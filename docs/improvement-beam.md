@@ -38,7 +38,7 @@ projection and 588/787 MB/s full construction before the hardware-limit cycle ab
 |---:|---|---|---|---|
 | 1 | B3 deterministic intra-file parallelism | promoted | 3.65-4.53x text projection; 2.16-3.24x text full versus initial baseline | bounded production path |
 | 2 | B1 compact document storage | promoted | BinaryCIF full 3.47-4.18x; RSS down 55-77% | shared spans and retained columns |
-| 3 | B4 build/input pipeline | promoted | PGO +13-17% on final parallel text; gzip backend/preallocation -17.6-22.6% before parallelism | native release workflow |
+| 3 | B4 build/input pipeline | promoted | PGO +13-17% on final parallel text; gzip backend/preallocation -17.6-22.6% before parallelism | native artifact workflow |
 | 4 | B2 fused strict scanner | promoted | +8.7-10.2% large text, small file neutral | one-pass scalar unquoted scan |
 
 ## Combination result

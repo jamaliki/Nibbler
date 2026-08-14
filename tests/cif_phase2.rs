@@ -1,4 +1,4 @@
-//! Projection, Arrow-storage, gzip, and resource-limit tests for Phase 2.
+//! Projection, Arrow storage, gzip, and resource-limit integration tests.
 //!
 //! Assertions intentionally use panic-based helpers, as permitted for tests by
 //! `ENGINEERING.md`; production code retains the workspace-wide deny policy.

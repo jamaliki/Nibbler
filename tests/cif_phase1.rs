@@ -1,4 +1,4 @@
-//! Phase 1 integration tests for strict CIF syntax and logical round trips.
+//! Strict CIF syntax and logical round-trip integration tests.
 //!
 //! Assertions intentionally use panic-based helpers, as permitted for tests by
 //! `ENGINEERING.md`; production code retains the workspace-wide deny policy.

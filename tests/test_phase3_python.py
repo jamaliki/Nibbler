@@ -1,4 +1,4 @@
-"""Public Python coverage for Phase 3 schemas, validation, and writing."""
+"""Public Python coverage for schemas, validation, and writing."""
 
 from __future__ import annotations
 

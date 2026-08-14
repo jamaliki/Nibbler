@@ -1,7 +1,7 @@
 # Nibbler design
 
 - Status: current implementation
-- Updated: 2026-08-12
+- Updated: 2026-08-14
 - Schema targets: PDBx/mmCIF 5.416 and ModelCIF 1.4.9
 - Engineering rules: [ENGINEERING.md](ENGINEERING.md)
 
@@ -11,8 +11,8 @@ recorded only in [docs/improvement-beam.md](docs/improvement-beam.md).
 
 ## 1. Purpose
 
-Nibbler is a native Python and Rust toolkit for CIF 1.1, PDBx/mmCIF, and ModelCIF. It
-has three jobs:
+Nibbler is a typed Python package backed by a safe Rust library for CIF 1.1,
+PDBx/mmCIF, and ModelCIF. It has three jobs:
 
 1. parse a complete CIF document without losing its logical structure;
 2. project one category directly into typed columnar storage; and
@@ -24,7 +24,7 @@ network data, or collapse CIF's unknown (`?`) and not-applicable (`.`) states.
 ## 2. System shape
 
 ```mermaid
-flowchart LR
+flowchart TB
     I["Path, bytes, or binary stream"] --> D["Input detection and bounded gzip decode"]
     D --> T["CIF 1.1 lexer and parser"]
     D --> B["BinaryCIF decoder"]
@@ -53,6 +53,26 @@ semantic construction, and profile validation operate above those shared types.
 
 The implementation is one Rust crate exposed through a thin PyO3 boundary and a small,
 typed Python facade. There is no plugin system, service layer, or second Python parser.
+
+### Algorithm diagrams by owner
+
+The system map above is intentionally broad. Detailed diagrams live beside the code
+that owns each invariant:
+
+- [`src/cif/README.md`](src/cif/README.md): input dispatch, grammar and sinks, the
+  performance-critical large-loop kernel, safe boundaries, storage, Arrow, BinaryCIF,
+  and dictionary validation;
+- [`src/pdbx/README.md`](src/pdbx/README.md): borrowed semantic decoding, chemical
+  component resolution, PDBx validation, and canonical construction;
+- [`src/modelcif/README.md`](src/modelcif/README.md): ModelCIF aggregation, validation,
+  category ordering, and explicit QA-to-B-factor mirroring;
+- [`python/README.md`](python/README.md): PyO3 dispatch, bounded ordered scanning, and
+  transactional output; and
+- [`tools/README.md`](tools/README.md): schema provenance, optional native PGO, and
+  portable release qualification.
+
+The benchmark correctness and measurement pipeline is diagrammed in
+[`benchmarks/README.md`](benchmarks/README.md).
 
 ## 3. Input and formats
 
@@ -122,12 +142,18 @@ invalid values fail at their source location. Unknown items in a schema-guided
 projection produce a structured error.
 
 `CifTable` owns segmented Arrow-compatible buffers and exports the Arrow C Stream
-protocol. PyArrow, Polars, and pandas are optional consumers, not runtime dependencies.
-At that boundary the caller chooses one missing-value policy:
+protocol. PyArrow and Polars consume it directly; pandas can consume a table converted
+through either library. None is a Nibbler runtime dependency. At the Arrow boundary the
+caller chooses one missing-value policy:
 
-- `collapse`: map both CIF missing states to Arrow null;
-- `columns`: add companion columns that encode the exact missing state; or
-- `extension`: expose Nibbler's missing-state extension representation.
+- `collapse`: map both CIF missing states to Arrow null and retain counts in field
+  metadata;
+- `columns`: add a non-null `uint8` companion column for each value column; or
+- `extension`: expose a `struct<value, kind>` annotated as `nibbler.cif_missing`.
+
+Missing-kind codes are `0` for present, `1` for unknown, and `2` for not applicable.
+Projected tables produced by multi-source scans also export source, block, and frame
+provenance columns.
 
 ## 6. Concurrency and performance architecture
 
@@ -190,6 +216,11 @@ cross-reference checks. Lossless writing comes from the retained source document
 canonical writers reorder its categories and add resolved component definitions when
 needed.
 
+The Python PDBx summaries are entry ID; entity, asymmetric-unit, component, atom-site,
+and connection counts; entity kinds; and component IDs. ModelCIF adds prediction-model,
+target, template, QA-definition, and QA-value counts plus software and QA metric names
+and modes. These summaries are observations, not mutable record facades.
+
 Semantic decoders use one shared, borrowed category-occurrence view over the generic
 document. Each decoder resolves its requested columns once per scalar or loop
 occurrence, then reads rows lazily by index; it does not build per-row dictionaries or
@@ -236,7 +267,9 @@ Text output has two modes:
   deterministic layout.
 
 Preserving mode is not byte preservation: comments and original whitespace were not
-stored. BinaryCIF output is deterministic and supports canonical mode only.
+stored. BinaryCIF output is deterministic and supports canonical mode only. BinaryCIF
+0.3 cannot represent global blocks or save frames, and Nibbler rejects typed values
+outside the writer's lossless encodings rather than truncating them.
 
 Text CIF is the default stream format; BinaryCIF is selected explicitly for a stream or
 inferred from `.bcif` and `.bcif.gz` paths. Gzip is inferred from a path ending in
@@ -257,6 +290,8 @@ The root facade is intentionally four operations:
 
 `chomp` and `feast` are exact aliases, not alternate implementations. `sniff` and
 `dump` dispatch only from explicit `schema=` or `profile=` arguments and Nibbler types.
+The full signatures, predicate forms, missing-state policies, object summaries, and
+error fields are documented in [docs/python-api.md](docs/python-api.md).
 
 ```python
 import nibbler
@@ -287,11 +322,12 @@ available.
 ## 12. Resource and safety contract
 
 The Rust crate forbids unsafe code. File contents and Python arguments must not cause a
-panic. Checked sizes and explicit limits bound allocation from untrusted input. Default text
-limits include 2 GiB input, 64 MiB per token, 100,000 blocks, 1,000,000 frames,
+panic. Checked sizes and explicit limits bound allocation from untrusted input. Default
+text limits include 2 GiB input, 64 MiB per token, 100,000 blocks, 1,000,000 frames,
 10,000,000 loops and tags, 100,000 loop columns, and 1,000,000,000 rows and values.
 Default gzip limits are 2 GiB compressed, 2 GiB decompressed, and a 1,000-fold expansion
-ratio.
+ratio. BinaryCIF validates its container shape, logical row/value counts, and declared
+encoding expansion before allocating decoded columns.
 
 Determinism covers logical output, canonical bytes, validation order, batch order, and
 the selected earliest parse error across worker counts.
@@ -329,11 +365,12 @@ Each archive crosses the same qualification boundary before it can be assembled:
 4. exercise text CIF, gzip, BinaryCIF, schemas, missing states, writing, and Arrow C
    Stream interchange through the installed package.
 
-Manual release workflows produce qualified candidates only. An exact version tag may
-publish the already-qualified artifact set through a protected PyPI environment using
-short-lived trusted-publisher credentials. Build jobs are read-only and receive no
-publication identity. The GitHub release is created only after PyPI accepts the complete
-set, and both carry the same archives and SHA-256 checksums.
+Manual release workflows produce qualified candidates only. Publication requires a
+configured PyPI trusted publisher and matching GitHub `pypi` environment. An exact
+version tag may then publish the qualified artifact set with short-lived credentials;
+build jobs are read-only and receive no publication identity. The GitHub release is
+created only after PyPI accepts the complete set, and both carry the same archives and
+SHA-256 checksums.
 
 A scheduled regression job runs the complete hash-pinned PDB corpus through projection
 and full-document construction in CIF, BinaryCIF, and gzip. It requires cross-format
@@ -358,18 +395,20 @@ Nibbler does not provide:
 
 ## 16. Repository boundaries
 
-```text
-src/cif/          syntax, source ownership, projection, Arrow, dictionaries, validation,
-                  BinaryCIF, and generic writers
-src/pdbx/         coordinate semantics, component resolution, profile checks, writer
-src/modelcif/     prediction semantics, profile checks, writer
-src/python*.rs    PyO3 conversion and native scan orchestration
-python/nibbler/   source normalization, public dispatch, errors, and typed contracts
-schemas/          pinned dictionary locks and compiled artifacts
-benchmarks/       correctness-qualified adapters, corpus manifest, and regression floors
-tools/            schema, corpus, fixture, release qualification, and PGO workflows
-tests/            Rust, Python, bounded properties, corpus, and interoperability tests
-```
+- [`src/cif/`](src/cif/README.md): syntax, source ownership, projection, Arrow,
+  dictionaries, validation, BinaryCIF, and generic writers;
+- [`src/pdbx/`](src/pdbx/README.md): coordinate semantics, component resolution,
+  profile checks, and canonical construction;
+- [`src/modelcif/`](src/modelcif/README.md): prediction semantics, profile checks, and
+  canonical construction;
+- `src/python*.rs` and [`python/nibbler/`](python/README.md): PyO3 conversion, native
+  scan orchestration, source normalization, public dispatch, errors, and typed contracts;
+- [`schemas/`](schemas/README.md): pinned dictionary locks and compiled artifacts;
+- [`benchmarks/`](benchmarks/README.md): correctness-qualified adapters, corpus
+  manifest, and regression floors;
+- [`tools/`](tools/README.md): schema, corpus, fixture, release qualification, and PGO
+  workflows; and
+- `tests/`: Rust, Python, bounded properties, corpus, and interoperability tests.
 
 The current engineering gates are in [ENGINEERING.md](ENGINEERING.md). Benchmark usage
 is in [benchmarks/README.md](benchmarks/README.md), current performance qualification is

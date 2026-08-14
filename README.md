@@ -1,7 +1,11 @@
 # Nibbler
 
-Nibbler is a native Python and Rust toolkit for fast, strict CIF 1.1 analysis and for
-validated PDBx/mmCIF and ModelCIF output.
+Nibbler is a typed Python package backed by safe Rust for fast, strict CIF 1.1 analysis
+and validated PDBx/mmCIF and ModelCIF output.
+
+Nibbler 0.1.0 is an unreleased alpha. The supported Python contract targets CPython
+3.10 through 3.14. Building from source requires Rust 1.88 or newer; the repository's
+development environment pins Python 3.12.13 and Rust 1.97.1.
 
 ## What it does
 
@@ -23,6 +27,17 @@ validated PDBx/mmCIF and ModelCIF output.
 
 Parsing is strict: Nibbler does not silently repair malformed syntax, guess chemistry,
 or infer a document from a dataframe.
+
+## Install from this checkout
+
+Until 0.1.0 is published, install directly from a checkout with a compatible Python and
+Rust toolchain:
+
+```console
+python -m pip install .
+```
+
+For development, use the repository-local micromamba environment described below.
 
 ## Python API
 
@@ -103,6 +118,9 @@ exact aliases of `cif.read` and `cif.scan`.
 The import package is `nibbler`. The distribution is named `nibbler-cif` because the
 `nibbler` distribution name is used by another project.
 
+The complete source, predicate, missing-state, validation, model-summary, and error
+contracts are in the [Python API reference](docs/python-api.md).
+
 ## Development
 
 The only host prerequisite is
@@ -124,19 +142,26 @@ micromamba run -p .mamba/nibbler-dev python -m tools.fetch_pdb_corpus
 make pdb-stress
 ```
 
-Build a correctness-trained, target-specific PGO wheel:
+Optionally build a correctness-trained, target-specific PGO wheel:
 
 ```console
 micromamba run -p .mamba/nibbler-dev python -m tools.build_pgo
 ```
 
-The workflow writes a wheel and compiler/source/corpus fingerprint metadata to
-`dist-pgo/`. Profiles are compiler-, target-, ABI-, source-, and workload-specific; no
-PGO flags are stored in `Cargo.toml`.
+This native optimization workflow writes a wheel and compiler/source/corpus fingerprint
+metadata to `dist-pgo/`. Profiles are compiler-, target-, ABI-, source-, and
+workload-specific; no PGO flags are stored in `Cargo.toml`, and these wheels are not
+part of the portable release matrix.
 
 ## Documentation
 
 - [Current architecture and behavior](DESIGN.md)
+- [CIF core algorithm diagrams](src/cif/README.md)
+- [PDBx semantic algorithm diagrams](src/pdbx/README.md)
+- [ModelCIF semantic algorithm diagrams](src/modelcif/README.md)
+- [Python binding and scan diagrams](python/README.md)
+- [Schema, PGO, and release workflow diagrams](tools/README.md)
+- [Python API reference](docs/python-api.md)
 - [Engineering and review standard](ENGINEERING.md)
 - [Current performance architecture and qualification](docs/performance-report.md)
 - [Benchmark commands and measurement contract](benchmarks/README.md)

@@ -60,6 +60,60 @@ for gzip. Reports are workload-specific observations, never portable hardware cl
 The current qualified checkpoint is in
 [../docs/performance-report.md](../docs/performance-report.md).
 
+## Qualification pipeline
+
+Every reported timing is downstream of corpus verification and cross-format equality.
+The benchmark does not time a parser result that has not first been shown to represent
+the same selected rows.
+
+```mermaid
+flowchart TB
+    MANIFEST["pdb_corpus.toml<br/>sizes + SHA-256 + expected rows"]:::input --> VERIFY["Verify cached CIF, gzip,<br/>and BinaryCIF bytes"]:::proof
+    VERIFY --> PROJECT["Project identical atom_site columns<br/>from every selected format"]:::hot
+    PROJECT --> ARROW["Import each CifTable<br/>through Arrow C Stream"]:::hot
+    ARROW --> EQUAL{"Typed Arrow tables equal<br/>and row counts match?"}:::proof
+    EQUAL -- no --> FAIL["Reject benchmark run"]:::error
+    EQUAL -- yes --> STAGES["Measure warm read, native projection,<br/>and Arrow import separately"]:::hot
+
+    STAGES --> FULL{"--full-document?"}:::decision
+    FULL -- no --> JSON["Versioned JSON report"]:::output
+    FULL -- yes --> CHILD["Isolated child process per format"]:::hot
+    CHILD --> CANON["Document blocks + canonical bytes<br/>digest and peak RSS"]:::proof
+    CANON --> JSON
+    JSON --> GUARD["check_pdb_report<br/>>=8 MB throughput/RSS floors"]:::proof
+    GUARD --> ARCHIVE["Retained regression artifact"]:::output
+
+    classDef input fill:#eef2ff,stroke:#4f46e5,color:#1e1b4b;
+    classDef decision fill:#f8fafc,stroke:#64748b,color:#0f172a;
+    classDef hot fill:#fff1f2,stroke:#e11d48,color:#881337,stroke-width:2px;
+    classDef proof fill:#ecfdf5,stroke:#059669,color:#064e3b;
+    classDef output fill:#f5f3ff,stroke:#7c3aed,color:#4c1d95,stroke-width:2px;
+    classDef error fill:#fef2f2,stroke:#b91c1c,color:#7f1d1d;
+```
+
+## Scheduled regression gate
+
+`.github/workflows/pdb-regression.yml` runs the complete pinned corpus every Monday at
+04:23 UTC and on manual dispatch. It uses Python 3.12, Rust 1.88, a release build, two
+warmups, and seven measured samples. All three formats are projected and fully
+materialized:
+
+```console
+mkdir -p benchmarks/results
+micromamba run -p .mamba/nibbler-dev python -m benchmarks.pdb_stress \
+  --formats all --warmups 2 --samples 7 --full-document --json \
+  > benchmarks/results/pdb-regression.json
+micromamba run -p .mamba/nibbler-dev python -m benchmarks.check_pdb_report \
+  benchmarks/results/pdb-regression.json
+```
+
+The checker always requires equal CIF/BinaryCIF/gzip projections. Throughput and memory
+floors apply only when the logical input is at least 8 MB, which excludes unstable
+small-file timings. The versioned values in [`pdb_guardrails.toml`](pdb_guardrails.toml)
+are deliberately broad hosted-runner regression limits, not performance claims. Peak
+RSS must stay below both 4 GB and a fixed 160 MB process allowance plus eight times the
+logical input size. The complete JSON report is retained for 90 days.
+
 ## Promotion rule
 
 A performance change is retained only when:

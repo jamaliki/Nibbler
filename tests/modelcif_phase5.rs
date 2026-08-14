@@ -1,4 +1,4 @@
-//! Phase 5 ModelCIF prediction-semantics integration tests.
+//! ModelCIF prediction-semantics integration tests.
 
 #![allow(clippy::expect_used)]
 

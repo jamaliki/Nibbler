@@ -1,4 +1,4 @@
-"""Public Python coverage for Phase 2 reads and Arrow interchange."""
+"""Public Python coverage for reads and Arrow interchange."""
 
 from __future__ import annotations
 

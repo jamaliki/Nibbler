@@ -15,7 +15,7 @@ mod python_scan;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
-/// Version of the public Python/Rust contract established by Phase 0.
+/// Version of the public Python/Rust contract.
 pub const CONTRACT_VERSION: u16 = 1;
 
 /// Return the native crate version.

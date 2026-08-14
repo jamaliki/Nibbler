@@ -38,40 +38,40 @@ Measured artifact and toolchain:
 
 - package: `nibbler-cif 0.1.0`;
 - wheel: `nibbler_cif-0.1.0-cp312-cp312-macosx_11_0_arm64.whl`, SHA-256
-  `414bd016c3c940cfdaa0897918582f82a3fcec8489d973095712c009fe98b480`;
+  `222b0f3f2fb44075c83bbee30081be13df0a364cda81c2bb9407595418f9605d`;
 - native extension SHA-256:
-  `aead9eb91525f3de6b439414f1460ec9e5bdcf927582f3fe51c193e262188099`;
+  `fb27ea5be2034ad9cbf68c28bdaf1af2788de617fd4632ea6e7348cf17b3d9b0`;
 - Python/platform: CPython 3.12.13 on `macOS-26.5.2-arm64-arm-64bit`;
 - compiler: `rustc 1.97.1` commit `8bab26f4f68e0e26f0bb7960be334d5b520ea452`,
   LLVM 22.1.6, target `aarch64-apple-darwin`; and
 - PGO input fingerprint:
-  `64da60b77304b44b16324b0d38fdaa8bc935d147f871bba409f6b1d6716515cd`.
+  `865099cece8e32f4a8796045eebdd8959badfe91b16fd4dcefd9ac27d46ff963`.
 
 | Workload | PDB | Throughput |
 | --- | --- | ---: |
-| text projection | `6qnr` | 1,473-1,475 MB/s |
-| text projection | `3j3q` | 1,851-1,859 MB/s |
-| text full document | `6qnr` | 923 MB/s |
-| text full document | `3j3q` | 1,376 MB/s |
-| BinaryCIF projection | `6qnr` | 1,818-1,941 MB/s |
-| BinaryCIF projection | `3j3q` | 1,855-1,857 MB/s |
-| BinaryCIF full document | `6qnr` | 730 MB/s |
-| BinaryCIF full document | `3j3q` | 810 MB/s |
-| gzip text projection | `6qnr` | 657-667 MB/s logical CIF |
-| gzip text projection | `3j3q` | 757-764 MB/s logical CIF |
+| text projection | `6qnr` | 1,393-1,486 MB/s |
+| text projection | `3j3q` | 1,771-1,869 MB/s |
+| text full document | `6qnr` | 950 MB/s |
+| text full document | `3j3q` | 1,422 MB/s |
+| BinaryCIF projection | `6qnr` | 1,774-1,917 MB/s |
+| BinaryCIF projection | `3j3q` | 1,755-1,787 MB/s |
+| BinaryCIF full document | `6qnr` | 716 MB/s |
+| BinaryCIF full document | `3j3q` | 839 MB/s |
+| gzip text projection | `6qnr` | 646-653 MB/s logical CIF |
+| gzip text projection | `3j3q` | 750-766 MB/s logical CIF |
 
-Small `1crn` latency is 0.30 ms for text projection and a text document, 0.66 ms for
-BinaryCIF projection, and 1.12 ms for a BinaryCIF document.
+Small `1crn` latency is 0.31-0.32 ms for text projection, 0.30 ms for a text document,
+0.70-0.72 ms for BinaryCIF projection, and 0.99 ms for a BinaryCIF document.
 
 Peak RSS for full documents is:
 
 | Format | `6qnr` | `3j3q` |
 | --- | ---: | ---: |
-| text CIF | 263 MiB | 1.43 GiB |
-| BinaryCIF | 186 MiB | 0.86 GiB |
+| text CIF | 264.5 MiB | 1,438.2 MiB |
+| BinaryCIF | 185.3 MiB | 878.2 MiB |
 
-Arrow import of the already projected table takes 0.7 ms for `6qnr` and 5.0 ms for
-`3j3q`.
+Arrow import of the already projected table takes 0.6-0.8 ms for `6qnr` and 5.0-5.2 ms
+for `3j3q`.
 
 ## 3. Text representation
 
@@ -92,12 +92,6 @@ Semantic construction uses the same borrowed category-occurrence view as diction
 validation. A decoder resolves its fixed set of columns once per occurrence and reads
 rows lazily, so the `_atom_site` path creates neither a map nor an intermediate row
 object per atom.
-
-An isolated plain-release A/B against the preceding pushed implementation, with the
-document parsed before timing, measured PDBx model construction at 312 to 224 ms for
-`6qnr` and 2,449 to 1,748 ms for `3j3q`: 28.3% and 28.6% faster. One-shot `3j3q`
-parse-plus-model peak RSS fell from 2.366 to 2.259 GB. Full dictionary validation was
-neutral within 1.1%.
 
 ## 4. Lexer
 
@@ -167,9 +161,10 @@ The reserve reduces reallocations without trusting the compressed stream. Text,
 BinaryCIF, and gzip are detected by content, and all feed the same document/projection
 contracts.
 
-## 8. Profile-guided release build
+## 8. Optional profile-guided native build
 
-`tools/build_pgo.py` is the release-wheel workflow. It:
+`tools/build_pgo.py` builds one host-native optimization artifact. It is separate from
+the portable release workflow. The tool:
 
 1. rejects inherited profile flags and non-host targets;
 2. builds an instrumented wheel;
@@ -178,15 +173,16 @@ contracts.
    output counts;
 5. merges data with the active Rust toolchain's `llvm-profdata`;
 6. rebuilds the optimized wheel; and
-7. publishes the ABI-specific wheel plus compiler, target, source, and corpus
-   fingerprint metadata.
+7. writes the ABI-specific wheel plus compiler, target, source, and corpus fingerprint
+   metadata to `dist-pgo/`.
 
 ```console
 micromamba run -p .mamba/nibbler-dev python -m tools.build_pgo
 ```
 
 Profiles are never checked into Cargo configuration because they are coupled to the
-compiler, target, ABI, source, and training workload.
+compiler, target, ABI, source, and training workload. Portable release wheels are built
+without PGO on the full supported platform and CPython matrix.
 
 ## 9. Hardware interpretation
 
@@ -207,11 +203,14 @@ The current implementation is gated by:
 ```console
 make check
 micromamba run -p .mamba/nibbler-dev python -m tools.build_pgo
-# Run against an isolated installation of the wheel in dist-pgo/.
-micromamba run -p .mamba/nibbler-dev python -m benchmarks.pdb_stress \
+PGO_WHEEL=$(find dist-pgo -name '*.whl' -print -quit)
+micromamba run -p .mamba/nibbler-dev python -m tools.qualify_release "$PGO_WHEEL"
+python -m venv .cache/pgo-benchmark-env
+.cache/pgo-benchmark-env/bin/python -m pip install "$PGO_WHEEL" pyarrow
+.cache/pgo-benchmark-env/bin/python -m benchmarks.pdb_stress \
   --ids 1crn 6qnr 3j3q --formats all --warmups 2 --samples 9 --json
 # Run the projection command twice.
-micromamba run -p .mamba/nibbler-dev python -m benchmarks.pdb_stress \
+.cache/pgo-benchmark-env/bin/python -m benchmarks.pdb_stress \
   --ids 1crn 6qnr 3j3q --formats both --full-document --warmups 1 --samples 3 --json
 ```
 

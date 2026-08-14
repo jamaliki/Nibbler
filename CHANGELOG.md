@@ -17,5 +17,7 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
 - Bounded concurrent scanning, structured diagnostics, and transactional output.
 - Bounded property tests, a hash-pinned real-PDB stress corpus, and profile-guided native
   release tooling.
+- Portable CPython 3.10-3.14 wheels, isolated artifact qualification, trusted
+  publishing, and scheduled PDB correctness, throughput, and peak-RSS regression checks.
 
 [0.1.0]: https://github.com/jamaliki/Nibbler/releases/tag/v0.1.0

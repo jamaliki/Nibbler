@@ -1,4 +1,4 @@
-//! Pinned-schema projection and DDL2 validation tests for Phase 3.
+//! Pinned-schema projection and DDL2 validation integration tests.
 
 #![allow(clippy::expect_used)]
 

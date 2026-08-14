@@ -9,7 +9,10 @@ make schemas
 ```
 
 Runtime parsing, projection, validation, and writing never fetch schemas from the
-network.
+network. Selecting a schema while reading a complete document attaches the selector;
+it does not perform full-document validation. Projection uses the selected dictionary
+to check requested items and build typed columns. `nibbler.sniff` and
+`nibbler.cif.validate` apply the complete pinned dictionary.
 
 Compile the verified DDL2 inputs through Nibbler's own CIF parser with:
 
@@ -18,11 +21,12 @@ make compile-schemas
 ```
 
 The deterministic [`compiled/`](compiled/) `.nbs` files are committed release inputs.
-Each is a versioned, size-bounded MessagePack encoding of Nibbler's immutable compiled
-dictionary. It contains the definitions needed for projection typing and validation:
-item and category identity, DDL2 type patterns, mandatory flags, enumerations, numeric
-ranges, keys, and parent-child links. The native extension checks the envelope version
-and source digest before lazy initialization.
+Each is an artifact-format-v2, size-bounded MessagePack encoding of Nibbler's immutable
+compiled dictionary. It contains the definitions needed for projection typing and
+validation: item and category identity, DDL2 type patterns, mandatory flags,
+enumerations, numeric ranges, keys, and parent-child links. Before lazy initialization,
+the native extension checks the format version, schema identity, dictionary version,
+source SHA-256, container shape, and 16 MiB artifact limit.
 
 Updating a lock requires an explicit version and digest change, regenerated artifacts,
 and conformance review:

@@ -1,4 +1,4 @@
-//! BinaryCIF and preserving-writer acceptance tests for Phase 6.
+//! BinaryCIF and preserving-writer acceptance tests.
 
 #![allow(clippy::expect_used)]
 
