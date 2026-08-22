@@ -4,11 +4,28 @@ from __future__ import annotations
 
 import gzip
 import io
+from importlib import import_module
 from importlib.metadata import version
-
-import pyarrow  # type: ignore[import-untyped]
+from typing import Protocol, cast
 
 import nibbler
+
+
+class ArrowColumn(Protocol):
+    """The installed smoke test's required Arrow column surface."""
+
+    def to_pylist(self) -> list[object]: ...
+
+
+class ArrowTable(Protocol):
+    """The installed smoke test's required Arrow table surface."""
+
+    def equals(self, other: object) -> bool: ...
+
+    def column(self, name: str) -> ArrowColumn: ...
+
+
+pyarrow = import_module("pyarrow")
 
 SOURCE = b"""data_smoke
 _entry.id smoke
@@ -45,11 +62,14 @@ def project(source: bytes) -> nibbler.CifTable:
     return table
 
 
-def arrow(source: bytes) -> pyarrow.Table:
+def arrow(source: bytes) -> ArrowTable:
     """Import one native table through the standard Arrow stream protocol."""
-    return pyarrow.RecordBatchReader.from_stream(
-        project(source).with_missing("columns")
-    ).read_all()
+    return cast(
+        ArrowTable,
+        pyarrow.RecordBatchReader.from_stream(
+            project(source).with_missing("columns")
+        ).read_all(),
+    )
 
 
 def main() -> None:

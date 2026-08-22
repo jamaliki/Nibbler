@@ -56,9 +56,8 @@ def project_with_gemmi(file: Path, columns: tuple[str, ...]) -> ProjectedRows:
 
 def project_with_biotite(file: Path, columns: tuple[str, ...]) -> ProjectedRows:
     """Parse and extract atom_site columns with Biotite."""
-    from biotite.structure.io.pdbx import CIFFile
-
-    category = CIFFile.read(file).block["atom_site"]
+    module = import_module("biotite.structure.io.pdbx")
+    category = module.CIFFile.read(file).block["atom_site"]
     values = [category[column].as_array() for column in columns]
     return tuple(
         tuple(str(value) for value in row) for row in zip(*values, strict=True)
