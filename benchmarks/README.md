@@ -116,11 +116,12 @@ micromamba run -p .mamba/nibbler-dev python -m benchmarks.check_pdb_report \
 The checker always requires equal CIF/BinaryCIF/gzip projections. Throughput and memory
 floors apply only when the logical input is at least 8 MB, which excludes unstable
 small-file timings. The versioned values in [`pdb_guardrails.toml`](pdb_guardrails.toml)
-are deliberately broad hosted-runner regression limits, not performance claims. Peak
-RSS must stay below both 4 GB and a fixed 160 MB process allowance plus eight times the
-larger of the logical input and canonical document sizes. Using the decoded-document
-size keeps the check comparable when BinaryCIF is substantially smaller on disk. The
-complete JSON report is retained for 90 days.
+are deliberately broad hosted-runner regression limits, not performance claims. Each
+throughput floor retains roughly 25% headroom below the qualified Ubuntu runner's
+large-input minimum. Peak RSS must stay below both 4 GB and a fixed 160 MB process
+allowance plus eight times the larger of the logical input and canonical document
+sizes. Using the decoded-document size keeps the check comparable when BinaryCIF is
+substantially smaller on disk. The complete JSON report is retained for 90 days.
 
 ## Promotion rule
 

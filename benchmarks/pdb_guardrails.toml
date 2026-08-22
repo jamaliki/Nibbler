@@ -5,11 +5,11 @@ peak_rss_fixed_allowance_bytes = 160000000
 maximum_peak_rss_to_document_bytes = 8.0
 
 [minimum_projection_mb_per_second]
-cif = 200.0
+cif = 120.0
 bcif = 500.0
-"cif.gz" = 150.0
+"cif.gz" = 110.0
 
 [minimum_full_document_mb_per_second]
-cif = 150.0
+cif = 110.0
 bcif = 300.0
 "cif.gz" = 100.0
