@@ -19,5 +19,7 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
   release tooling.
 - Portable CPython 3.10-3.14 wheels, isolated artifact qualification, trusted
   publishing, and scheduled PDB correctness, throughput, and peak-RSS regression checks.
+- Immutable revision-addressed PDB text fixtures, public contribution and security
+  policies, checkout installation with `uv`, and original project artwork.
 
 [0.1.0]: https://github.com/jamaliki/Nibbler/releases/tag/v0.1.0

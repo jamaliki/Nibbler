@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/jamaliki/Nibbler/main/assets/nibbler-icon.png" width="180" alt="Nibbler, a small pixel-art creature eating a CIF data tile">
+</p>
+
 # Nibbler
 
 Nibbler is a typed Python package backed by safe Rust for fast, strict CIF 1.1 analysis
@@ -34,9 +38,12 @@ Until 0.1.0 is published, install directly from a checkout with a compatible Pyt
 Rust toolchain:
 
 ```console
-python -m pip install .
+uv venv --python 3.12
+uv pip install .
 ```
 
+Activate the environment with `source .venv/bin/activate` on macOS or Linux, or
+`.venv\Scripts\activate` on Windows. `python -m pip install .` is an equivalent fallback.
 For development, use the repository-local micromamba environment described below.
 
 ## Python API

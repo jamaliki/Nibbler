@@ -282,7 +282,7 @@ impl<'a> Validator<'a> {
                 self.push(
                     "CIF_SCHEMA_ENUMERATION",
                     Severity::Error,
-                    format!("value {:?} is not an allowed enumeration", text),
+                    format!("value {text:?} is not an allowed enumeration"),
                     context(
                         block,
                         frame,

@@ -28,7 +28,11 @@ decompressed throughput, files per second, peak RSS, row count, and semantic dig
 
 ## PDB stress corpus
 
-`pdb_corpus.toml` pins five RCSB structures by byte size, SHA-256, and atom count:
+`pdb_corpus.toml` pins five structures by byte size, SHA-256, and atom count. Text and
+gzip files use explicit revisions from the
+[wwPDB versioned archive](https://www.wwpdb.org/ftp/pdb-versioned-ftp-site), rather
+than mutable latest-entry URLs. BinaryCIF files are exact hash-pinned downloads from
+RCSB because that service does not expose the same revision-addressed archive:
 
 | ID | Workload |
 | --- | --- |
@@ -38,7 +42,9 @@ decompressed throughput, files per second, peak RSS, row count, and semantic dig
 | `6qnr` | large ribosome |
 | `3j3q` | 2.44-million-atom ribosomal assembly |
 
-Fetches go to ignored `.cache/pdb-stress`; tests never require network access.
+Fetches go to ignored `.cache/pdb-stress`; tests never require network access. A
+scientific fixture update must change the manifest deliberately and prove atom counts
+and projected values agree across text CIF, gzip, and BinaryCIF.
 
 ```console
 micromamba run -p .mamba/nibbler-dev python -m tools.fetch_pdb_corpus
@@ -112,7 +118,9 @@ floors apply only when the logical input is at least 8 MB, which excludes unstab
 small-file timings. The versioned values in [`pdb_guardrails.toml`](pdb_guardrails.toml)
 are deliberately broad hosted-runner regression limits, not performance claims. Peak
 RSS must stay below both 4 GB and a fixed 160 MB process allowance plus eight times the
-logical input size. The complete JSON report is retained for 90 days.
+larger of the logical input and canonical document sizes. Using the decoded-document
+size keeps the check comparable when BinaryCIF is substantially smaller on disk. The
+complete JSON report is retained for 90 days.
 
 ## Promotion rule
 

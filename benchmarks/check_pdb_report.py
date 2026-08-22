@@ -25,7 +25,7 @@ class Guardrails:
     minimum_logical_input_bytes: int
     maximum_peak_rss_bytes: int
     peak_rss_fixed_allowance_bytes: int
-    maximum_incremental_rss_to_logical_input: float
+    maximum_peak_rss_to_document_bytes: float
     minimum_projection: Mapping[str, float]
     minimum_full_document: Mapping[str, float]
 
@@ -59,7 +59,7 @@ def load_guardrails(file: Path) -> Guardrails:
     """Load and type-check the versioned guardrail document."""
     with file.open("rb") as stream:
         raw: dict[str, Any] = tomllib.load(stream)
-    if raw.get("version") != 1:
+    if raw.get("version") != 2:
         raise RuntimeError(f"{file}: unsupported guardrail version")
 
     def integer(name: str) -> int:
@@ -78,9 +78,7 @@ def load_guardrails(file: Path) -> Guardrails:
         minimum_logical_input_bytes=integer("minimum_logical_input_bytes"),
         maximum_peak_rss_bytes=integer("maximum_peak_rss_bytes"),
         peak_rss_fixed_allowance_bytes=integer("peak_rss_fixed_allowance_bytes"),
-        maximum_incremental_rss_to_logical_input=number(
-            "maximum_incremental_rss_to_logical_input"
-        ),
+        maximum_peak_rss_to_document_bytes=number("maximum_peak_rss_to_document_bytes"),
         minimum_projection=numeric_map(
             raw.get("minimum_projection_mb_per_second"),
             "minimum_projection_mb_per_second",
@@ -136,6 +134,7 @@ def check(report: Mapping[str, Any], guardrails: Guardrails) -> tuple[str, ...]:
             projection_rate = projection.get("input_mb_per_second")
             full_stage = full.get("stage")
             peak_rss = full.get("peak_rss_bytes")
+            canonical_bytes = full.get("canonical_bytes")
             if not isinstance(full_stage, dict):
                 failures.append(f"{pdb_id}.{file_format}: full stage is missing")
                 continue
@@ -163,11 +162,15 @@ def check(report: Mapping[str, Any], guardrails: Guardrails) -> tuple[str, ...]:
                 )
             if not isinstance(peak_rss, int):
                 failures.append(f"{pdb_id}.{file_format}: peak RSS is missing")
+            elif not isinstance(canonical_bytes, int):
+                failures.append(
+                    f"{pdb_id}.{file_format}: canonical document size is missing"
+                )
             else:
+                document_bytes = max(logical_bytes, canonical_bytes)
                 relative_limit = (
                     guardrails.peak_rss_fixed_allowance_bytes
-                    + guardrails.maximum_incremental_rss_to_logical_input
-                    * logical_bytes
+                    + guardrails.maximum_peak_rss_to_document_bytes * document_bytes
                 )
                 memory_limit = min(guardrails.maximum_peak_rss_bytes, relative_limit)
                 if peak_rss <= memory_limit:

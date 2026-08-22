@@ -29,7 +29,9 @@ classifiers = [
 [project.urls]
 Changelog = "https://github.com/jamaliki/Nibbler/blob/main/CHANGELOG.md"
 Documentation = "https://github.com/jamaliki/Nibbler#readme"
+Issues = "https://github.com/jamaliki/Nibbler/issues"
 Repository = "https://github.com/jamaliki/Nibbler"
+Security = "https://github.com/jamaliki/Nibbler/security/policy"
 
 [tool.maturin]
 features = ["extension-module"]

@@ -4,6 +4,10 @@ These tools are side-effect boundaries around the offline library. Network acces
 limited to explicit schema/corpus fetch commands; runtime parsing and validation never
 fetch data.
 
+The PDB corpus fetcher downloads immutable, revision-addressed text/gzip entries from
+the wwPDB versioned archive and exact hash-pinned BinaryCIF files from RCSB. It writes
+through temporary files and only promotes bytes that match the manifest.
+
 ## Lock-pinned schema supply chain
 
 ```mermaid

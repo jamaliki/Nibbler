@@ -15,7 +15,7 @@ GUARDRAILS = Guardrails(
     minimum_logical_input_bytes=8_000_000,
     maximum_peak_rss_bytes=4_000_000_000,
     peak_rss_fixed_allowance_bytes=160_000_000,
-    maximum_incremental_rss_to_logical_input=8.0,
+    maximum_peak_rss_to_document_bytes=8.0,
     minimum_projection={"cif": 200.0},
     minimum_full_document={"cif": 150.0},
 )
@@ -28,6 +28,7 @@ def pdb_report(
     projection_rate: float = 300.0,
     full_rate: float = 250.0,
     peak_rss: int = 200_000_000,
+    canonical_bytes: int = 10_000_000,
 ) -> dict[str, object]:
     """Return one minimal large-input PDB benchmark report."""
     return {
@@ -45,6 +46,7 @@ def pdb_report(
                         "full_document": {
                             "stage": {"input_mb_per_second": full_rate},
                             "peak_rss_bytes": peak_rss,
+                            "canonical_bytes": canonical_bytes,
                         },
                     }
                 ],
@@ -80,6 +82,16 @@ def test_pdb_stress_format_selection_includes_pinned_gzip() -> None:
 
 def test_pdb_guardrails_accept_healthy_large_input() -> None:
     assert check(pdb_report(), GUARDRAILS) == ()
+
+
+def test_pdb_guardrails_use_decoded_document_size_for_compact_inputs() -> None:
+    report = pdb_report(
+        logical_input_bytes=10_000_000,
+        canonical_bytes=20_000_000,
+        peak_rss=300_000_000,
+    )
+
+    assert check(report, GUARDRAILS) == ()
 
 
 def test_pdb_guardrails_report_independent_failures() -> None:

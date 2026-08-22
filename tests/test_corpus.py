@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from benchmarks.corpus import load_structures
 from benchmarks.run import WORKLOADS
 from tools.fetch_schemas import load_schema_locks
@@ -28,10 +30,13 @@ def test_benchmark_workload_names_are_stable() -> None:
 
 
 def test_pdb_manifest_models_derived_and_remote_files() -> None:
-    structure = load_structures()[0]
-    assert structure.cif.bytes > 0
-    assert structure.bcif.url.startswith("https://")
-    assert structure.cif_gz.url.startswith("https://")
+    for structure in load_structures():
+        assert structure.cif.bytes > 0
+        assert structure.bcif.url.startswith("https://models.rcsb.org/")
+        assert structure.cif_gz.url.startswith(
+            "https://files-versioned.wwpdb.org/pdb_versioned/"
+        )
+        assert re.search(r"_v\d+-\d+\.cif\.gz$", structure.cif_gz.url)
 
 
 def test_schema_versions_and_digests_are_locked() -> None:

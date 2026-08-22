@@ -1,8 +1,8 @@
-version = 1
+version = 2
 minimum_logical_input_bytes = 8000000
 maximum_peak_rss_bytes = 4000000000
 peak_rss_fixed_allowance_bytes = 160000000
-maximum_incremental_rss_to_logical_input = 8.0
+maximum_peak_rss_to_document_bytes = 8.0
 
 [minimum_projection_mb_per_second]
 cif = 200.0
