@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import subprocess
+import io
 import tempfile
 from importlib import import_module
 from pathlib import Path
@@ -36,18 +36,19 @@ ATP PG P
 
 def validate_gemmi(dictionary_file: Path, fixtures: tuple[Path, ...]) -> None:
     """Raise if Gemmi rejects any fixture against the locked dictionary."""
-    command = [
-        "gemmi",
-        "validate",
-        "--quiet",
-        "--ddl",
-        str(dictionary_file),
-        *(str(fixture) for fixture in fixtures),
-    ]
-    completed = subprocess.run(command, check=False, text=True, capture_output=True)
-    if completed.returncode != 0:
-        details = completed.stderr.strip() or completed.stdout.strip()
-        raise RuntimeError(f"Gemmi dictionary validation failed:\n{details}")
+    gemmi = import_module("gemmi")
+    messages = io.StringIO()
+    validator = gemmi.cif.Ddl(logger=messages, use_context=False)
+    validator.read_ddl(gemmi.cif.read(str(dictionary_file)))
+    for fixture in fixtures:
+        messages.seek(0)
+        messages.truncate()
+        if validator.validate_cif(gemmi.cif.read(str(fixture))):
+            continue
+        details = messages.getvalue().strip()
+        raise RuntimeError(
+            f"Gemmi dictionary validation failed for {fixture}:\n{details}"
+        )
 
 
 def validate_pdbe(dictionary_file: Path, fixtures: tuple[Path, ...]) -> None:
