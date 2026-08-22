@@ -159,9 +159,22 @@ def test_feast_collects_errors_without_silent_skips() -> None:
     assert len(result.errors) == 1
     assert result.errors[0].source_index == 1
     assert result.errors[0].code == "CIF_LOOP_VALUE_COUNT"
-    assert result.errors.to_polars()["source_index"].to_list() == [1]
 
+
+def test_feast_exports_optional_arrow_and_polars_views() -> None:
     pyarrow = pytest.importorskip("pyarrow")
+    pytest.importorskip("polars")
+    malformed = FIXTURES / "syntax" / "malformed_loop.cif"
+    result = nibbler.feast(
+        [MISSING, malformed, MISSING],
+        category="nibbler_missing",
+        columns=["id"],
+        workers=2,
+        on_error="collect",
+    )
+    batches = list(result)
+
+    assert result.errors.to_polars()["source_index"].to_list() == [1]
     first = pyarrow.RecordBatchReader.from_stream(batches[0]).read_all()
     assert isinstance(first, pyarrow.Table)
     assert "_nibbler_source" in first.column_names
