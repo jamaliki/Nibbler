@@ -1,6 +1,13 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/jamaliki/Nibbler/main/assets/nibbler-icon.png" width="180" alt="Nibbler, a small pixel-art creature eating a CIF data tile">
-</p>
+<pre align="center">
+          .-----.
+         /   o   \
+         \       /
+          '-----'
+    .-----.     .-----.
+   /   o   \   /   o   \
+   \       /   \       /
+    '-----'     '-----'
+</pre>
 
 # Nibbler
 
@@ -45,6 +52,10 @@ uv pip install .
 Activate the environment with `source .venv/bin/activate` on macOS or Linux, or
 `.venv\Scripts\activate` on Windows. `python -m pip install .` is an equivalent fallback.
 For development, use the repository-local micromamba environment described below.
+
+Nibbler currently provides a Python API, not a command-line program. The commands under
+`tools/` and `benchmarks/` are repository-development utilities rather than installed
+user interfaces.
 
 ## Python API
 
