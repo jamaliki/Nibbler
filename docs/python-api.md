@@ -275,15 +275,20 @@ The keyword options are Reduce2's parameters with Reduce2's defaults: `approach`
 `bonded_neighbor_depth`, `stop_on_any_missing_hydrogen`, `ignore_missing_restraints`,
 `verbosity`, and `probe`, a mapping of Probe scoring parameters such as
 `{"probe_radius": 0.25}`. `compat=True` reproduces Reduce2 exactly, including its known
-defects; the default corrects them. Residues that neither monomer library describes get
-restraints built from their chemical component definition, as in Reduce2.
+defects; the default corrects them and goes on where Reduce2 gives up. Residues that
+neither monomer library describes get restraints built from their chemical component
+definition, including the entries Reduce2's RDKit step rejects; atoms of unknown element
+(`UNX`) are kept unchanged; and a residue with no definition anywhere keeps its input
+hydrogens and is reported in the report instead of stopping the run
+(`stop_on_any_missing_hydrogen=True` stops it).
 
 Reduce3 needs the cctbx `chem_data` monomer library. `chem_data` names its directory;
 otherwise it is found through `REDUCE3_CHEM_DATA`, `CHEM_DATA`, the parent of
 `MMTBX_CCP4_MONOMER_LIB` or `CLIBD_MON`, or the active conda environment. It is loaded
 once per directory and process. Failures raise `ChemistryError` with a `REDUCE_*` code:
 `REDUCE_MONOMER_LIBRARY_NOT_FOUND`, `REDUCE_MONOMER_LIBRARY_INVALID`,
-`REDUCE_INVALID_MODEL`, `REDUCE_FAILED` (for example, missing restraints), or
+`REDUCE_INVALID_MODEL`, `REDUCE_FAILED` (for example, missing restraints in compat mode),
+or
 `REDUCE_RESULT_TOO_LARGE`. `nibbler.reduce.available()` reports whether the build
 includes Reduce3.
 
