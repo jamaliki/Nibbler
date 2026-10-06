@@ -24,7 +24,7 @@ arrow-schema = { version = "59.2.0", default-features = false }
 flate2 = { version = "1.1.9", default-features = false, features = ["zlib-rs"] }
 memchr = { version = "2.7.6", default-features = false }
 pyo3 = { version = "0.29.0", default-features = false, features = ["macros"], optional = true }
-reduce3 = { git = "https://github.com/jamaliki/reduce3", rev = "06dd27d4c231e9fe5e107078ade5a6066bff11ab", optional = true }
+reduce3 = { git = "https://github.com/jamaliki/reduce3", rev = "54db45dfc762aa3fa6d9158754ed3e83c5eb2145", optional = true }
 regex = { version = "1.12.2", default-features = false, features = ["std"] }
 rmp-serde = { version = "1.3.0", default-features = false }
 serde = { version = "1.0.228", default-features = false, features = ["derive", "std"] }

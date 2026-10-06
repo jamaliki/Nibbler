@@ -277,7 +277,9 @@ The keyword options are Reduce2's parameters with Reduce2's defaults: `approach`
 `{"probe_radius": 0.25}`. `compat=True` reproduces Reduce2 exactly, including its known
 defects; the default corrects them and goes on where Reduce2 gives up. Residues that
 neither monomer library describes get restraints built from their chemical component
-definition, including the entries Reduce2's RDKit step rejects; atoms of unknown element
+definition, including the entries Reduce2's RDKit step rejects, with GeoStd-style atom
+types (so their donors and acceptors take part in scoring) and physiological protonation
+of their acids; atoms of unknown element
 (`UNX`) are kept unchanged; and a residue with no definition anywhere keeps its input
 hydrogens and is reported in the report instead of stopping the run
 (`stop_on_any_missing_hydrogen=True` stops it).
