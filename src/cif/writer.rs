@@ -3,8 +3,10 @@ use super::document::{
 };
 use super::error::{WriteError, WriteErrorCode};
 use super::numeric::{parse_float, parse_integer};
+use std::borrow::Cow;
 
-type ValueFormatter = fn(CifValueRef<'_>) -> Result<String, WriteError>;
+/// Formats one value; text written as it is stays borrowed from the document.
+type ValueFormatter = for<'a> fn(CifValueRef<'a>) -> Result<Cow<'a, str>, WriteError>;
 
 /// Serialize an order-preserving logical document using deterministic CIF 1.1 syntax.
 ///
@@ -78,16 +80,20 @@ fn write_document(document: &CifDocument, format: ValueFormatter) -> Result<Stri
 /// or text containing a line that begins with `;`, which CIF 1.1 cannot represent in a
 /// semicolon-delimited value without altering the content.
 pub fn format_text(text: &str) -> Result<String, WriteError> {
+    format_text_cow(text).map(Cow::into_owned)
+}
+
+fn format_text_cow(text: &str) -> Result<Cow<'_, str>, WriteError> {
     validate_text_characters(text)?;
     if is_bare_value(text) {
-        return Ok(text.to_owned());
+        return Ok(Cow::Borrowed(text));
     }
     let is_single_line = !text.contains('\n') && !text.contains('\r');
     if is_single_line && !text.contains('\'') {
-        return Ok(format!("'{text}'"));
+        return Ok(Cow::Owned(format!("'{text}'")));
     }
     if is_single_line && !text.contains('"') {
-        return Ok(format!("\"{text}\""));
+        return Ok(Cow::Owned(format!("\"{text}\"")));
     }
     if contains_text_field_delimiter(text) {
         return Err(WriteError::new(
@@ -96,7 +102,7 @@ pub fn format_text(text: &str) -> Result<String, WriteError> {
         ));
     }
     let delimiter_newline = if text.ends_with('\r') { '\r' } else { '\n' };
-    Ok(format!(";{text}{delimiter_newline};"))
+    Ok(Cow::Owned(format!(";{text}{delimiter_newline};")))
 }
 
 fn write_entry(
@@ -199,13 +205,13 @@ fn write_frame(
 }
 
 pub(super) fn format_value(value: &CifValue) -> Result<String, WriteError> {
-    format_value_ref(value.as_ref())
+    format_value_ref(value.as_ref()).map(Cow::into_owned)
 }
 
-fn format_value_ref(value: CifValueRef<'_>) -> Result<String, WriteError> {
+fn format_value_ref(value: CifValueRef<'_>) -> Result<Cow<'_, str>, WriteError> {
     match value {
-        CifValueRef::Text(text) => format_text(text.as_str()),
-        CifValueRef::Integer(number, _) => Ok(number.to_string()),
+        CifValueRef::Text(text) => format_text_cow(text.as_str()),
+        CifValueRef::Integer(number, _) => Ok(Cow::Owned(number.to_string())),
         CifValueRef::Float(number, uncertainty, _) => {
             if !number.is_finite() {
                 return Err(WriteError::new(
@@ -228,20 +234,20 @@ fn format_value_ref(value: CifValueRef<'_>) -> Result<String, WriteError> {
             if let Some(exponent) = exponent {
                 mantissa.push_str(&exponent);
             }
-            Ok(mantissa)
+            Ok(Cow::Owned(mantissa))
         }
-        CifValueRef::Unknown => Ok("?".to_owned()),
-        CifValueRef::NotApplicable => Ok(".".to_owned()),
+        CifValueRef::Unknown => Ok(Cow::Borrowed("?")),
+        CifValueRef::NotApplicable => Ok(Cow::Borrowed(".")),
     }
 }
 
-fn format_preserving_value_ref(value: CifValueRef<'_>) -> Result<String, WriteError> {
+fn format_preserving_value_ref(value: CifValueRef<'_>) -> Result<Cow<'_, str>, WriteError> {
     match value {
         CifValueRef::Text(text) => format_preserving_text(text.as_str(), text.quote_style()),
         CifValueRef::Integer(number, Some(original))
             if parse_integer(original.as_str()) == Some(number) =>
         {
-            Ok(original.as_str().to_owned())
+            Ok(Cow::Borrowed(original.as_str()))
         }
         CifValueRef::Float(number, uncertainty, Some(original))
             if parse_float(original.as_str()).is_some_and(|parsed| {
@@ -250,23 +256,27 @@ fn format_preserving_value_ref(value: CifValueRef<'_>) -> Result<String, WriteEr
                         == Some(uncertainty.map(|value| value.digits()))
             }) =>
         {
-            Ok(original.as_str().to_owned())
+            Ok(Cow::Borrowed(original.as_str()))
         }
         _ => format_value_ref(value),
     }
 }
 
-fn format_preserving_text(text: &str, style: QuoteStyle) -> Result<String, WriteError> {
+fn format_preserving_text(text: &str, style: QuoteStyle) -> Result<Cow<'_, str>, WriteError> {
     validate_text_characters(text)?;
     match style {
-        QuoteStyle::Unquoted if is_bare_value(text) => Ok(text.to_owned()),
-        QuoteStyle::Single if valid_quoted_content(text, b'\'') => Ok(format!("'{text}'")),
-        QuoteStyle::Double if valid_quoted_content(text, b'"') => Ok(format!("\"{text}\"")),
+        QuoteStyle::Unquoted if is_bare_value(text) => Ok(Cow::Borrowed(text)),
+        QuoteStyle::Single if valid_quoted_content(text, b'\'') => {
+            Ok(Cow::Owned(format!("'{text}'")))
+        }
+        QuoteStyle::Double if valid_quoted_content(text, b'"') => {
+            Ok(Cow::Owned(format!("\"{text}\"")))
+        }
         QuoteStyle::TextField if !contains_text_field_delimiter(text) => {
             let delimiter_newline = if text.ends_with('\r') { '\r' } else { '\n' };
-            Ok(format!(";{text}{delimiter_newline};"))
+            Ok(Cow::Owned(format!(";{text}{delimiter_newline};")))
         }
-        _ => format_text(text),
+        _ => format_text_cow(text),
     }
 }
 
@@ -295,6 +305,14 @@ fn original_uncertainty(text: &str) -> Option<Option<u64>> {
 }
 
 fn validate_text_characters(text: &str) -> Result<(), WriteError> {
+    // ASCII text: the control characters are U+0000-U+001F and U+007F
+    if text.is_ascii()
+        && !text
+            .bytes()
+            .any(|byte| (byte < 0x20 || byte == 0x7f) && !matches!(byte, b'\t' | b'\n' | b'\r'))
+    {
+        return Ok(());
+    }
     if let Some(character) = text
         .chars()
         .find(|character| character.is_control() && !matches!(*character, '\t' | '\n' | '\r'))
@@ -311,12 +329,14 @@ fn validate_text_characters(text: &str) -> Result<(), WriteError> {
 }
 
 fn is_bare_value(text: &str) -> bool {
-    if text.is_empty()
-        || text == "?"
-        || text == "."
-        || text.contains(['\'', '"'])
-        || text.chars().any(char::is_whitespace)
-    {
+    // in ASCII text the whitespace characters are U+0009-U+000D and U+0020
+    let has_quote_or_space = if text.is_ascii() {
+        text.bytes()
+            .any(|byte| matches!(byte, b'\'' | b'"' | b' ' | b'\t'..=b'\r'))
+    } else {
+        text.contains(['\'', '"']) || text.chars().any(char::is_whitespace)
+    };
+    if text.is_empty() || text == "?" || text == "." || has_quote_or_space {
         return false;
     }
     if text

@@ -4,6 +4,11 @@
 //! projection, schema, and Python APIs build on that one production path. With the
 //! `reduce3` feature, `reduce` adds hydrogens to parsed models in memory.
 
+// The Python extension's Rust allocations (parsing, Reduce3) use mimalloc.
+#[cfg(feature = "extension-module")]
+#[global_allocator]
+static ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 pub mod cif;
 pub mod modelcif;
 pub mod pdbx;

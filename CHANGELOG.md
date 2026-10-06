@@ -22,6 +22,10 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
 - Optional Reduce3 integration (the `reduce3` Cargo feature, enabled in the Python
   package): `nibbler.reduce.run` and `reduce::run` add and optimize hydrogens on a parsed
   document in memory and return a new document that keeps the source block's categories.
+- The Python extension allocates with mimalloc, and the CIF text writers borrow values
+  they write unchanged instead of copying each one (same output). On a 225-residue
+  AlphaFold model, `nibbler.reduce.run` takes 14 ms and `to_canonical` 1.9 ms (from 26 ms
+  and 5 ms).
 - Immutable revision-addressed PDB text fixtures, public contribution and security
   policies, checkout installation with `uv`, and original project artwork.
 
