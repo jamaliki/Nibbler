@@ -6,11 +6,16 @@
 //! reads the parsed values through [`BlockSource`] and streams its output model into a
 //! [`DocumentSink`].
 //!
-//! The result block keeps the source block code. Its items and loops are the ones the
-//! `reduce3` program writes to an mmCIF file (cell, space group, `_struct_asym`,
-//! `_chem_comp`, `_atom_site`, and `_atom_site_anisotrop`), held as text values, so the
-//! entries equal a parse of that file. Other source categories are not carried over,
-//! because Reduce3 renumbers atoms and reassigns label asym identifiers.
+//! The result block keeps the source block code and, by default, every category of the
+//! source block in its order: `_atom_site` is rebuilt with the source's items and label
+//! identifiers (new hydrogens take their residue's), atom ids are renumbered,
+//! `_atom_site_anisotrop` follows the new ids, and `_atom_type` gains the elements it
+//! lacks; every other entry is shared unchanged, so `_struct_conn`, the entities and the
+//! sequence schemes stay valid ([`block_document`]). With [`Params::compat`] the block
+//! instead has the layout Reduce2 writes (cell, space group, `_struct_asym`,
+//! `_chem_comp`, `_atom_site`, and `_atom_site_anisotrop`, with regenerated label
+//! identifiers; [`structure_document`]). Either way the entries equal a parse of the
+//! file the `reduce3` program writes in that mode.
 //!
 //! Reduce3 needs the cctbx `chem_data` monomer library; [`load_monomer_library`] finds
 //! and caches it.
@@ -185,10 +190,31 @@ pub fn run_block(
     }
     let output = reduce3::pipeline::run(structure, monomers, params)
         .map_err(|message| ReduceError::new(ReduceErrorCode::Failed, message))?;
+    let document = if params.compat {
+        structure_document(&output.structure, block.code().unwrap_or("default"))?
+    } else {
+        block_document(&output.structure, block)?
+    };
     Ok(Reduction {
-        document: structure_document(&output.structure, block.code().unwrap_or("default"))?,
+        document,
         report: output.description,
     })
+}
+
+/// Build a one-block document holding `structure` in the block it was read from:
+/// every category of `block` in order, with the atom tables rebuilt (see the module
+/// documentation). Entries Reduce3 does not change are shared with `block`.
+///
+/// # Errors
+///
+/// Returns [`ReduceErrorCode::InvalidModel`] when `block` has no `_atom_site` loop and
+/// [`ReduceErrorCode::ResultTooLarge`] when a column exceeds the in-memory representation.
+pub fn block_document(structure: &Structure, block: &CifBlock) -> Result<CifDocument, ReduceError> {
+    let code = block.code().unwrap_or("default");
+    let mut sink = DocumentSink::with_source(block);
+    reduce3::mmcif::write_cif_preserving(structure, &BlockSource::new(block), code, &mut sink)
+        .map_err(|message| ReduceError::new(ReduceErrorCode::InvalidModel, message))?;
+    sink.finish(code)
 }
 
 /// Build a one-block document holding `structure` as Reduce3 writes it.
@@ -304,6 +330,23 @@ impl CifSource for BlockSource<'_> {
         }
         (!items.is_empty()).then_some(BlockTable(TableKind::Items(items)))
     }
+
+    fn categories(&self) -> Vec<String> {
+        let mut names: Vec<String> = Vec::new();
+        for entry in self.block.entries() {
+            let tag = match entry {
+                CifEntry::Loop(cif_loop) => cif_loop.tags().first().map(String::as_str),
+                CifEntry::Item(item) => Some(item.tag()),
+                CifEntry::Frame(_) => None,
+            };
+            if let Some((name, _)) = tag.and_then(split_tag)
+                && !names.iter().any(|n| n.eq_ignore_ascii_case(name))
+            {
+                names.push(name.to_owned());
+            }
+        }
+        names
+    }
 }
 
 /// One category of a [`BlockSource`]: a loop, or the category's scalar items as one row.
@@ -366,14 +409,39 @@ impl CifTable for BlockTable<'_> {
             CifValueRef::Unknown | CifValueRef::NotApplicable => None,
         }
     }
+
+    fn tags(&self) -> Vec<Cow<'_, str>> {
+        match &self.0 {
+            TableKind::Loop(cif_loop) => cif_loop
+                .tags()
+                .iter()
+                .map(|t| Cow::Borrowed(t.as_str()))
+                .collect(),
+            TableKind::Items(items) => items.iter().map(|item| Cow::Borrowed(item.tag())).collect(),
+        }
+    }
+
+    fn is_loop(&self) -> bool {
+        matches!(self.0, TableKind::Loop(_))
+    }
+
+    fn missing(&self, row: usize, column: usize) -> Option<CifCell<'static>> {
+        match self.value(row, column) {
+            Some(CifValueRef::Unknown) | None => Some(CifCell::Unknown),
+            Some(CifValueRef::NotApplicable) => Some(CifCell::NotApplicable),
+            Some(CifValueRef::Text(_) | CifValueRef::Integer(..) | CifValueRef::Float(..)) => None,
+        }
+    }
 }
 
 /// Builds a native one-block document from Reduce3's output.
 ///
-/// Loops are stored column-wise with one string column per item, the representation
-/// BinaryCIF decoding uses; present values are unquoted text.
+/// Loops Reduce3 writes are stored column-wise with one string column per item, the
+/// representation BinaryCIF decoding uses; present values are unquoted text. With a
+/// source block, categories Reduce3 leaves unchanged are copied from it as they are.
 #[derive(Debug, Default)]
-pub struct DocumentSink {
+pub struct DocumentSink<'a> {
+    source: Option<&'a CifBlock>,
     entries: Vec<CifEntry>,
     open: Option<OpenLoop>,
     failure: Option<&'static str>,
@@ -451,11 +519,20 @@ fn owned_value(value: CifCell<'_>) -> CifValue {
     }
 }
 
-impl DocumentSink {
+impl<'a> DocumentSink<'a> {
     /// An empty sink.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// An empty sink that copies unchanged categories from `source`.
+    #[must_use]
+    pub fn with_source(source: &'a CifBlock) -> Self {
+        Self {
+            source: Some(source),
+            ..Self::default()
+        }
     }
 
     fn close_loop(&mut self) {
@@ -492,8 +569,30 @@ impl DocumentSink {
     }
 }
 
-impl CifSink for DocumentSink {
+impl CifSink for DocumentSink<'_> {
     fn begin_block(&mut self, _code: &str) {}
+
+    fn copy_category(&mut self, category: &str) -> bool {
+        let Some(source) = self.source else {
+            return false;
+        };
+        self.close_loop();
+        let before = self.entries.len();
+        for entry in source.entries() {
+            let copy = match entry {
+                CifEntry::Loop(cif_loop) => cif_loop
+                    .tags()
+                    .first()
+                    .is_some_and(|tag| in_category(tag, category)),
+                CifEntry::Item(item) => in_category(item.tag(), category),
+                CifEntry::Frame(_) => false,
+            };
+            if copy {
+                self.entries.push(entry.clone());
+            }
+        }
+        self.entries.len() > before
+    }
 
     fn item(&mut self, tag: &str, value: CifCell<'_>) {
         self.close_loop();

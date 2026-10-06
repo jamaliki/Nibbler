@@ -258,10 +258,15 @@ flippable groups, and builds the result as a new `CifDocument`. No text is writt
 parsed again, and the GIL is released while it runs.
 
 The result block keeps the source block code and the source document's schema selector.
-Its entries are the ones the `reduce3` program writes to an mmCIF file: cell, space
-group, `_struct_asym`, `_chem_comp`, `_atom_site`, and `_atom_site_anisotrop`, as text
-values. Other source categories are not carried over, because atoms are renumbered and
-label asym identifiers reassigned.
+By default it also keeps every category of the source block, in order: `_atom_site` is
+rebuilt with the source's items and label identifiers (new hydrogens take their
+residue's), atom ids are renumbered, `_atom_site_anisotrop` follows the new ids, and
+`_atom_type` gains the elements it lacks. Everything else, including `_struct_conn`, the
+entities and the sequence schemes, is shared with the source unchanged. With
+`compat=True` the block has the layout Reduce2 writes instead: cell, space group,
+`_struct_asym`, `_chem_comp`, `_atom_site`, and `_atom_site_anisotrop`, with regenerated
+label identifiers. Either way the entries equal a parse of the file the `reduce3`
+program writes in that mode.
 
 The keyword options are Reduce2's parameters with Reduce2's defaults: `approach`
 (`"add"`, `"remove"`, or `"optimize"`), `add_flip_movers`, `n_terminal_charge`,
@@ -270,7 +275,8 @@ The keyword options are Reduce2's parameters with Reduce2's defaults: `approach`
 `bonded_neighbor_depth`, `stop_on_any_missing_hydrogen`, `ignore_missing_restraints`,
 `verbosity`, and `probe`, a mapping of Probe scoring parameters such as
 `{"probe_radius": 0.25}`. `compat=True` reproduces Reduce2 exactly, including its known
-defects; the default corrects them.
+defects; the default corrects them. Residues that neither monomer library describes get
+restraints built from their chemical component definition, as in Reduce2.
 
 Reduce3 needs the cctbx `chem_data` monomer library. `chem_data` names its directory;
 otherwise it is found through `REDUCE3_CHEM_DATA`, `CHEM_DATA`, the parent of

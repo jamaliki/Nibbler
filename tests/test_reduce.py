@@ -12,6 +12,7 @@ from nibbler import ChemistryError, CifDocument
 from nibbler.reduce import Reduction
 
 CRAMBIN = Path(__file__).parent / "reduce3" / "crambin_1-5.cif"
+CRAMBIN_ENTRY = Path(__file__).parent / "reduce3" / "1crn.cif"
 
 pytestmark = pytest.mark.skipif(
     not nibbler.reduce.available(), reason="built without the reduce3 feature"
@@ -52,6 +53,25 @@ def test_paths_documents_and_compat_mode_agree() -> None:
     from_document = nibbler.reduce.run(nibbler.chomp(CRAMBIN), compat=True)
 
     assert from_path.document.to_canonical() == from_document.document.to_canonical()
+
+
+def test_the_source_metadata_is_kept() -> None:
+    _chem_data_or_skip()
+    result = nibbler.reduce.run(CRAMBIN_ENTRY)
+    output = result.document.to_canonical().encode()
+
+    before = nibbler.cif.read(CRAMBIN_ENTRY, category="struct_conn")
+    after = nibbler.cif.read(output, category="struct_conn")
+    assert len(before) == len(after) == 3
+    assert after.columns == before.columns
+    model = nibbler.mmcif.read(result.document)
+    assert model.entry_id == "1CRN"
+    assert model.atom_site_count > 600
+
+    # compat mode writes Reduce2's layout, which has no struct_conn
+    reduce2_layout = nibbler.reduce.run(CRAMBIN_ENTRY, compat=True)
+    canonical = reduce2_layout.document.to_canonical().encode()
+    assert len(nibbler.cif.read(canonical, category="struct_conn")) == 0
 
 
 def test_remove_strips_the_added_hydrogens() -> None:

@@ -13,6 +13,8 @@ use _core::reduce::{
 
 /// The first five residues of PDB entry 1CRN (crambin), heavy atoms only.
 const CRAMBIN: &str = include_str!("reduce3/crambin_1-5.cif");
+/// PDB entry 1CRN as distributed by the RCSB.
+const CRAMBIN_ENTRY: &str = include_str!("reduce3/1crn.cif");
 
 const CHEMISTRY: &str = include_str!("fixtures/chemistry/ligand_ion_water.cif");
 const GLYCAN: &str = include_str!("fixtures/chemistry/branched_glycan.cif");
@@ -120,8 +122,22 @@ fn hydrogens_are_added_in_memory() {
             &params,
         )
         .expect("Reduce3 must succeed");
-        let written = parse(reduce3::mmcif::write_mmcif(&expected.structure).as_bytes())
-            .expect("reduce3 output must parse");
+        // the file the reduce3 program writes in this mode
+        let text = if compat {
+            reduce3::mmcif::write_mmcif(&expected.structure)
+        } else {
+            let source = reduce3::cif::parse(CRAMBIN);
+            let mut w = reduce3::cifsource::CifText::with_capacity(16384);
+            reduce3::mmcif::write_cif_preserving(
+                &expected.structure,
+                &source.blocks[0],
+                "crn5",
+                &mut w,
+            )
+            .expect("reduce3 must write the model");
+            w.out
+        };
+        let written = parse(text.as_bytes()).expect("reduce3 output must parse");
         assert_eq!(entries(reduction.document()), entries(&written));
         assert_eq!(
             without_timings(reduction.report()),
@@ -145,4 +161,39 @@ fn hydrogens_are_added_in_memory() {
     let no_model = parse(b"data_empty\n_entry.id empty\n").expect("must parse");
     let error = run(&no_model, &monomers, &Params::default()).expect_err("no model");
     assert_eq!(error.code(), ReduceErrorCode::InvalidModel);
+}
+
+#[test]
+fn the_source_metadata_is_kept() {
+    let Ok(monomers) = load_monomer_library(None) else {
+        eprintln!("skipped: chem_data not found (set REDUCE3_CHEM_DATA)");
+        return;
+    };
+    let document = parse(CRAMBIN_ENTRY.as_bytes()).expect("entry must parse");
+    let reduction = run(&document, &monomers, &Params::default()).expect("Reduce3 must succeed");
+    let block = reduction.document().blocks().first().expect("one block");
+    assert_eq!(block.code(), Some("1CRN"));
+    // every entry apart from the atom tables is the source's, in the source's order
+    let rebuilt = |entry: &CifEntry| match entry {
+        CifEntry::Loop(cif_loop) => {
+            let tag = cif_loop.tags()[0].to_ascii_lowercase();
+            tag.starts_with("_atom_site.") || tag.starts_with("_atom_type.")
+        }
+        CifEntry::Item(item) => item.tag().to_ascii_lowercase().starts_with("_atom_type."),
+        CifEntry::Frame(_) => false,
+    };
+    let kept: Vec<&CifEntry> = entries(&document).iter().filter(|e| !rebuilt(e)).collect();
+    let out: Vec<&CifEntry> = block.entries().iter().filter(|e| !rebuilt(e)).collect();
+    assert_eq!(kept, out);
+    assert!(
+        out.iter()
+            .any(|e| matches!(e, CifEntry::Loop(l) if l.tags()[0] == "_struct_conn.id"))
+    );
+    // the result is still a coherent PDBx model, with the hydrogens added
+    let model = _core::pdbx::build_model(reduction.document()).expect("a PDBx model");
+    assert!(
+        model.atom_site_count() > 600,
+        "{} atoms",
+        model.atom_site_count()
+    );
 }
