@@ -34,7 +34,7 @@ Repository = "https://github.com/jamaliki/Nibbler"
 Security = "https://github.com/jamaliki/Nibbler/security/policy"
 
 [tool.maturin]
-features = ["extension-module"]
+features = ["extension-module", "reduce3"]
 module-name = "nibbler._core"
 python-source = "python"
 

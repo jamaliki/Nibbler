@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Literal, TypeAlias
 
 PredicateSpec: TypeAlias = tuple[str, str, list[str]]
@@ -131,3 +131,6 @@ def validate_mmcif_document(
     document: CifDocument, profile: Literal["pdbx", "modelcif"]
 ) -> ValidationFields: ...
 def validate_mmcif_model(model: MmcifModel) -> ValidationFields: ...
+def reduce_document(
+    document: CifDocument, options: Mapping[str, object]
+) -> tuple[CifDocument, str]: ...

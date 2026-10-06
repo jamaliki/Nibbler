@@ -1,0 +1,75 @@
+data_crn5
+_cell.length_a                    40.960
+_cell.length_b                    18.650
+_cell.length_c                    22.520
+_cell.angle_alpha                 90.000
+_cell.angle_beta                  90.770
+_cell.angle_gamma                 90.000
+_cell.volume                      17201.565
+_space_group.crystal_system       monoclinic
+_space_group.IT_number            4
+_space_group.name_H-M_alt         'P 1 21 1'
+_space_group.name_Hall            ' P 2yb'
+_symmetry.space_group_name_H-M    'P 1 21 1'
+_symmetry.space_group_name_Hall   ' P 2yb'
+_symmetry.Int_Tables_number       4
+loop_
+  _space_group_symop.id
+  _space_group_symop.operation_xyz
+   1 x,y,z
+   2 -x,y+1/2,-z
+
+loop_
+  _atom_site.group_PDB
+  _atom_site.id
+  _atom_site.label_atom_id
+  _atom_site.label_alt_id
+  _atom_site.label_comp_id
+  _atom_site.auth_asym_id
+  _atom_site.auth_seq_id
+  _atom_site.pdbx_PDB_ins_code
+  _atom_site.Cartn_x
+  _atom_site.Cartn_y
+  _atom_site.Cartn_z
+  _atom_site.occupancy
+  _atom_site.B_iso_or_equiv
+  _atom_site.type_symbol
+  _atom_site.pdbx_formal_charge
+  _atom_site.label_asym_id
+  _atom_site.label_entity_id
+  _atom_site.label_seq_id
+  _atom_site.auth_atom_id
+  _atom_site.pdbx_PDB_model_num
+   ATOM 1 N . THR A 1 ? 17.04700 14.09900 3.62500 1.000 13.79000 N ? A ? 1 N 1
+   ATOM 2 CA . THR A 1 ? 16.96700 12.78400 4.33800 1.000 10.80000 C ? A ? 1 CA 1
+   ATOM 3 C . THR A 1 ? 15.68500 12.75500 5.13300 1.000 9.19000 C ? A ? 1 C 1
+   ATOM 4 O . THR A 1 ? 15.26800 13.82500 5.59400 1.000 9.85000 O ? A ? 1 O 1
+   ATOM 5 CB . THR A 1 ? 18.17000 12.70300 5.33700 1.000 13.02000 C ? A ? 1 CB 1
+   ATOM 6 OG1 . THR A 1 ? 19.33400 12.82900 4.46300 1.000 15.06000 O ? A ? 1 OG1 1
+   ATOM 7 CG2 . THR A 1 ? 18.15000 11.54600 6.30400 1.000 14.23000 C ? A ? 1 CG2 1
+   ATOM 8 N . THR A 2 ? 15.11500 11.55500 5.26500 1.000 7.81000 N ? A ? 2 N 1
+   ATOM 9 CA . THR A 2 ? 13.85600 11.46900 6.06600 1.000 8.31000 C ? A ? 2 CA 1
+   ATOM 10 C . THR A 2 ? 14.16400 10.78500 7.37900 1.000 5.80000 C ? A ? 2 C 1
+   ATOM 11 O . THR A 2 ? 14.99300 9.86200 7.44300 1.000 6.94000 O ? A ? 2 O 1
+   ATOM 12 CB . THR A 2 ? 12.73200 10.71100 5.26100 1.000 10.32000 C ? A ? 2 CB 1
+   ATOM 13 OG1 . THR A 2 ? 13.30800 9.43900 4.92600 1.000 12.81000 O ? A ? 2 OG1 1
+   ATOM 14 CG2 . THR A 2 ? 12.48400 11.44200 3.89500 1.000 11.90000 C ? A ? 2 CG2 1
+   ATOM 15 N . CYS A 3 ? 13.48800 11.24100 8.41700 1.000 5.24000 N ? A ? 3 N 1
+   ATOM 16 CA . CYS A 3 ? 13.66000 10.70700 9.78700 1.000 5.39000 C ? A ? 3 CA 1
+   ATOM 17 C . CYS A 3 ? 12.26900 10.43100 10.32300 1.000 4.45000 C ? A ? 3 C 1
+   ATOM 18 O . CYS A 3 ? 11.39300 11.30800 10.18500 1.000 6.54000 O ? A ? 3 O 1
+   ATOM 19 CB . CYS A 3 ? 14.36800 11.74800 10.69100 1.000 5.99000 C ? A ? 3 CB 1
+   ATOM 20 SG . CYS A 3 ? 15.88500 12.42600 10.01600 1.000 7.01000 S ? A ? 3 SG 1
+   ATOM 21 N . CYS A 4 ? 12.01900 9.27200 10.92800 1.000 3.90000 N ? A ? 4 N 1
+   ATOM 22 CA . CYS A 4 ? 10.64600 8.99100 11.40800 1.000 4.24000 C ? A ? 4 CA 1
+   ATOM 23 C . CYS A 4 ? 10.65400 8.79300 12.91900 1.000 3.72000 C ? A ? 4 C 1
+   ATOM 24 O . CYS A 4 ? 11.65900 8.29600 13.49100 1.000 5.30000 O ? A ? 4 O 1
+   ATOM 25 CB . CYS A 4 ? 10.05700 7.75200 10.68200 1.000 4.41000 C ? A ? 4 CB 1
+   ATOM 26 SG . CYS A 4 ? 9.83700 8.01800 8.90400 1.000 4.72000 S ? A ? 4 SG 1
+   ATOM 27 N . PRO A 5 ? 9.56100 9.10800 13.56300 1.000 3.96000 N ? A ? 5 N 1
+   ATOM 28 CA . PRO A 5 ? 9.44800 9.03400 15.01200 1.000 4.25000 C ? A ? 5 CA 1
+   ATOM 29 C . PRO A 5 ? 9.28800 7.67000 15.60600 1.000 4.96000 C ? A ? 5 C 1
+   ATOM 30 O . PRO A 5 ? 9.49000 7.51900 16.81900 1.000 7.44000 O ? A ? 5 O 1
+   ATOM 31 CB . PRO A 5 ? 8.23000 9.95700 15.34500 1.000 5.11000 C ? A ? 5 CB 1
+   ATOM 32 CG . PRO A 5 ? 7.33800 9.78600 14.11400 1.000 5.24000 C ? A ? 5 CG 1
+   ATOM 33 CD . PRO A 5 ? 8.36600 9.80400 12.95800 1.000 5.20000 C ? A ? 5 CD 1

@@ -33,7 +33,8 @@ development environment pins Python 3.12.13 and Rust 1.97.1.
 - builds immutable PDBx coordinate and ModelCIF prediction models;
 - resolves chemical components from embedded definitions, an explicit local CCD cache,
   or a small built-in registry, without network access;
-- validates dictionary and semantic-profile invariants with stable diagnostics; and
+- validates dictionary and semantic-profile invariants with stable diagnostics;
+- adds and optimizes hydrogens on parsed models in memory with Reduce3; and
 - writes deterministic CIF or BinaryCIF transactionally.
 
 Parsing is strict: Nibbler does not silently repair malformed syntax, guess chemistry,
@@ -114,6 +115,15 @@ nibbler.dump(
 )
 ```
 
+Reduce3 adds hydrogens and optimizes rotatable and flippable groups on a parsed model
+without writing or re-reading text. It needs the cctbx `chem_data` monomer library:
+
+```python
+result = nibbler.reduce.run(document, add_flip_movers=True, chem_data="chem_data")
+nibbler.dump(result.document, "with-hydrogens.cif")
+print(result.report)
+```
+
 Scan results are bounded and yielded in input order:
 
 ```python
@@ -130,7 +140,7 @@ for error in result.errors:
 ```
 
 The searchable conventional APIs are `nibbler.cif.read`, `scan`, `validate`, and
-`write`, plus `nibbler.mmcif.read`, `validate`, and `write`. `chomp` and `feast` are
+`write`, plus `nibbler.mmcif.read`, `validate`, and `write`, and `nibbler.reduce.run`. `chomp` and `feast` are
 exact aliases of `cif.read` and `cif.scan`.
 
 The import package is `nibbler`. The distribution is named `nibbler-cif` because the
@@ -190,4 +200,7 @@ part of the portable release matrix.
 
 ## License
 
-Nibbler is released under the [MIT License](LICENSE).
+Nibbler is released under the [MIT License](LICENSE). Builds with the `reduce3` Cargo
+feature, which the Python package enables, also contain
+[Reduce3](https://github.com/jamaliki/reduce3), which is licensed under the Apache
+License 2.0 and includes code derived from cctbx under the cctbx license.

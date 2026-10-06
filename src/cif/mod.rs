@@ -52,6 +52,8 @@ pub use document::{
     CifValueRef, CifValues, OriginalLexeme, QuoteStyle, StandardUncertainty, TextValue,
     TextValueRef,
 };
+#[cfg(feature = "reduce3")]
+pub(crate) use document::{ColumnValues, LoopColumn, StringColumn};
 pub use error::{ParseError, ParseErrorCode, SourceSpan, WriteError, WriteErrorCode};
 pub use input::{InputError, InputErrorCode, InputLimits, decode_source, read_source_file};
 #[cfg(feature = "python")]
