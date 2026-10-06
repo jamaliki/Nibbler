@@ -1,14 +1,19 @@
 //! Native core for the Nibbler CIF toolkit.
 //!
 //! The [`cif`] module contains the shared CIF 1.1 syntax implementation. Higher-level
-//! projection, schema, and Python APIs build on that one production path.
+//! projection, schema, and Python APIs build on that one production path. With the
+//! `reduce3` feature, `reduce` adds hydrogens to parsed models in memory.
 
 pub mod cif;
 pub mod modelcif;
 pub mod pdbx;
+#[cfg(feature = "reduce3")]
+pub mod reduce;
 
 #[cfg(feature = "python")]
 mod python;
+#[cfg(all(feature = "python", feature = "reduce3"))]
+mod python_reduce;
 #[cfg(feature = "python")]
 mod python_scan;
 

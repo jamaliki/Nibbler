@@ -19,6 +19,9 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
   release tooling.
 - Portable CPython 3.10-3.14 wheels, isolated artifact qualification, trusted
   publishing, and scheduled PDB correctness, throughput, and peak-RSS regression checks.
+- Optional Reduce3 integration (the `reduce3` Cargo feature, enabled in the Python
+  package): `nibbler.reduce.run` and `reduce::run` add and optimize hydrogens on a parsed
+  document in memory and return a new document that keeps the source block's categories.
 - Immutable revision-addressed PDB text fixtures, public contribution and security
   policies, checkout installation with `uv`, and original project artwork.
 

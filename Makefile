@@ -22,6 +22,7 @@ lint:
 	$(RUN) cargo fmt --all --check
 	$(RUN) cargo clippy --all-targets --no-default-features -- -D warnings
 	$(RUN) cargo clippy --all-targets --features robustness -- -D warnings
+	$(RUN) cargo clippy --all-targets --features python,reduce3 -- -D warnings
 	$(RUN) ruff format --check .
 	$(RUN) ruff check .
 
@@ -30,6 +31,7 @@ typecheck:
 
 test: develop
 	$(RUN) cargo test --no-default-features
+	$(RUN) cargo test --features reduce3
 	$(RUN) pytest
 
 robustness:
@@ -37,6 +39,7 @@ robustness:
 
 docs:
 	$(RUN) env RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --no-default-features
+	$(RUN) env RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --features reduce3
 
 corpus:
 	$(RUN) python -m tools.verify_corpus

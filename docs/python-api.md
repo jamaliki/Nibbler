@@ -234,6 +234,59 @@ validate it, then atomically replace the destination. A failed operation leaves 
 existing destination unchanged. BinaryCIF cannot represent global blocks or save frames,
 and its writer rejects values outside its lossless supported encodings.
 
+## Hydrogens with Reduce3
+
+Builds with the `reduce3` Cargo feature, which the Python package enables, can run
+[Reduce3](https://github.com/jamaliki/reduce3) on a model without leaving memory:
+
+```python
+result = nibbler.reduce.run(
+    source_document_or_model,
+    approach="add",
+    add_flip_movers=False,
+    compat=False,
+    chem_data=None,
+)
+result.document  # a new CifDocument
+result.report  # Reduce3's description text
+```
+
+`run` accepts a `CifDocument`, an `MmcifModel` (its source document is used), or any
+source `cif.read` accepts. Reduce3 reads the first data block with an `_atom_site` loop
+directly from the parsed values, adds and places hydrogens, optimizes rotatable and
+flippable groups, and builds the result as a new `CifDocument`. No text is written or
+parsed again, and the GIL is released while it runs.
+
+The result block keeps the source block code and the source document's schema selector.
+By default it also keeps every category of the source block, in order: `_atom_site` is
+rebuilt with the source's items and label identifiers (new hydrogens take their
+residue's), atom ids are renumbered, `_atom_site_anisotrop` follows the new ids, and
+`_atom_type` gains the elements it lacks. Everything else, including `_struct_conn`, the
+entities and the sequence schemes, is shared with the source unchanged. With
+`compat=True` the block has the layout Reduce2 writes instead: cell, space group,
+`_struct_asym`, `_chem_comp`, `_atom_site`, and `_atom_site_anisotrop`, with regenerated
+label identifiers. Either way the entries equal a parse of the file the `reduce3`
+program writes in that mode.
+
+The keyword options are Reduce2's parameters with Reduce2's defaults: `approach`
+(`"add"`, `"remove"`, or `"optimize"`), `add_flip_movers`, `n_terminal_charge`,
+`keep_existing_h`, `exclude_water`, `use_neutron_distances`, `preference_magnitude`,
+`non_flip_preference`, `skip_bond_fix_up`, `set_flip_states`, `model_id`, `alt_id`,
+`bonded_neighbor_depth`, `stop_on_any_missing_hydrogen`, `ignore_missing_restraints`,
+`verbosity`, and `probe`, a mapping of Probe scoring parameters such as
+`{"probe_radius": 0.25}`. `compat=True` reproduces Reduce2 exactly, including its known
+defects; the default corrects them. Residues that neither monomer library describes get
+restraints built from their chemical component definition, as in Reduce2.
+
+Reduce3 needs the cctbx `chem_data` monomer library. `chem_data` names its directory;
+otherwise it is found through `REDUCE3_CHEM_DATA`, `CHEM_DATA`, the parent of
+`MMTBX_CCP4_MONOMER_LIB` or `CLIBD_MON`, or the active conda environment. It is loaded
+once per directory and process. Failures raise `ChemistryError` with a `REDUCE_*` code:
+`REDUCE_MONOMER_LIBRARY_NOT_FOUND`, `REDUCE_MONOMER_LIBRARY_INVALID`,
+`REDUCE_INVALID_MODEL`, `REDUCE_FAILED` (for example, missing restraints), or
+`REDUCE_RESULT_TOO_LARGE`. `nibbler.reduce.available()` reports whether the build
+includes Reduce3.
+
 ## Errors
 
 All public failures derive from `NibblerError`:
@@ -241,7 +294,8 @@ All public failures derive from `NibblerError`:
 - `ParseError`: input, decompression, UTF-8, resource, or CIF syntax failure;
 - `ProjectionError`: malformed projection or incompatible category occurrence;
 - `SchemaError`: schema selector, artifact, dictionary item, or typed-value failure;
-- `ChemistryError`: semantic-model construction or component-resolution failure;
+- `ChemistryError`: semantic-model construction, component-resolution, or Reduce3
+  failure;
 - `WriteError`: serialization or destination failure;
 - `BatchError`: one source failure from `scan`, with `source_index`; and
 - `ValidationError`: one or more error diagnostics from a validation report.

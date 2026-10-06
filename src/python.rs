@@ -51,9 +51,24 @@ enum LoadedSource {
 
 /// An immutable, order-preserving generic CIF document.
 #[pyclass(name = "CifDocument", module = "nibbler", frozen)]
-struct PyCifDocument {
+pub(crate) struct PyCifDocument {
     document: Arc<CifDocument>,
     schema: Option<String>,
+}
+
+#[cfg(feature = "reduce3")]
+impl PyCifDocument {
+    pub(crate) const fn new(document: Arc<CifDocument>, schema: Option<String>) -> Self {
+        Self { document, schema }
+    }
+
+    pub(crate) const fn document(&self) -> &Arc<CifDocument> {
+        &self.document
+    }
+
+    pub(crate) fn schema_name(&self) -> Option<&str> {
+        self.schema.as_deref()
+    }
 }
 
 #[pymethods]
@@ -812,5 +827,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(validate_mmcif_document, module)?)?;
     module.add_function(wrap_pyfunction!(validate_mmcif_model, module)?)?;
     crate::python_scan::register(module)?;
+    #[cfg(feature = "reduce3")]
+    crate::python_reduce::register(module)?;
     Ok(())
 }
