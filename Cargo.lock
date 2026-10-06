@@ -621,7 +621,7 @@ dependencies = [
 [[package]]
 name = "reduce3"
 version = "0.1.0"
-source = "git+https://github.com/jamaliki/reduce3?rev=c02a408ae66de2e0c89c640a72b33e8665281563#c02a408ae66de2e0c89c640a72b33e8665281563"
+source = "git+https://github.com/jamaliki/reduce3?rev=262834051fd8c05dbab0518cdcaba82d26117dc6#262834051fd8c05dbab0518cdcaba82d26117dc6"
 dependencies = [
  "mimalloc",
  "rayon",
