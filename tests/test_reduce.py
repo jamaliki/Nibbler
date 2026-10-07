@@ -47,6 +47,17 @@ def test_hydrogens_are_added_to_a_parsed_document() -> None:
     assert "MoverSingleHydrogenRotator" in result.report
 
 
+def test_flips_are_considered_by_default() -> None:
+    _chem_data_or_skip()
+    default = nibbler.reduce.run(CRAMBIN_ENTRY)
+    flips = nibbler.reduce.run(CRAMBIN_ENTRY, add_flip_movers=True)
+    no_flips = nibbler.reduce.run(CRAMBIN_ENTRY, add_flip_movers=False)
+
+    assert "MoverAmideFlip" in default.report
+    assert "MoverAmideFlip" not in no_flips.report
+    assert default.document.to_canonical() == flips.document.to_canonical()
+
+
 def test_paths_documents_and_compat_mode_agree() -> None:
     _chem_data_or_skip()
     from_path = nibbler.reduce.run(CRAMBIN, compat=True)

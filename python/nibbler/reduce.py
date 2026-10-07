@@ -63,7 +63,7 @@ def run(
     source: Source | CifDocument | MmcifModel,
     *,
     approach: Approach = "add",
-    add_flip_movers: bool = False,
+    add_flip_movers: bool = True,
     compat: bool = False,
     chem_data: str | PathLike[str] | None = None,
     n_terminal_charge: NTerminalCharge = "residue_one",
@@ -87,7 +87,10 @@ def run(
     Reduce3 reads the first data block with an ``_atom_site`` loop straight from the
     parsed document and builds the result as a new :class:`CifDocument`; no text is
     written or parsed again. The options are Reduce2's parameters with the same
-    defaults, and ``compat=True`` reproduces Reduce2 exactly. ``chem_data`` is the
+    defaults, except that ``add_flip_movers`` is True (Reduce2: False), so Asn, Gln and
+    His flips are considered unless it is set to False. ``compat=True`` reproduces
+    Reduce2 exactly; pass ``add_flip_movers=False`` too to match a default Reduce2
+    run. ``chem_data`` is the
     cctbx monomer library directory; by default it is found through
     ``REDUCE3_CHEM_DATA``, ``CHEM_DATA``, or the active conda environment. The run
     releases the GIL.

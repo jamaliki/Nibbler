@@ -243,7 +243,7 @@ Builds with the `reduce3` Cargo feature, which the Python package enables, can r
 result = nibbler.reduce.run(
     source_document_or_model,
     approach="add",
-    add_flip_movers=False,
+    add_flip_movers=True,
     compat=False,
     chem_data=None,
 )
@@ -268,9 +268,11 @@ entities and the sequence schemes, is shared with the source unchanged. With
 label identifiers. Either way the entries equal a parse of the file the `reduce3`
 program writes in that mode.
 
-The keyword options are Reduce2's parameters with Reduce2's defaults: `approach`
-(`"add"`, `"remove"`, or `"optimize"`), `add_flip_movers`, `n_terminal_charge`,
-`keep_existing_h`, `exclude_water`, `use_neutron_distances`, `preference_magnitude`,
+The keyword options are Reduce2's parameters with Reduce2's defaults, except that
+`add_flip_movers` is True (Reduce2: False), so Asn, Gln and His flips are considered
+unless it is set to False: `approach` (`"add"`, `"remove"`, or `"optimize"`),
+`add_flip_movers`, `n_terminal_charge`, `keep_existing_h`, `exclude_water`,
+`use_neutron_distances`, `preference_magnitude`,
 `non_flip_preference`, `skip_bond_fix_up`, `set_flip_states`, `model_id`, `alt_id`,
 `bonded_neighbor_depth`, `stop_on_any_missing_hydrogen`, `ignore_missing_restraints`,
 `verbosity`, and `probe`, a mapping of Probe scoring parameters such as
