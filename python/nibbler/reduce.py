@@ -72,6 +72,8 @@ def run(
     use_neutron_distances: bool = False,
     preference_magnitude: float = 1.0,
     non_flip_preference: float = 0.5,
+    planar_hydroxyl_preference: float = 1.0,
+    acid_syn_preference: float = 1.0,
     skip_bond_fix_up: bool = False,
     set_flip_states: str | None = None,
     model_id: int | None = None,
@@ -90,7 +92,10 @@ def run(
     defaults, except that ``add_flip_movers`` is True (Reduce2: False), so Asn, Gln and
     His flips are considered unless it is set to False. ``compat=True`` reproduces
     Reduce2 exactly; pass ``add_flip_movers=False`` too to match a default Reduce2
-    run. ``chem_data`` is the
+    run. Without ``compat``, a hydroxyl hydrogen on a planar atom (a phenol, an
+    enol, a carboxylic acid) prefers that atom's plane by ``planar_hydroxyl_preference``
+    and an acid's hydrogen prefers syn to its carbonyl oxygen by
+    ``acid_syn_preference`` (Probe score units; 0 turns either off). ``chem_data`` is the
     cctbx monomer library directory; by default it is found through
     ``REDUCE3_CHEM_DATA``, ``CHEM_DATA``, or the active conda environment. The run
     releases the GIL.
@@ -140,6 +145,8 @@ def run(
     for name, number in (
         ("preference_magnitude", preference_magnitude),
         ("non_flip_preference", non_flip_preference),
+        ("planar_hydroxyl_preference", planar_hydroxyl_preference),
+        ("acid_syn_preference", acid_syn_preference),
     ):
         _require_number(name, number)
     probe_numbers: dict[str, float] = {}
@@ -160,6 +167,8 @@ def run(
         "n_terminal_charge": n_terminal_charge,
         "preference_magnitude": float(preference_magnitude),
         "non_flip_preference": float(non_flip_preference),
+        "planar_hydroxyl_preference": float(planar_hydroxyl_preference),
+        "acid_syn_preference": float(acid_syn_preference),
         "set_flip_states": set_flip_states,
         "model_id": model_id,
         "alt_id": alt_id,
