@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 35b3810cba45adca5dc7d1e5499aaa40683570223f54bea6c3be70e1d3b31726 # shrinks to fixture = 3, mutations = [(6448168674920157651, 33)], selector = 0
+cc c323ff8cb59a6eb3a231dc00ab30a52eaf9d78c8d48e6d8ac8377eda18f42f45 # shrinks to fixture = 3, mutations = [(759510168774828559, 0)]
