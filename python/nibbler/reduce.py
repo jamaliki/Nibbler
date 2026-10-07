@@ -89,14 +89,14 @@ def run(
     Reduce3 reads the first data block with an ``_atom_site`` loop straight from the
     parsed document and builds the result as a new :class:`CifDocument`; no text is
     written or parsed again. The options are Reduce2's parameters with the same
-    defaults, except that ``add_flip_movers`` is True (Reduce2: False), so Asn, Gln and
-    His flips are considered unless it is set to False. ``compat=True`` reproduces
+    defaults, except that ``add_flip_movers`` is True (Reduce2: False), so Asn, Gln
+    and His flips are considered unless it is set to False. ``compat=True`` reproduces
     Reduce2 exactly; pass ``add_flip_movers=False`` too to match a default Reduce2
-    run. Without ``compat``, a hydroxyl hydrogen on a planar atom (a phenol, an
-    enol, a carboxylic acid) prefers that atom's plane by ``planar_hydroxyl_preference``
+    run. Without ``compat``, a hydroxyl hydrogen on a planar atom (a phenol, an enol,
+    a carboxylic acid) prefers that atom's plane by ``planar_hydroxyl_preference``,
     and an acid's hydrogen prefers syn to its carbonyl oxygen by
-    ``acid_syn_preference`` (Probe score units; 0 turns either off). ``chem_data`` is the
-    cctbx monomer library directory; by default it is found through
+    ``acid_syn_preference`` (Probe score units; 0 turns either off). ``chem_data`` is
+    the cctbx monomer library directory; by default it is found through
     ``REDUCE3_CHEM_DATA``, ``CHEM_DATA``, or the active conda environment. The run
     releases the GIL.
     """

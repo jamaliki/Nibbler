@@ -240,6 +240,15 @@ remain visible on read but fail strict profile validation, which semantic writin
 by default. Nibbler does not infer components, bonds, charges, or entity kind from atom
 names or distances.
 
+`nibbler.mmcif.assembly` writes one `_pdbx_struct_assembly` of a PDBx model out as a new
+document in which every copy is explicit: each distinct operator combination is a copy,
+copy *n* > 1 renames its chains `X-n`, and `_struct_asym`, the sequence schemes,
+`_atom_site`, `_atom_site_anisotrop`, and same-copy `_struct_conn` rows are written once
+per copy; copies of an atom on a symmetry axis are written once. Only categories that
+describe the coordinates are kept; the crystal cell,
+symmetry, and assembly definitions are left out, so no consumer applies crystal symmetry
+to copies that are already present. The result is itself a valid PDBx model.
+
 ## 9. ModelCIF semantics
 
 `profile="modelcif"` extends the same PDBx coordinate graph with immutable typed

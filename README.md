@@ -119,9 +119,18 @@ Reduce3 adds hydrogens and optimizes rotatable and flippable groups on a parsed 
 without writing or re-reading text. It needs the cctbx `chem_data` monomer library:
 
 ```python
-result = nibbler.reduce.run(document, chem_data="chem_data")  # flips Asn/Gln/His by default
+# flips Asn/Gln/His by default
+result = nibbler.reduce.run(document, chem_data="chem_data")
 nibbler.dump(result.document, "with-hydrogens.cif")
 print(result.report)
+```
+
+To place hydrogens on a biological assembly with the contacts between its copies taken
+into account, write the assembly out first:
+
+```python
+assembly = nibbler.mmcif.assembly(document)  # the first _pdbx_struct_assembly
+result = nibbler.reduce.run(assembly, chem_data="chem_data")
 ```
 
 Scan results are bounded and yielded in input order:
@@ -140,8 +149,9 @@ for error in result.errors:
 ```
 
 The searchable conventional APIs are `nibbler.cif.read`, `scan`, `validate`, and
-`write`, plus `nibbler.mmcif.read`, `validate`, and `write`, and `nibbler.reduce.run`. `chomp` and `feast` are
-exact aliases of `cif.read` and `cif.scan`.
+`write`, plus `nibbler.mmcif.read`, `validate`, `write`, and `assembly`, and
+`nibbler.reduce.run`. `chomp` and `feast` are exact aliases of `cif.read` and
+`cif.scan`.
 
 The import package is `nibbler`. The distribution is named `nibbler-cif` because the
 `nibbler` distribution name is used by another project.

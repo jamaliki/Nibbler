@@ -48,8 +48,8 @@ pub use reduce3::probe::ProbeParams;
 pub use reduce3::{Approach, MonLib, Params};
 
 use crate::cif::{
-    CifBlock, CifDocument, CifEntry, CifItem, CifLoop, CifValue, CifValueRef, ColumnValues,
-    LoopColumn, StringColumn, split_tag,
+    BlockCategory, CifBlock, CifDocument, CifEntry, CifItem, CifLoop, CifValue, CifValueRef,
+    TextCell, TextColumnBuilder, in_category, split_tag,
 };
 
 /// The class of a [`ReduceError`].
@@ -284,14 +284,6 @@ pub fn load_monomer_library(chem_data: Option<&Path>) -> Result<Arc<MonLib>, Red
     Ok(library)
 }
 
-fn in_category(tag: &str, category: &str) -> bool {
-    split_tag(tag).is_some_and(|(name, _)| name.eq_ignore_ascii_case(category))
-}
-
-fn item_is(tag: &str, item: &str) -> bool {
-    split_tag(tag).is_some_and(|(_, name)| name.eq_ignore_ascii_case(item))
-}
-
 /// A parsed data block as Reduce3 input.
 #[derive(Clone, Copy, Debug)]
 pub struct BlockSource<'a> {
@@ -313,22 +305,7 @@ impl CifSource for BlockSource<'_> {
         Self: 't;
 
     fn table(&self, category: &str) -> Option<BlockTable<'_>> {
-        let mut items = Vec::new();
-        for entry in self.block.entries() {
-            match entry {
-                CifEntry::Loop(cif_loop)
-                    if cif_loop
-                        .tags()
-                        .first()
-                        .is_some_and(|tag| in_category(tag, category)) =>
-                {
-                    return Some(BlockTable(TableKind::Loop(cif_loop)));
-                }
-                CifEntry::Item(item) if in_category(item.tag(), category) => items.push(item),
-                CifEntry::Loop(_) | CifEntry::Item(_) | CifEntry::Frame(_) => {}
-            }
-        }
-        (!items.is_empty()).then_some(BlockTable(TableKind::Items(items)))
+        BlockCategory::find(self.block.entries(), category).map(BlockTable)
     }
 
     fn categories(&self) -> Vec<String> {
@@ -351,58 +328,28 @@ impl CifSource for BlockSource<'_> {
 
 /// One category of a [`BlockSource`]: a loop, or the category's scalar items as one row.
 #[derive(Clone, Debug)]
-pub struct BlockTable<'a>(TableKind<'a>);
-
-#[derive(Clone, Debug)]
-enum TableKind<'a> {
-    Loop(&'a CifLoop),
-    Items(Vec<&'a CifItem>),
-}
-
-impl<'a> BlockTable<'a> {
-    fn value(&self, row: usize, column: usize) -> Option<CifValueRef<'a>> {
-        match &self.0 {
-            TableKind::Loop(cif_loop) => cif_loop.value(row, column),
-            TableKind::Items(items) => (row == 0)
-                .then(|| items.get(column).map(|item| item.value().as_ref()))
-                .flatten(),
-        }
-    }
-}
+pub struct BlockTable<'a>(BlockCategory<'a>);
 
 impl CifTable for BlockTable<'_> {
     fn row_count(&self) -> usize {
-        match &self.0 {
-            TableKind::Loop(cif_loop) => cif_loop.row_count(),
-            TableKind::Items(_) => 1,
-        }
+        self.0.row_count()
     }
 
     fn column(&self, tag: &str) -> Option<usize> {
-        match &self.0 {
-            TableKind::Loop(cif_loop) => cif_loop.tags().iter().position(|t| item_is(t, tag)),
-            TableKind::Items(items) => items.iter().position(|item| item_is(item.tag(), tag)),
-        }
+        self.0.column(tag)
     }
 
     fn cell(&self, row: usize, column: usize) -> Cow<'_, str> {
-        match self.value(row, column) {
-            Some(CifValueRef::Text(text)) => Cow::Borrowed(text.as_str()),
-            Some(CifValueRef::Integer(number, original)) => original.map_or_else(
-                || Cow::Owned(number.to_string()),
-                |text| Cow::Borrowed(text.as_str()),
-            ),
-            Some(CifValueRef::Float(number, _, original)) => original.map_or_else(
-                || Cow::Owned(number.to_string()),
-                |text| Cow::Borrowed(text.as_str()),
-            ),
-            Some(CifValueRef::NotApplicable) => Cow::Borrowed("."),
-            Some(CifValueRef::Unknown) | None => Cow::Borrowed("?"),
-        }
+        self.0
+            .text(row, column)
+            .unwrap_or(Cow::Borrowed(match self.0.value(row, column) {
+                Some(CifValueRef::NotApplicable) => ".",
+                _ => "?",
+            }))
     }
 
     fn number(&self, row: usize, column: usize) -> Option<f64> {
-        match self.value(row, column)? {
+        match self.0.value(row, column)? {
             CifValueRef::Text(text) => reduce3::cif::parse_f64(text.as_str()),
             CifValueRef::Integer(number, _) => Some(number as f64),
             CifValueRef::Float(number, _, _) => Some(number),
@@ -411,22 +358,15 @@ impl CifTable for BlockTable<'_> {
     }
 
     fn tags(&self) -> Vec<Cow<'_, str>> {
-        match &self.0 {
-            TableKind::Loop(cif_loop) => cif_loop
-                .tags()
-                .iter()
-                .map(|t| Cow::Borrowed(t.as_str()))
-                .collect(),
-            TableKind::Items(items) => items.iter().map(|item| Cow::Borrowed(item.tag())).collect(),
-        }
+        self.0.tags().into_iter().map(Cow::Borrowed).collect()
     }
 
     fn is_loop(&self) -> bool {
-        matches!(self.0, TableKind::Loop(_))
+        self.0.is_loop()
     }
 
     fn missing(&self, row: usize, column: usize) -> Option<CifCell<'static>> {
-        match self.value(row, column) {
+        match self.0.value(row, column) {
             Some(CifValueRef::Unknown) | None => Some(CifCell::Unknown),
             Some(CifValueRef::NotApplicable) => Some(CifCell::NotApplicable),
             Some(CifValueRef::Text(_) | CifValueRef::Integer(..) | CifValueRef::Float(..)) => None,
@@ -450,64 +390,15 @@ pub struct DocumentSink<'a> {
 #[derive(Debug)]
 struct OpenLoop {
     tags: Vec<String>,
-    columns: Vec<ColumnBuilder>,
+    columns: Vec<TextColumnBuilder>,
     rows: usize,
 }
 
-#[derive(Debug)]
-struct ColumnBuilder {
-    data: String,
-    offsets: Vec<u32>,
-    indices: Vec<u32>,
-    mask: Option<Vec<u8>>,
-}
-
-impl ColumnBuilder {
-    fn with_capacity(rows: usize) -> Self {
-        let mut offsets = Vec::with_capacity(rows.min(1 << 20) + 1);
-        offsets.push(0);
-        Self {
-            data: String::new(),
-            offsets,
-            indices: Vec::with_capacity(rows),
-            mask: None,
-        }
-    }
-
-    fn last_entry(&self) -> Option<&str> {
-        let [.., start, end] = self.offsets[..] else {
-            return None;
-        };
-        self.data.get(start as usize..end as usize)
-    }
-
-    /// Append one value; `None` when the column outgrows 32-bit offsets.
-    fn push(&mut self, value: CifCell<'_>) -> Option<()> {
-        let row = self.indices.len();
-        let (index, kind) = match value {
-            CifCell::Text("") => (0, 0),
-            CifCell::Text(text) => {
-                if self.last_entry() != Some(text) {
-                    self.data.push_str(text);
-                    self.offsets.push(u32::try_from(self.data.len()).ok()?);
-                }
-                (u32::try_from(self.offsets.len() - 1).ok()?, 0)
-            }
-            CifCell::NotApplicable => (0, 1),
-            CifCell::Unknown => (0, 2),
-        };
-        if kind != 0 || self.mask.is_some() {
-            self.mask.get_or_insert_with(|| vec![0; row]).push(kind);
-        }
-        self.indices.push(index);
-        Some(())
-    }
-
-    fn finish(self) -> LoopColumn {
-        LoopColumn {
-            values: ColumnValues::Strings(StringColumn::new(self.data, self.offsets, self.indices)),
-            mask: self.mask,
-        }
+const fn text_cell(value: CifCell<'_>) -> TextCell<'_> {
+    match value {
+        CifCell::Text(text) => TextCell::Text(text),
+        CifCell::NotApplicable => TextCell::NotApplicable,
+        CifCell::Unknown => TextCell::Unknown,
     }
 }
 
@@ -542,7 +433,7 @@ impl<'a> DocumentSink<'a> {
             let columns = open
                 .columns
                 .into_iter()
-                .map(ColumnBuilder::finish)
+                .map(TextColumnBuilder::finish)
                 .collect();
             self.entries.push(CifEntry::Loop(CifLoop::from_columns(
                 open.tags, columns, open.rows,
@@ -608,7 +499,7 @@ impl CifSink for DocumentSink<'_> {
             tags: tags.iter().map(|tag| (*tag).to_owned()).collect(),
             columns: tags
                 .iter()
-                .map(|_| ColumnBuilder::with_capacity(rows))
+                .map(|_| TextColumnBuilder::with_capacity(rows))
                 .collect(),
             rows: 0,
         });
@@ -624,7 +515,7 @@ impl CifSink for DocumentSink<'_> {
             return;
         }
         for (column, &value) in open.columns.iter_mut().zip(values) {
-            if column.push(value).is_none() {
+            if column.push(text_cell(value)).is_none() {
                 self.failure = Some("a column of the output model exceeds 4 GiB of text");
             }
         }

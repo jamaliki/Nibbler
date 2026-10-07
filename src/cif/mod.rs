@@ -17,6 +17,7 @@
 
 mod arrow;
 mod binary;
+mod block_category;
 mod dictionary;
 mod dictionary_compiler;
 mod dictionary_source;
@@ -36,11 +37,13 @@ mod schema_artifact;
 mod sink;
 mod source;
 mod table;
+mod text_column;
 mod token;
 mod validation;
 mod validation_engine;
 mod writer;
 
+pub(crate) use block_category::{BlockCategory, in_category};
 pub use dictionary::{
     CategoryDefinition, Dictionary, DictionaryError, DictionaryMetadata, ItemDefinition, ItemRange,
     TypeDefinition,
@@ -52,8 +55,6 @@ pub use document::{
     CifValueRef, CifValues, OriginalLexeme, QuoteStyle, StandardUncertainty, TextValue,
     TextValueRef,
 };
-#[cfg(feature = "reduce3")]
-pub(crate) use document::{ColumnValues, LoopColumn, StringColumn};
 pub use error::{ParseError, ParseErrorCode, SourceSpan, WriteError, WriteErrorCode};
 pub use input::{InputError, InputErrorCode, InputLimits, decode_source, read_source_file};
 #[cfg(feature = "python")]
@@ -69,6 +70,7 @@ pub use schema::{SchemaError, SchemaName};
 pub use schema_artifact::encode_dictionary;
 pub use source::SourceBuffer;
 pub use table::{CifCell, CifCellRef, CifColumn, CifTable, ColumnType, MissingKind, RowProvenance};
+pub(crate) use text_column::{TextCell, TextColumnBuilder};
 pub use validation::{Diagnostic, Severity, ValidationReport, validate_document};
 pub use writer::{format_text, write_canonical, write_preserving};
 

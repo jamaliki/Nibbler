@@ -18,8 +18,9 @@ use crate::modelcif::{
     validate_document as validate_modelcif,
 };
 use crate::pdbx::{
-    ComponentRegistry, PdbxModel, build_component_registry as load_component_registry,
-    build_model_with_registry, canonical_document, validate_document as validate_pdbx,
+    ComponentRegistry, PdbxModel, assembly_document,
+    build_component_registry as load_component_registry, build_model_with_registry,
+    canonical_document, validate_document as validate_pdbx,
 };
 
 pub(crate) type PredicateSpec = (String, String, Vec<String>);
@@ -327,6 +328,23 @@ fn _model_document(
     Ok(PyCifDocument {
         document: Arc::new(document),
         schema: Some(model.profile().to_owned()),
+    })
+}
+
+/// Write out every copy of one biological assembly of a model's coordinates.
+#[pyfunction]
+#[pyo3(signature = (model, assembly_id=None))]
+fn build_assembly_document(
+    py: Python<'_>,
+    model: &PyMmcifModel,
+    assembly_id: Option<String>,
+) -> PyResult<PyCifDocument> {
+    let document = py
+        .detach(|| assembly_document(model.model.coordinates(), assembly_id.as_deref()))
+        .map_err(model_error_to_python)?;
+    Ok(PyCifDocument {
+        document: Arc::new(document),
+        schema: Some("pdbx".to_owned()),
     })
 }
 
@@ -823,6 +841,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(validate_document, module)?)?;
     module.add_function(wrap_pyfunction!(build_mmcif_model, module)?)?;
     module.add_function(wrap_pyfunction!(_model_document, module)?)?;
+    module.add_function(wrap_pyfunction!(build_assembly_document, module)?)?;
     module.add_function(wrap_pyfunction!(build_component_registry, module)?)?;
     module.add_function(wrap_pyfunction!(validate_mmcif_document, module)?)?;
     module.add_function(wrap_pyfunction!(validate_mmcif_model, module)?)?;

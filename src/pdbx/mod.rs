@@ -1,5 +1,6 @@
 //! Immutable PDBx coordinate-model semantics over the shared generic CIF document.
 
+mod assembly;
 mod component_source;
 mod error;
 pub(crate) mod fields;
@@ -11,6 +12,7 @@ mod validation_atom;
 mod validation_entity;
 pub(crate) mod writer;
 
+pub use assembly::{MAX_ASSEMBLY_ATOM_SITES, assembly_document};
 pub use error::SemanticError;
 pub use model::PdbxModel;
 pub use registry::ComponentRegistry;

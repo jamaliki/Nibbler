@@ -93,3 +93,34 @@ flowchart TB
 The writer preserves all source categories, adds non-embedded resolved component
 definitions when required, orders known profile categories, and delegates value quoting
 and byte serialization to the generic CIF layer.
+
+## Biological assemblies
+
+`assembly_document` writes one `_pdbx_struct_assembly` out as explicit copies. Operator
+expressions expand to combinations (leftmost group outermost, rightmost operator applied
+first); each distinct combination is one copy. Copies of an atom that land within 0.2 Å
+of each other (an atom on a symmetry axis) are written once; each atom's copies are hashed
+into cells of that size, so the check grows with the atoms written. Rows of the per-copy
+categories are streamed into text columns, so a large assembly does not allocate a value
+object per cell.
+
+```mermaid
+flowchart TB
+    MODEL["PdbxModel<br/>source document"]:::input --> GEN["_pdbx_struct_assembly_gen<br/>rows of the selected assembly"]:::data
+    OPER["_pdbx_struct_oper_list<br/>rotation + translation"]:::data --> COMBO
+    GEN --> COMBO["Expand oper_expression<br/>(1,2) (1-60)(61) ..."]:::proof
+    COMBO --> COPIES["Copies: distinct combinations<br/>composed transform + asym ids"]:::data
+    COPIES --> NAMES{"Renamed chains<br/>X-n unique?"}:::decision
+    NAMES -- no --> COLLIDE["PDBX_ASSEMBLY_ID_COLLISION"]:::error
+    NAMES -- yes --> MERGE["Copies of an atom within 0.2 Å<br/>written once; absorbed chain copies<br/>left out, connections redirected"]:::proof
+    MERGE --> ROWS["Per copy: struct_asym, schemes,<br/>atom_site (transformed), anisotrop (rotated),<br/>same-copy struct_conn"]:::hot
+    ROWS --> DOC["New one-block CifDocument<br/>no cell, symmetry, or assembly categories"]:::output
+
+    classDef input fill:#eef2ff,stroke:#4f46e5,color:#1e1b4b;
+    classDef hot fill:#fff1f2,stroke:#e11d48,color:#881337,stroke-width:2px;
+    classDef proof fill:#ecfdf5,stroke:#059669,color:#064e3b;
+    classDef data fill:#ecfeff,stroke:#0891b2,color:#164e63;
+    classDef decision fill:#f8fafc,stroke:#64748b,color:#0f172a;
+    classDef output fill:#f5f3ff,stroke:#7c3aed,color:#4c1d95,stroke-width:2px;
+    classDef error fill:#fef2f2,stroke:#b91c1c,color:#7f1d1d;
+```
