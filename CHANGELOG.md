@@ -33,6 +33,11 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
   phenols, enols, carboxylic acids) in that atom's plane and an acid's hydrogen syn to
   its carbonyl oxygen; `nibbler.reduce.run` takes `planar_hydroxyl_preference` and
   `acid_syn_preference` (1.0 each, 0 turns them off; compat mode never applies them).
+- Reduce3's fixed mode no longer leaves a histidine with neither ring hydrogen (an
+  imidazolate), and removes the thiol hydrogen of a cysteine bound to any metal, not
+  just zinc. Against 334 neutron structures, histidine protonation (where the ring is
+  oriented as deposited) matches for 62.6%, up from 56.3%, and all 36 metal-bound
+  cysteines match, up from none.
 - Immutable revision-addressed PDB text fixtures, public contribution and security
   policies, checkout installation with `uv`, and original project artwork.
 
