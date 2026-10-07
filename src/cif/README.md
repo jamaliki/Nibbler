@@ -328,7 +328,7 @@ missing-state, schema, and writer contracts.
 ```mermaid
 flowchart TB
     RAW["MessagePack bytes"]:::input --> DECODE["Deserialize BinaryFile"]:::hot
-    DECODE --> SHAPE["Require 0.3.x + data blocks<br/>non-empty block headers<br/>names with a text CIF spelling<br/>no case-folded repeats per scope<br/>checked counts + <=1000x expansion"]:::proof
+    DECODE --> SHAPE["Require 0.3.x + data blocks<br/>non-empty names with a text CIF spelling<br/>no case-folded repeats per scope<br/>columns for every category with rows<br/>checked counts + <=1000x expansion"]:::proof
     SHAPE --> MODE{"Requested output"}:::decision
 
     MODE -- document --> ALL["Reverse every encoding chain<br/>validate row counts and masks"]:::hot
