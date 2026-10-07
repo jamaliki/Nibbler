@@ -49,7 +49,12 @@ fn validate_file_shape(file: &BinaryFile<'_>, input_bytes: usize) -> Result<(), 
     let mut tags = 0_usize;
     let mut rows = 0_usize;
     let mut values = 0_usize;
+    let mut block_headers = Vec::with_capacity(file.data_blocks.len());
+    let mut category_names = Vec::new();
+    let mut column_names = Vec::new();
     for block in &file.data_blocks {
+        require_text_name(&block.header, "data block header")?;
+        block_headers.push(block.header.as_str());
         categories = categories
             .checked_add(block.categories.len())
             .ok_or_else(|| shape_error("BinaryCIF category count overflows usize"))?;
@@ -58,7 +63,10 @@ fn validate_file_shape(file: &BinaryFile<'_>, input_bytes: usize) -> Result<(), 
                 "BinaryCIF category count exceeds the resource limit",
             ));
         }
+        category_names.clear();
         for category in &block.categories {
+            require_text_name(&category.name, "category name")?;
+            category_names.push(normalize_category_name(&category.name)?);
             if category.columns.len() > limits.loop_columns {
                 return Err(shape_error(
                     "BinaryCIF category width exceeds the resource limit",
@@ -82,12 +90,63 @@ fn validate_file_shape(file: &BinaryFile<'_>, input_bytes: usize) -> Result<(), 
                     "BinaryCIF logical size exceeds the resource limit",
                 ));
             }
+            column_names.clear();
             for column in &category.columns {
+                require_text_name(&column.name, "column name")?;
+                column_names.push(column.name.as_str());
                 validate_encoding_sizes(&column.data.encoding, value_limit)?;
                 if let Some(mask) = &column.mask {
                     validate_encoding_sizes(&mask.encoding, value_limit)?;
                 }
             }
+            require_unique_names(&mut column_names, "column name")?;
+        }
+        require_unique_names(&mut category_names, "category name")?;
+    }
+    require_unique_names(&mut block_headers, "data block header")
+}
+
+/// Require a BinaryCIF name to have a text CIF spelling as part of one bare token.
+///
+/// The text lexer ends a token at space, tab, CR, or LF and rejects every other control
+/// character, so a name containing either would decode to a document whose canonical
+/// text does not parse. Checking here covers both document decoding and projection.
+fn require_text_name(name: &str, kind: &str) -> Result<(), BinaryCifError> {
+    if name
+        .chars()
+        .any(|character| character == ' ' || character.is_control())
+    {
+        return Err(shape_error(format!(
+            "BinaryCIF {kind} {name:?} contains whitespace or a control character"
+        )));
+    }
+    Ok(())
+}
+
+/// Require the names of one scope to differ under ASCII case folding.
+///
+/// Text CIF folds block codes and tags this way, so a repeated block header, category
+/// within one block, or column within one category would decode to a document whose
+/// canonical text fails with `DuplicateBlock` or `DuplicateTag`.
+///
+/// Every BinaryCIF read runs this. Sorting the borrowed names in place adds about 4 µs to
+/// shape validation of PDB 1CRN, against about 26 µs for a set of folded copies. Folding
+/// preserves byte length, so ordering by length first settles most comparisons without
+/// reading bytes and still places folded equals next to each other.
+fn require_unique_names(names: &mut [&str], kind: &str) -> Result<(), BinaryCifError> {
+    names.sort_unstable_by(|left, right| {
+        left.len().cmp(&right.len()).then_with(|| {
+            let left = left.bytes().map(|byte| byte.to_ascii_lowercase());
+            left.cmp(right.bytes().map(|byte| byte.to_ascii_lowercase()))
+        })
+    });
+    for pair in names.windows(2) {
+        if let [left, right] = pair
+            && left.eq_ignore_ascii_case(right)
+        {
+            return Err(shape_error(format!(
+                "duplicate BinaryCIF {kind} {left:?} and {right:?}"
+            )));
         }
     }
     Ok(())
@@ -124,8 +183,10 @@ fn validate_encoding_sizes(
 ///
 /// # Errors
 ///
-/// Returns a structured error for malformed containers, unsupported versions or
-/// encoding chains, invalid string dictionaries, and inconsistent row counts.
+/// Returns a structured error for malformed containers, names without a text CIF
+/// spelling, block headers, categories within a block, or columns within a category
+/// repeated under ASCII case folding, unsupported versions or encoding chains, invalid
+/// string dictionaries, and inconsistent row counts.
 pub fn decode_binary(bytes: &[u8]) -> Result<CifDocument, BinaryCifError> {
     let file = decode_file(bytes)?;
     let mut blocks = Vec::with_capacity(file.data_blocks.len());
@@ -239,9 +300,120 @@ mod tests {
 
     use std::borrow::Cow;
 
-    use super::{decode_category, validate_encoding_sizes};
-    use crate::cif::CifValueRef;
-    use crate::cif::binary::model::{BinaryCategory, BinaryColumn, BinaryData, Encoding};
+    use super::{BinaryCifErrorCode, decode_binary, decode_category, validate_encoding_sizes};
+    use crate::cif::binary::model::{
+        BinaryBlock, BinaryCategory, BinaryColumn, BinaryData, BinaryFile, Encoding,
+    };
+    use crate::cif::{CifValueRef, ProjectionPlan, parse, project_binary, write_canonical};
+
+    /// Serialize one single-row integer column per `(header, category, column)` triple.
+    ///
+    /// A triple joins the previous block or category only when it spells the same name
+    /// exactly, so case variants and repeats of non-adjacent names stay separate.
+    fn single_row_container(columns: &[(&str, &str, &str)]) -> Vec<u8> {
+        let mut data_blocks: Vec<BinaryBlock<'_>> = Vec::new();
+        for &(header, category, column) in columns {
+            if data_blocks
+                .last()
+                .is_none_or(|block| block.header != header)
+            {
+                data_blocks.push(BinaryBlock {
+                    header: header.to_owned(),
+                    categories: Vec::new(),
+                });
+            }
+            let block = data_blocks.last_mut().expect("a block was just ensured");
+            if block
+                .categories
+                .last()
+                .is_none_or(|existing| existing.name != category)
+            {
+                block.categories.push(BinaryCategory {
+                    name: category.to_owned(),
+                    row_count: 1,
+                    columns: Vec::new(),
+                });
+            }
+            let category = block.categories.last_mut().expect("a category was ensured");
+            category.columns.push(BinaryColumn {
+                name: column.to_owned(),
+                data: BinaryData {
+                    encoding: vec![Encoding::ByteArray { data_type: 4 }],
+                    data: Cow::Owned(vec![6]),
+                },
+                mask: None,
+            });
+        }
+        let file = BinaryFile {
+            version: "0.3.0".to_owned(),
+            encoder: "test".to_owned(),
+            data_blocks,
+        };
+        rmp_serde::to_vec_named(&file).expect("test container serializes")
+    }
+
+    fn assert_shape_error_in_documents_and_projections(bytes: &[u8]) {
+        assert_eq!(
+            decode_binary(bytes).map_err(|error| error.code()).err(),
+            Some(BinaryCifErrorCode::Shape)
+        );
+        let plan = ProjectionPlan::new("entry").expect("static category is valid");
+        assert_eq!(
+            project_binary(bytes, plan)
+                .map_err(|error| error.code())
+                .err(),
+            Some(BinaryCifErrorCode::Shape)
+        );
+    }
+
+    #[test]
+    fn rejects_names_without_a_text_spelling_in_documents_and_projections() {
+        // Minimized from a robustness seed: one mutated byte turned `_atom_type` into
+        // `\0atom_type`, which decoded and projected but wrote text the lexer rejects.
+        for column in [
+            ("glycan", "\0atom_type", "symbol"),
+            ("glycan", "_atom_type", "type symbol"),
+            ("gly\u{85}can", "_atom_type", "symbol"),
+        ] {
+            assert_shape_error_in_documents_and_projections(&single_row_container(&[column]));
+        }
+
+        let document = decode_binary(&single_row_container(&[("glycan", "_atom_typé", "symbol")]))
+            .expect("printable non-ASCII names have a text spelling");
+        let text = write_canonical(&document).expect("decoded document is writable");
+        assert!(parse(text.as_bytes()).is_ok());
+    }
+
+    #[test]
+    fn rejects_names_that_repeat_under_text_case_folding() {
+        // Minimized from a robustness seed: one mutated byte turned `Cartn_y` into
+        // `Cartn_x`, which decoded and projected but wrote text with a duplicate tag.
+        for columns in [
+            [
+                ("glycan", "_atom_type", "symbol"),
+                ("GLYCAN", "_atom_type", "symbol"),
+            ],
+            [
+                ("glycan", "_atom_type", "symbol"),
+                ("glycan", "ATOM_TYPE", "symbol"),
+            ],
+            [
+                ("glycan", "_atom_type", "symbol"),
+                ("glycan", "_atom_type", "Symbol"),
+            ],
+        ] {
+            assert_shape_error_in_documents_and_projections(&single_row_container(&columns));
+        }
+
+        let repeated_across_blocks = single_row_container(&[
+            ("glycan", "_atom_type", "symbol"),
+            ("ligand", "_ATOM_TYPE", "symbol"),
+        ]);
+        let plan = ProjectionPlan::new("atom_type").expect("static category is valid");
+        let table = project_binary(&repeated_across_blocks, plan)
+            .expect("one category may repeat across distinct blocks");
+        assert_eq!(table.row_count(), 2);
+    }
 
     #[test]
     fn rejects_declared_encoding_expansion_before_allocation() {

@@ -69,6 +69,11 @@ pub fn encode_binary(document: &CifDocument) -> Result<Vec<u8>, BinaryCifError> 
     })
 }
 
+/// Group one block's entries into BinaryCIF categories.
+///
+/// Category names compare under ASCII case folding, as text CIF tags do, so `_cell.a`
+/// and `_Cell.b` join the first spelling's category. The decoder rejects a block that
+/// repeats a category under that folding.
 fn collect_categories(entries: &[CifEntry]) -> Result<Vec<CategoryValues>, BinaryCifError> {
     let mut categories: Vec<CategoryValues> = Vec::new();
     for entry in entries {
@@ -80,7 +85,10 @@ fn collect_categories(entries: &[CifEntry]) -> Result<Vec<CategoryValues>, Binar
             }
             CifEntry::Item(item) => {
                 let (category, column) = split_tag(item.tag())?;
-                if let Some(existing) = categories.iter_mut().find(|value| value.name == category) {
+                if let Some(existing) = categories
+                    .iter_mut()
+                    .find(|value| value.name.eq_ignore_ascii_case(category))
+                {
                     if !existing.scalar {
                         return Err(unrepresentable(format!(
                             "category {category:?} mixes scalar and loop forms"
@@ -103,7 +111,10 @@ fn collect_categories(entries: &[CifEntry]) -> Result<Vec<CategoryValues>, Binar
                     return Err(unrepresentable("cannot encode a loop without tags"));
                 };
                 let (category, _) = split_tag(first_tag)?;
-                if categories.iter().any(|value| value.name == category) {
+                if categories
+                    .iter()
+                    .any(|value| value.name.eq_ignore_ascii_case(category))
+                {
                     return Err(unrepresentable(format!(
                         "category {category:?} occurs in multiple CIF entries"
                     )));
@@ -114,7 +125,7 @@ fn collect_categories(entries: &[CifEntry]) -> Result<Vec<CategoryValues>, Binar
                 let mut columns = Vec::with_capacity(cif_loop.column_count());
                 for (column_index, tag) in cif_loop.tags().iter().enumerate() {
                     let (candidate, column) = split_tag(tag)?;
-                    if candidate != category {
+                    if !candidate.eq_ignore_ascii_case(category) {
                         return Err(unrepresentable(format!(
                             "one loop mixes categories {category:?} and {candidate:?}"
                         )));
@@ -275,8 +286,32 @@ fn unrepresentable(message: impl Into<String>) -> BinaryCifError {
 
 #[cfg(test)]
 mod tests {
-    use super::{Encoding, encode_column};
-    use crate::cif::{CifValue, StandardUncertainty};
+    #![allow(clippy::expect_used)]
+
+    use super::{Encoding, encode_binary, encode_column};
+    use crate::cif::{
+        BinaryCifErrorCode, CifEntry, CifValue, StandardUncertainty, decode_binary, parse,
+    };
+
+    #[test]
+    fn groups_categories_under_text_case_folding() {
+        let scalars = parse(b"data_cell\n_cell.length_a 1\n_Cell.length_b 2\n")
+            .expect("tags differ under case folding");
+        let decoded = decode_binary(&encode_binary(&scalars).expect("scalars encode"))
+            .expect("encoded scalars decode");
+        let entries = decoded.blocks()[0].entries();
+        assert!(matches!(
+            entries,
+            [CifEntry::Loop(cif_loop)] if cif_loop.tags() == ["_cell.length_a", "_cell.length_b"]
+        ));
+
+        let loops = parse(b"data_cell\nloop_ _cell.length_a 1\nloop_ _Cell.length_b 2\n")
+            .expect("tags differ under case folding");
+        assert_eq!(
+            encode_binary(&loops).map_err(|error| error.code()).err(),
+            Some(BinaryCifErrorCode::Unrepresentable)
+        );
+    }
 
     #[test]
     fn standard_uncertainty_uses_lossless_string_encoding() {

@@ -23,8 +23,11 @@ struct ProjectedColumn {
 ///
 /// # Errors
 ///
-/// Returns a structured BinaryCIF error for malformed encoding chains, missing
-/// selected columns, incompatible repeated categories, or invalid typed values.
+/// Returns a structured BinaryCIF error for malformed containers, names without a text
+/// CIF spelling, block headers, categories within a block, or columns within a category
+/// repeated under ASCII case folding, malformed encoding chains, missing selected
+/// columns, a category repeated across blocks with incompatible columns, or invalid
+/// typed values.
 pub fn project_binary(bytes: &[u8], plan: ProjectionPlan) -> Result<CifTable, BinaryCifError> {
     project_binary_named(bytes, plan, "<binary>")
 }
