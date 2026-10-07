@@ -119,7 +119,7 @@ Reduce3 adds hydrogens and optimizes rotatable and flippable groups on a parsed 
 without writing or re-reading text. It needs the cctbx `chem_data` monomer library:
 
 ```python
-result = nibbler.reduce.run(document, add_flip_movers=True, chem_data="chem_data")
+result = nibbler.reduce.run(document, chem_data="chem_data")  # flips Asn/Gln/His by default
 nibbler.dump(result.document, "with-hydrogens.cif")
 print(result.report)
 ```

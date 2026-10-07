@@ -27,6 +27,8 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
   AlphaFold model, `nibbler.reduce.run` takes 13 ms and `to_canonical` 1.9 ms (from 26 ms
   and 5 ms). Reduce3's vectorized dot scoring takes a single-threaded run from 19.3 ms to
   17.4 ms (same output), and Reduce3 is built without its command-line-only features.
+- `nibbler.reduce.run` and `reduce::Params::default()` consider Asn/Gln/His flips by
+  default (`add_flip_movers=True`; Reduce2's default is False).
 - Immutable revision-addressed PDB text fixtures, public contribution and security
   policies, checkout installation with `uv`, and original project artwork.
 
