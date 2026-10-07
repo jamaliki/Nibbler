@@ -62,7 +62,8 @@ without its leading underscore. Item selectors may be bare names such as `Cartn_
 full tags from the selected category. Explicit output columns retain caller order.
 Omitting `columns` retains the category's source item order. Predicates may refer to an
 item that is not returned. A category absent from the source produces a zero-row table;
-a matching category occurrence missing a requested or predicate item is an error.
+a BinaryCIF category with no rows counts as absent, as it does in the decoded document.
+A matching category occurrence missing a requested or predicate item is an error.
 
 Without a schema, projected columns are text. A schema-guided projection rejects
 unknown items and builds dictionary-declared text, `int64`, or `float64` columns.
