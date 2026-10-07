@@ -456,12 +456,18 @@ mod tests {
     }
 
     #[test]
-    fn rejects_names_that_do_not_form_a_text_tag_in_documents_and_projections() {
-        for column in [
-            ("", "_entry", "id"),
-            ("glycan", "_entry", ""),
-            ("glycan", "_entry", "a.b"),
-        ] {
+    fn rejects_empty_block_headers_in_documents_and_projections() {
+        // Text CIF rejects a bare `data_` with an empty block code.
+        assert_shape_error_in_documents_and_projections(&single_row_container(&[(
+            "",
+            "_atom_type",
+            "symbol",
+        )]));
+    }
+
+    #[test]
+    fn rejects_column_names_that_do_not_split_out_of_a_tag_in_documents_and_projections() {
+        for column in [("glycan", "_entry", ""), ("glycan", "_entry", "a.b")] {
             assert_shape_error_in_documents_and_projections(&single_row_container(&[column]));
         }
     }
