@@ -621,9 +621,8 @@ dependencies = [
 [[package]]
 name = "reduce3"
 version = "0.1.0"
-source = "git+https://github.com/jamaliki/reduce3?rev=262834051fd8c05dbab0518cdcaba82d26117dc6#262834051fd8c05dbab0518cdcaba82d26117dc6"
+source = "git+https://github.com/jamaliki/reduce3?rev=c099ac874bba2edeb3e9da2ec85cbdd5fa92d3d5#c099ac874bba2edeb3e9da2ec85cbdd5fa92d3d5"
 dependencies = [
- "mimalloc",
  "rayon",
  "rustc-hash",
  "smallvec",
