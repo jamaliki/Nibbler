@@ -19,7 +19,11 @@ struct ProjectedColumn {
 /// Decode one BinaryCIF category directly into the shared columnar table model.
 ///
 /// Only output and predicate columns are decoded. Category and column selectors use
-/// the same [`ProjectionPlan`] contract as text CIF projection.
+/// the same [`ProjectionPlan`] contract as text CIF projection. A matching category with
+/// `rowCount: 0` is skipped, as [`decode_binary`] leaves it out of the document, so it
+/// sets no column layout and cannot conflict with an occurrence in another block.
+///
+/// [`decode_binary`]: crate::cif::decode_binary
 ///
 /// # Errors
 ///

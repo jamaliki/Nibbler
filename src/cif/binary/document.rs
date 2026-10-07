@@ -9,8 +9,13 @@ use super::model::{BinaryCategory, BinaryFile, Encoding};
 
 const MAX_BINARY_EXPANSION_RATIO: usize = 1_000;
 
+/// Deserialize and shape-check a container, then keep only categories with rows.
+///
+/// Text CIF has no loop without values, so a `rowCount: 0` category has no place in the
+/// shared logical model. Its names still pass shape validation first; dropping it here
+/// keeps document decoding and projection from disagreeing about its columns.
 pub(super) fn decode_file(bytes: &[u8]) -> Result<BinaryFile<'_>, BinaryCifError> {
-    let file: BinaryFile<'_> = rmp_serde::from_slice(bytes).map_err(|error| {
+    let mut file: BinaryFile<'_> = rmp_serde::from_slice(bytes).map_err(|error| {
         BinaryCifError::new(
             BinaryCifErrorCode::Container,
             format!("invalid BinaryCIF MessagePack container: {error}"),
@@ -32,6 +37,9 @@ pub(super) fn decode_file(bytes: &[u8]) -> Result<BinaryFile<'_>, BinaryCifError
         ));
     }
     validate_file_shape(&file, bytes.len())?;
+    for block in &mut file.data_blocks {
+        block.categories.retain(|category| category.row_count != 0);
+    }
     Ok(file)
 }
 
@@ -97,8 +105,8 @@ fn validate_file_shape(file: &BinaryFile<'_>, input_bytes: usize) -> Result<(), 
                 ));
             }
             column_names.clear();
-            // Zero-row categories are checked too: the document decoder drops them, but
-            // projection takes its column layout from the first matching category.
+            // Zero-row categories are checked like any other before `decode_file` drops
+            // them, so whether a name is accepted never depends on its row count.
             for column in &category.columns {
                 require_column_name(category_name, &column.name)?;
                 column_names.push(column.name.as_str());
@@ -217,34 +225,33 @@ fn validate_encoding_sizes(
 
 /// Decode a BinaryCIF 0.3 MessagePack document into the shared logical model.
 ///
+/// A category with `rowCount: 0` is shape-checked like any other but has no text CIF
+/// spelling, so it is left out of its block, as it is from [`project_binary`].
+///
+/// [`project_binary`]: crate::cif::project_binary
+///
 /// # Errors
 ///
 /// Returns a structured error for malformed containers, names without a text CIF
 /// spelling (including empty names and column names containing `.`), block headers,
 /// categories within a block, or columns within a category repeated under ASCII case
 /// folding, categories with rows but no columns, unsupported versions or encoding
-/// chains, invalid string dictionaries, and inconsistent row counts. Categories with no
-/// rows are checked like any other and then omitted from the document.
+/// chains, invalid string dictionaries, and inconsistent row counts.
 pub fn decode_binary(bytes: &[u8]) -> Result<CifDocument, BinaryCifError> {
     let file = decode_file(bytes)?;
     let mut blocks = Vec::with_capacity(file.data_blocks.len());
     for block in file.data_blocks {
         let mut entries = Vec::with_capacity(block.categories.len());
         for category in block.categories {
-            if let Some(cif_loop) = decode_category(category)? {
-                entries.push(CifEntry::Loop(cif_loop));
-            }
+            entries.push(CifEntry::Loop(decode_category(category)?));
         }
         blocks.push(CifBlock::data(block.header, entries));
     }
     Ok(CifDocument::new(blocks))
 }
 
-fn decode_category(category: BinaryCategory<'_>) -> Result<Option<CifLoop>, BinaryCifError> {
+fn decode_category(category: BinaryCategory<'_>) -> Result<CifLoop, BinaryCifError> {
     let category_name = normalize_category_name(&category.name)?;
-    if category.row_count == 0 {
-        return Ok(None);
-    }
     let mut tags = Vec::with_capacity(category.columns.len());
     let mut columns = Vec::with_capacity(category.columns.len());
     for column in category.columns {
@@ -282,11 +289,7 @@ fn decode_category(category: BinaryCategory<'_>) -> Result<Option<CifLoop>, Bina
         }
         columns.push(LoopColumn { values, mask });
     }
-    Ok(Some(CifLoop::from_columns(
-        tags,
-        columns,
-        category.row_count,
-    )))
+    Ok(CifLoop::from_columns(tags, columns, category.row_count))
 }
 
 pub(super) fn decode_mask(data: super::model::BinaryData) -> Result<Vec<u8>, BinaryCifError> {
@@ -328,7 +331,9 @@ mod tests {
     use crate::cif::binary::model::{
         BinaryBlock, BinaryCategory, BinaryColumn, BinaryData, BinaryFile, Encoding,
     };
-    use crate::cif::{CifValueRef, ProjectionPlan, parse, project_binary, write_canonical};
+    use crate::cif::{
+        CifColumn, CifValueRef, ProjectionPlan, parse, project, project_binary, write_canonical,
+    };
 
     /// Serialize one single-row integer column per `(header, category, column)` triple.
     ///
@@ -485,23 +490,54 @@ mod tests {
 
     #[test]
     fn checks_column_names_of_zero_row_categories() {
-        // A zero-row category decodes to no loop, but projection still takes its column
-        // layout from it, so its names must form text tags like any other category's.
-        let zero_rows = |column| {
-            single_block_container(vec![BinaryCategory {
+        // `decode_file` drops a zero-row category only after shape validation, so its
+        // names must form text tags like any other category's.
+        assert_shape_error_in_documents_and_projections(&single_block_container(vec![
+            BinaryCategory {
                 name: "_entry".to_owned(),
                 row_count: 0,
-                columns: vec![uint8_column(column, Vec::new())],
-            }])
-        };
-        assert_shape_error_in_documents_and_projections(&zero_rows("a.b"));
+                columns: vec![uint8_column("a.b", Vec::new())],
+            },
+        ]));
+    }
 
-        let accepted = zero_rows("id");
-        let document = decode_binary(&accepted).expect("a zero-row category is accepted");
-        assert!(document.blocks()[0].entries().is_empty());
-        let plan = ProjectionPlan::new("entry").expect("static category is valid");
-        let table = project_binary(&accepted, plan).expect("a zero-row category projects");
-        assert_eq!(table.row_count(), 0);
+    #[test]
+    fn zero_row_categories_are_absent_from_documents_and_projections() {
+        // Third-party encoders may write `rowCount: 0` with typed columns. Text CIF has no
+        // loop without values, so such a category must not shape a projection, alone or
+        // beside an occurrence with rows and other columns in a later block.
+        let entry_block = |header: &str, row_count: usize, column: &str| BinaryBlock {
+            header: header.to_owned(),
+            categories: vec![BinaryCategory {
+                name: "_entry".to_owned(),
+                row_count,
+                columns: vec![uint8_column(column, vec![6; row_count])],
+            }],
+        };
+        for (data_blocks, expected_names, expected_row_count) in [
+            (vec![entry_block("glycan", 0, "id")], vec![], 0),
+            (
+                vec![
+                    entry_block("glycan", 0, "id"),
+                    entry_block("ligand", 1, "title"),
+                ],
+                vec!["title"],
+                1,
+            ),
+        ] {
+            let bytes = serialize(data_blocks);
+            let document = decode_binary(&bytes).expect("a zero-row category is valid");
+            assert!(document.blocks()[0].entries().is_empty());
+            let text = write_canonical(&document).expect("decoded document is writable");
+            let plan = ProjectionPlan::new("entry").expect("static category is valid");
+            let from_text = project(text.as_bytes(), plan.clone()).expect("text projects");
+            let from_binary = project_binary(&bytes, plan).expect("BinaryCIF projects");
+            for table in [from_text, from_binary] {
+                let names: Vec<_> = table.columns().iter().map(CifColumn::name).collect();
+                assert_eq!(names, expected_names);
+                assert_eq!(table.row_count(), expected_row_count);
+            }
+        }
     }
 
     #[test]
@@ -534,9 +570,7 @@ mod tests {
             }],
         };
 
-        let cif_loop = decode_category(category)
-            .expect("masked non-finite placeholder is valid")
-            .expect("non-empty category produces a loop");
+        let cif_loop = decode_category(category).expect("masked non-finite placeholder is valid");
         assert_eq!(cif_loop.value(0, 0), Some(CifValueRef::NotApplicable));
         assert_eq!(
             cif_loop.value(1, 0),
