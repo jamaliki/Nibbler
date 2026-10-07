@@ -29,6 +29,10 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
   17.4 ms (same output), and Reduce3 is built without its command-line-only features.
 - `nibbler.reduce.run` and `reduce::Params::default()` consider Asn/Gln/His flips by
   default (`add_flip_movers=True`; Reduce2's default is False).
+- Reduce3's fixed mode keeps a hydroxyl hydrogen on a planar atom (tyrosine and other
+  phenols, enols, carboxylic acids) in that atom's plane and an acid's hydrogen syn to
+  its carbonyl oxygen; `nibbler.reduce.run` takes `planar_hydroxyl_preference` and
+  `acid_syn_preference` (1.0 each, 0 turns them off; compat mode never applies them).
 - Immutable revision-addressed PDB text fixtures, public contribution and security
   policies, checkout installation with `uv`, and original project artwork.
 

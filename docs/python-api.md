@@ -272,8 +272,9 @@ The keyword options are Reduce2's parameters with Reduce2's defaults, except tha
 `add_flip_movers` is True (Reduce2: False), so Asn, Gln and His flips are considered
 unless it is set to False: `approach` (`"add"`, `"remove"`, or `"optimize"`),
 `add_flip_movers`, `n_terminal_charge`, `keep_existing_h`, `exclude_water`,
-`use_neutron_distances`, `preference_magnitude`,
-`non_flip_preference`, `skip_bond_fix_up`, `set_flip_states`, `model_id`, `alt_id`,
+`use_neutron_distances`, `preference_magnitude`, `non_flip_preference`,
+`planar_hydroxyl_preference`, `acid_syn_preference`, `skip_bond_fix_up`,
+`set_flip_states`, `model_id`, `alt_id`,
 `bonded_neighbor_depth`, `stop_on_any_missing_hydrogen`, `ignore_missing_restraints`,
 `verbosity`, and `probe`, a mapping of Probe scoring parameters such as
 `{"probe_radius": 0.25}`. `compat=True` reproduces Reduce2 exactly, including its known
@@ -281,7 +282,10 @@ defects; the default corrects them and goes on where Reduce2 gives up. Residues 
 neither monomer library describes get restraints built from their chemical component
 definition, including the entries Reduce2's RDKit step rejects, with GeoStd-style atom
 types (so their donors and acceptors take part in scoring) and physiological protonation
-of their acids; atoms of unknown element
+of their acids; a hydroxyl hydrogen on a planar atom (a phenol such as tyrosine, an enol,
+a carboxylic acid) prefers that atom's plane by `planar_hydroxyl_preference` and an
+acid's hydrogen prefers syn to its carbonyl oxygen by `acid_syn_preference` (both 1.0
+Probe score units by default, 0 turns them off; Reduce2 has neither); atoms of unknown element
 (`UNX`) are kept unchanged; and a residue with no definition anywhere keeps its input
 hydrogens and is reported in the report instead of stopping the run
 (`stop_on_any_missing_hydrogen=True` stops it).

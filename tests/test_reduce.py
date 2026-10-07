@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from nibbler.reduce import Reduction
 
 CRAMBIN = Path(__file__).parent / "reduce3" / "crambin_1-5.cif"
 CRAMBIN_ENTRY = Path(__file__).parent / "reduce3" / "1crn.cif"
+MBO = Path(__file__).parent / "reduce3" / "mbo.cif"
 
 pytestmark = pytest.mark.skipif(
     not nibbler.reduce.available(), reason="built without the reduce3 feature"
@@ -56,6 +58,48 @@ def test_flips_are_considered_by_default() -> None:
     assert "MoverAmideFlip" in default.report
     assert "MoverAmideFlip" not in no_flips.report
     assert default.document.to_canonical() == flips.document.to_canonical()
+
+
+def _acid_dihedral(document: CifDocument) -> float:
+    """O=C-O-H of the mercuribenzoic acid fixture, in degrees from syn."""
+    pyarrow = pytest.importorskip("pyarrow")
+    table = nibbler.cif.read(document.to_canonical().encode(), category="atom_site")
+    rows = pyarrow.RecordBatchReader.from_stream(table).read_all().to_pylist()
+    site = {
+        row["label_atom_id"]: tuple(
+            float(row[k]) for k in ("Cartn_x", "Cartn_y", "Cartn_z")
+        )
+        for row in rows
+    }
+
+    def sub(a: tuple[float, ...], b: tuple[float, ...]) -> tuple[float, ...]:
+        return tuple(x - y for x, y in zip(a, b))
+
+    def cross(a: tuple[float, ...], b: tuple[float, ...]) -> tuple[float, ...]:
+        return (
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0],
+        )
+
+    def dot(a: tuple[float, ...], b: tuple[float, ...]) -> float:
+        return sum(x * y for x, y in zip(a, b))
+
+    p0, p1, p2, p3 = (site[n] for n in ("OZ1", "CZ", "OZ2", "HZ2"))
+    b0, b1, b2 = sub(p1, p0), sub(p2, p1), sub(p3, p2)
+    n0, n1 = cross(b0, b1), cross(b1, b2)
+    m = cross(n0, b1)
+    norm = math.sqrt(dot(b1, b1))
+    return abs(math.degrees(math.atan2(dot(m, n1) / norm, dot(n0, n1))))
+
+
+def test_acid_hydrogens_prefer_syn_unless_turned_off() -> None:
+    _chem_data_or_skip()
+    default = nibbler.reduce.run(MBO)
+    off = nibbler.reduce.run(MBO, planar_hydroxyl_preference=0.0, acid_syn_preference=0.0)
+
+    assert _acid_dihedral(default.document) < 10.0
+    assert _acid_dihedral(off.document) > 90.0
 
 
 def test_paths_documents_and_compat_mode_agree() -> None:
@@ -116,6 +160,7 @@ def test_documents_without_a_model_are_rejected() -> None:
         ({"bonded_neighbor_depth": -1}, ValueError),
         ({"add_flip_movers": 1}, TypeError),
         ({"preference_magnitude": "1"}, TypeError),
+        ({"acid_syn_preference": "1"}, TypeError),
         ({"probe": {"probe_radius": True}}, TypeError),
         ({"probe": {"set_polar_hydrogen_radius": 1}}, TypeError),
         ({"probe": {"radius": 0.3}}, ValueError),
