@@ -234,6 +234,46 @@ validate it, then atomically replace the destination. A failed operation leaves 
 existing destination unchanged. BinaryCIF cannot represent global blocks or save frames,
 and its writer rejects values outside its lossless supported encodings.
 
+## Biological assemblies
+
+`mmcif.assembly` writes out every copy of one biological assembly as explicit
+coordinates, so a consumer of the coordinates sees the contacts between copies:
+
+```python
+document = nibbler.mmcif.assembly(source_document_or_model, assembly_id=None)
+result = nibbler.reduce.run(document)  # hydrogens see the other copies
+```
+
+It accepts a `CifDocument`, an `MmcifModel`, or any source `cif.read` accepts (built
+with `registry=`, as `mmcif.read` does), and returns a new `CifDocument` with one block.
+`assembly_id` selects a `_pdbx_struct_assembly`; the default is the first. Each distinct
+operator combination of the assembly's `_pdbx_struct_assembly_gen` rows is one copy,
+numbered from 1 in order of first appearance. An operator expression is a list (`1,2`,
+`1-4`), a parenthesized list, or a product of lists (`(1-60)(61)`) whose combinations
+apply the rightmost operator first. Copy 1 keeps the chain identifiers; copy *n* appends
+`-n` to the `label_asym_id` and `auth_asym_id` of its chains (`A` becomes `A-2`). A copy of
+an atom within 0.2 Å of an earlier copy of the same atom (an atom on a symmetry axis of
+the assembly) is written once, as gemmi's `transform_to_assembly` does. A chain copy all
+of whose atoms are written that way (an ion on an axis) is left out, and connections to
+it name the earlier copy instead.
+
+The result keeps the entry, entity, and component categories and `_atom_type`
+unchanged, except that `_entity_poly.pdbx_strand_id` lists every copy's chains. It has
+one row per copy in `_struct_asym`, the sequence schemes, `_atom_site` (coordinates
+transformed and written with three decimals, atom ids renumbered, model by model),
+`_atom_site_anisotrop` (tensors rotated; uncertainties of a rotated tensor become `?`),
+and `_struct_conn` (only connections within one crystal copy, symmetry `1_555`). Every
+other category is left out, including the crystal cell and symmetry, so nothing
+downstream applies the crystal symmetry again, and the assembly definitions, which
+described the source. The result builds a PDBx model and validates against the profile.
+
+Failures raise `ChemistryError` with `PDBX_ASSEMBLY_ABSENT` (no assembly is defined),
+`PDBX_ASSEMBLY_UNKNOWN`, `PDBX_ASSEMBLY_EXPRESSION`, `PDBX_ASSEMBLY_OPERATOR` (an
+operator missing from `_pdbx_struct_oper_list`), `PDBX_ASSEMBLY_ASYM`,
+`PDBX_ASSEMBLY_ID_COLLISION` (a renamed chain would take an existing name),
+`PDBX_ASSEMBLY_TOO_LARGE` (over 50 million atom sites), or a `PDBX_ITEM_*` code for a
+missing or untyped operator or coordinate value.
+
 ## Hydrogens with Reduce3
 
 Builds with the `reduce3` Cargo feature, which the Python package enables, can run

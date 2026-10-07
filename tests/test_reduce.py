@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -73,7 +74,7 @@ def _acid_dihedral(document: CifDocument) -> float:
     }
 
     def sub(a: tuple[float, ...], b: tuple[float, ...]) -> tuple[float, ...]:
-        return tuple(x - y for x, y in zip(a, b))
+        return tuple(x - y for x, y in zip(a, b, strict=True))
 
     def cross(a: tuple[float, ...], b: tuple[float, ...]) -> tuple[float, ...]:
         return (
@@ -83,7 +84,7 @@ def _acid_dihedral(document: CifDocument) -> float:
         )
 
     def dot(a: tuple[float, ...], b: tuple[float, ...]) -> float:
-        return sum(x * y for x, y in zip(a, b))
+        return sum(x * y for x, y in zip(a, b, strict=True))
 
     p0, p1, p2, p3 = (site[n] for n in ("OZ1", "CZ", "OZ2", "HZ2"))
     b0, b1, b2 = sub(p1, p0), sub(p2, p1), sub(p3, p2)
@@ -96,7 +97,9 @@ def _acid_dihedral(document: CifDocument) -> float:
 def test_acid_hydrogens_prefer_syn_unless_turned_off() -> None:
     _chem_data_or_skip()
     default = nibbler.reduce.run(MBO)
-    off = nibbler.reduce.run(MBO, planar_hydroxyl_preference=0.0, acid_syn_preference=0.0)
+    off = nibbler.reduce.run(
+        MBO, planar_hydroxyl_preference=0.0, acid_syn_preference=0.0
+    )
 
     assert _acid_dihedral(default.document) < 10.0
     assert _acid_dihedral(off.document) > 90.0
@@ -184,3 +187,53 @@ def test_explicit_chem_data_directory(
     result = nibbler.reduce.run(CRAMBIN, chem_data=Path(chem_data))
 
     assert _atom_count(result.document) == 66
+
+
+def _crambin_with_neighbor(translation: tuple[float, float, float]) -> CifDocument:
+    """1CRN as an assembly of itself and one copy moved by `translation`."""
+    source = CRAMBIN_ENTRY.read_text()
+    text = re.sub(r"^_pdbx_struct_oper_list\..*\n", "", source, flags=re.M)
+    text = text.replace(
+        "_pdbx_struct_assembly_gen.oper_expression   1",
+        "_pdbx_struct_assembly_gen.oper_expression   (1,2)",
+    )
+    items = ["id"] + [
+        f"{kind}[{row}]{'' if kind == 'vector' else f'[{column}]'}"
+        for row in (1, 2, 3)
+        for kind, column in [("matrix", 1), ("matrix", 2), ("matrix", 3), ("vector", 0)]
+    ]
+    x, y, z = translation
+    tags = "".join(f"_pdbx_struct_oper_list.{item}\n" for item in items)
+    operators = "\nloop_\n" + tags
+    operators += "1 1 0 0 0 0 1 0 0 0 0 1 0\n"
+    operators += f"2 1 0 0 {x} 0 1 0 {y} 0 0 1 {z}\n"
+    return nibbler.mmcif.assembly(nibbler.chomp((text + operators).encode()))
+
+
+def _sites(document: CifDocument) -> dict[tuple[str, str, str], tuple[float, ...]]:
+    pyarrow = pytest.importorskip("pyarrow")
+    table = pyarrow.RecordBatchReader.from_stream(
+        nibbler.cif.read(document.to_canonical().encode(), category="atom_site")
+    ).read_all()
+    keys = ("label_asym_id", "label_seq_id", "label_atom_id")
+    coordinates = ("Cartn_x", "Cartn_y", "Cartn_z")
+    columns = [table.column(name).to_pylist() for name in keys + coordinates]
+    return {
+        (asym, seq, atom): (float(x), float(y), float(z))
+        for asym, seq, atom, x, y, z in zip(*columns, strict=True)
+    }
+
+
+def test_hydrogens_see_the_other_copies_of_an_assembly() -> None:
+    _chem_data_or_skip()
+    # the next copy along the crystal's c axis: Ser 6 OG is 2.81 A from its Leu 18 O
+    neighbor = nibbler.reduce.run(_crambin_with_neighbor((-0.303, 0.0, 22.518)))
+    isolated = nibbler.reduce.run(_crambin_with_neighbor((0.0, 100.0, 0.0)))
+    near, far = _sites(neighbor.document), _sites(isolated.document)
+
+    acceptor = near[("A-2", "18", "O")]
+    assert math.dist(near[("A", "6", "HG")], acceptor) < 2.2
+    assert math.dist(far[("A", "6", "HG")], acceptor) > 2.3
+    assert sum(1 for key in near if key[0] == "A-2" and key[2].startswith("H")) == sum(
+        1 for key in near if key[0] == "A" and key[2].startswith("H")
+    )

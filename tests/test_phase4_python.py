@@ -143,3 +143,78 @@ def test_semantic_api_rejects_ambiguous_inputs_and_preserves_source_document() -
         mode="preserve",
     )
     assert stream.getvalue() == document.to_preserving().encode()
+
+
+ASSEMBLIES = """
+loop_
+_pdbx_struct_assembly.id
+_pdbx_struct_assembly.details
+1 author_defined_assembly
+2 'chain A alone'
+
+loop_
+_pdbx_struct_assembly_gen.assembly_id
+_pdbx_struct_assembly_gen.oper_expression
+_pdbx_struct_assembly_gen.asym_id_list
+1 (1,2) A,B,C,D
+2 1 A
+
+loop_
+_pdbx_struct_oper_list.id
+_pdbx_struct_oper_list.matrix[1][1]
+_pdbx_struct_oper_list.matrix[1][2]
+_pdbx_struct_oper_list.matrix[1][3]
+_pdbx_struct_oper_list.vector[1]
+_pdbx_struct_oper_list.matrix[2][1]
+_pdbx_struct_oper_list.matrix[2][2]
+_pdbx_struct_oper_list.matrix[2][3]
+_pdbx_struct_oper_list.vector[2]
+_pdbx_struct_oper_list.matrix[3][1]
+_pdbx_struct_oper_list.matrix[3][2]
+_pdbx_struct_oper_list.matrix[3][3]
+_pdbx_struct_oper_list.vector[3]
+1 1 0 0 0 0 1 0 0 0 0 1 0
+2 -1 0 0 10 0 -1 0 0 0 0 1 0
+"""
+
+
+def _with_assemblies() -> bytes:
+    return CHEMISTRY.read_bytes() + ASSEMBLIES.encode()
+
+
+def test_assembly_writes_every_copy_as_explicit_coordinates() -> None:
+    pyarrow = pytest.importorskip("pyarrow")
+    document = nibbler.mmcif.assembly(nibbler.chomp(_with_assemblies()))
+
+    model = nibbler.mmcif.read(document)
+    assert model.atom_site_count == 12
+    assert model.asym_unit_count == 8
+    nibbler.sniff(document, profile="pdbx").raise_for_errors()
+    atoms = pyarrow.RecordBatchReader.from_stream(
+        nibbler.cif.read(document.to_canonical().encode(), category="atom_site")
+    ).read_all()
+    assert atoms.column("label_asym_id").to_pylist() == [
+        *["A", "A", "B", "B", "C", "D"],
+        *["A-2", "A-2", "B-2", "B-2", "C-2", "D-2"],
+    ]
+    # the second copy is turned about z and shifted 10 A along x
+    assert atoms.column("Cartn_x").to_pylist()[7] == "6.200"
+
+
+def test_assembly_selects_by_id_and_accepts_models() -> None:
+    model = nibbler.mmcif.read(nibbler.chomp(_with_assemblies()))
+
+    document = nibbler.mmcif.assembly(model, "2")
+
+    assert nibbler.mmcif.read(document).atom_site_count == 2
+
+
+def test_assembly_reports_what_it_cannot_build() -> None:
+    with pytest.raises(ChemistryError) as absent:
+        nibbler.mmcif.assembly(CHEMISTRY)
+    assert absent.value.code == "PDBX_ASSEMBLY_ABSENT"
+    with pytest.raises(ChemistryError) as unknown:
+        nibbler.mmcif.assembly(nibbler.chomp(_with_assemblies()), "9")
+    assert unknown.value.code == "PDBX_ASSEMBLY_UNKNOWN"
+    with pytest.raises(TypeError):
+        nibbler.mmcif.assembly(CHEMISTRY, 1)  # type: ignore[arg-type]

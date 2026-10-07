@@ -126,6 +126,9 @@ def build_mmcif_model(
 def _model_document(
     model: MmcifModel, mirror_local_qa_metric: int | None = None
 ) -> CifDocument: ...
+def build_assembly_document(
+    model: MmcifModel, assembly_id: str | None = None
+) -> CifDocument: ...
 def build_component_registry(document: CifDocument) -> Registry: ...
 def validate_mmcif_document(
     document: CifDocument, profile: Literal["pdbx", "modelcif"]

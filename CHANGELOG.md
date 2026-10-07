@@ -38,6 +38,11 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
   just zinc. Against 334 neutron structures, histidine protonation (where the ring is
   oriented as deposited) matches for 62.6%, up from 56.3%, and all 36 metal-bound
   cysteines match, up from none.
+- `nibbler.mmcif.assembly` and `pdbx::assembly_document` write one biological assembly
+  out as explicit coordinates: every copy of the asymmetric units it uses, chains of copy
+  *n* renamed `X-n`, coordinates transformed and anisotropic tensors rotated, atoms on
+  symmetry axes written once, without the crystal cell or symmetry. `nibbler.reduce.run` on the result places hydrogens with the
+  contacts between copies taken into account.
 - Immutable revision-addressed PDB text fixtures, public contribution and security
   policies, checkout installation with `uv`, and original project artwork.
 

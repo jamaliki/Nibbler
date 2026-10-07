@@ -120,3 +120,35 @@ def write(
         validate=generic_validation,
         format=format,
     )
+
+
+def assembly(
+    source: Source | CifDocument | MmcifModel,
+    assembly_id: str | None = None,
+    *,
+    registry: Registry | None = None,
+) -> CifDocument:
+    """Write out every copy of one biological assembly as explicit coordinates.
+
+    ``assembly_id`` selects a ``_pdbx_struct_assembly`` (default: the first). Each
+    distinct operator combination of its ``_pdbx_struct_assembly_gen`` rows is one copy;
+    copy 1 keeps the chain identifiers and copy *n* appends ``-n`` to the
+    ``label_asym_id`` and ``auth_asym_id`` of its chains. An atom on a symmetry axis of
+    the assembly, whose copies coincide, is written once. The result holds the entry,
+    entity, and component categories, and one row per copy in ``_struct_asym``, the
+    sequence schemes, ``_atom_site`` (coordinates transformed, atom ids renumbered),
+    ``_atom_site_anisotrop`` (tensors rotated), and ``_struct_conn`` (connections
+    within one crystal copy). The crystal cell, symmetry, and assembly definitions are
+    left out, so nothing downstream applies the crystal symmetry again.
+    """
+    if assembly_id is not None and not isinstance(assembly_id, str):
+        raise TypeError("assembly_id must be a string")
+    model = (
+        source
+        if isinstance(source, MmcifModel)
+        else read(source, profile=Profile.PDBX, registry=registry)
+    )
+    try:
+        return _core.build_assembly_document(model, assembly_id)
+    except ValueError as error:
+        raise_chemistry_error(error)
