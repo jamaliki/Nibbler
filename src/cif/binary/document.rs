@@ -53,6 +53,9 @@ fn validate_file_shape(file: &BinaryFile<'_>, input_bytes: usize) -> Result<(), 
     let mut category_names = Vec::new();
     let mut column_names = Vec::new();
     for block in &file.data_blocks {
+        if block.header.is_empty() {
+            return Err(shape_error("BinaryCIF data block has an empty header"));
+        }
         require_text_name(&block.header, "data block header")?;
         block_headers.push(block.header.as_str());
         categories = categories
@@ -183,17 +186,14 @@ fn validate_encoding_sizes(
 ///
 /// # Errors
 ///
-/// Returns a structured error for malformed containers, names without a text CIF
-/// spelling, block headers, categories within a block, or columns within a category
-/// repeated under ASCII case folding, unsupported versions or encoding chains, invalid
-/// string dictionaries, and inconsistent row counts.
+/// Returns a structured error for malformed containers, empty data block headers, names
+/// without a text CIF spelling, block headers, categories within a block, or columns
+/// within a category repeated under ASCII case folding, unsupported versions or encoding
+/// chains, invalid string dictionaries, and inconsistent row counts.
 pub fn decode_binary(bytes: &[u8]) -> Result<CifDocument, BinaryCifError> {
     let file = decode_file(bytes)?;
     let mut blocks = Vec::with_capacity(file.data_blocks.len());
     for block in file.data_blocks {
-        if block.header.is_empty() {
-            return Err(shape_error("BinaryCIF data block has an empty header"));
-        }
         let mut entries = Vec::with_capacity(block.categories.len());
         for category in block.categories {
             if let Some(cif_loop) = decode_category(category)? {
@@ -413,6 +413,16 @@ mod tests {
         let table = project_binary(&repeated_across_blocks, plan)
             .expect("one category may repeat across distinct blocks");
         assert_eq!(table.row_count(), 2);
+    }
+
+    #[test]
+    fn rejects_empty_block_headers_in_documents_and_projections() {
+        // Text CIF rejects a bare `data_` with an empty block code.
+        assert_shape_error_in_documents_and_projections(&single_row_container(&[(
+            "",
+            "_atom_type",
+            "symbol",
+        )]));
     }
 
     #[test]
