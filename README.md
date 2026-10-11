@@ -210,7 +210,10 @@ part of the portable release matrix.
 
 ## License
 
-Nibbler is released under the [MIT License](LICENSE). Builds with the `reduce3` Cargo
-feature, which the Python package enables, also contain
+Nibbler's original code uses the [MIT License](LICENSE). The geometry evaluator
+adapts scitbx's cyclic Jacobi algorithm under the
+[CCTBX license](licenses/CCTBX-LICENSE.txt); its
+[copyright notice](licenses/CCTBX-COPYRIGHT.txt) accompanies the package.
+Builds with the `reduce3` Cargo feature, which the Python package enables, also contain
 [Reduce3](https://github.com/jamaliki/reduce3), which is licensed under the Apache
 License 2.0 and includes code derived from cctbx under the cctbx license.

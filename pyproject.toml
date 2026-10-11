@@ -8,7 +8,8 @@ version = "0.1.0"
 description = "Fast, robust CIF parsing and standards-aware mmCIF writing"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "MIT"
+license = "MIT AND BSD-3-Clause-LBNL"
+license-files = ["LICENSE", "licenses/CCTBX-LICENSE.txt", "licenses/CCTBX-COPYRIGHT.txt"]
 authors = [{ name = "Kiarash Jamali" }]
 classifiers = [
   "Development Status :: 3 - Alpha",

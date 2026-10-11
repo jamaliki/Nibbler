@@ -1,5 +1,5 @@
 from collections.abc import Mapping, Sequence
-from typing import Literal, TypeAlias
+from typing import Literal, TypeAlias, TypedDict
 
 PredicateSpec: TypeAlias = tuple[str, str, list[str]]
 ErrorFields: TypeAlias = tuple[
@@ -12,6 +12,34 @@ ErrorFields: TypeAlias = tuple[
     int | None,
 ]
 DiagnosticFields: TypeAlias = tuple[str, str, str, list[str]]
+BondRestraint: TypeAlias = tuple[int, int, float, float, float, bool]
+AngleRestraint: TypeAlias = tuple[int, int, int, float, float]
+ChiralRestraint: TypeAlias = tuple[int, int, int, int, float, float, bool, bool]
+PlaneRestraint: TypeAlias = tuple[Sequence[int], Sequence[float]]
+
+class GeometryCheck(TypedDict):
+    status: Literal["checked"]
+    count: int
+
+class GeometryEvaluation(TypedDict):
+    near_cutoff: bool
+    checks: dict[str, GeometryCheck]
+    failures: list[dict[str, object]]
+
+class RestraintGraph:
+    def __init__(
+        self,
+        atom_ids: Sequence[str],
+        hydrogen_flags: Sequence[bool],
+        bonds: Sequence[BondRestraint],
+        angles: Sequence[AngleRestraint],
+        chiralities: Sequence[ChiralRestraint],
+        planes: Sequence[PlaneRestraint],
+    ) -> None: ...
+    def evaluate(
+        self, coordinates: Sequence[Sequence[float]], sigma_cutoff: float = 5.0
+    ) -> GeometryEvaluation: ...
+
 ValidationFields: TypeAlias = tuple[
     str,
     str,
