@@ -1,0 +1,61 @@
+data_phenix
+loop_
+  _atom_site.group_PDB
+  _atom_site.id
+  _atom_site.label_atom_id
+  _atom_site.label_alt_id
+  _atom_site.label_comp_id
+  _atom_site.auth_asym_id
+  _atom_site.auth_seq_id
+  _atom_site.pdbx_PDB_ins_code
+  _atom_site.Cartn_x
+  _atom_site.Cartn_y
+  _atom_site.Cartn_z
+  _atom_site.occupancy
+  _atom_site.B_iso_or_equiv
+  _atom_site.type_symbol
+  _atom_site.pdbx_formal_charge
+  _atom_site.label_asym_id
+  _atom_site.label_entity_id
+  _atom_site.label_seq_id
+  _atom_site.auth_atom_id
+  _atom_site.pdbx_PDB_model_num
+  ATOM   1  P     .  XRU  A  1  ?  28.81900   1.98600  -1.01300  1.000  10.00000  P  ?  A  ?  .  P     1
+  ATOM   2  OP1   .  XRU  A  1  ?  28.32900   1.25800  -2.25100  1.000  10.00000  O  ?  A  ?  .  OP1   1
+  ATOM   3  OP2   .  XRU  A  1  ?  30.22400   2.53600  -1.17100  1.000  10.00000  O  ?  A  ?  .  OP2   1
+  ATOM   4  O5'   .  XRU  A  1  ?  27.85900   3.27300  -0.84900  1.000  10.00000  O  ?  A  ?  .  O5'   1
+  ATOM   5  C5'   .  XRU  A  1  ?  26.43900   3.06300  -0.63500  1.000  10.00000  C  ?  A  ?  .  C5'   1
+  ATOM   6  C4'   .  XRU  A  1  ?  25.71800   4.38900  -0.67100  1.000  10.00000  C  ?  A  ?  .  C4'   1
+  ATOM   7  O4'   .  XRU  A  1  ?  26.31100   5.30500   0.28100  1.000  10.00000  O  ?  A  ?  .  O4'   1
+  ATOM   8  C3'   .  XRU  A  1  ?  25.77800   5.16600  -1.99100  1.000  10.00000  C  ?  A  ?  .  C3'   1
+  ATOM   9  O3'   .  XRU  A  1  ?  24.83500   4.65400  -2.92500  1.000  10.00000  O  ?  A  ?  .  O3'   1
+  ATOM  10  C2'   .  XRU  A  1  ?  25.45800   6.59600  -1.53300  1.000  10.00000  C  ?  A  ?  .  C2'   1
+  ATOM  11  O2'   .  XRU  A  1  ?  24.07100   6.86700  -1.49800  1.000  10.00000  O  ?  A  ?  .  O2'   1
+  ATOM  12  C1'   .  XRU  A  1  ?  26.01900   6.63300  -0.10600  1.000  10.00000  C  ?  A  ?  .  C1'   1
+  ATOM  13  N1    .  XRU  A  1  ?  27.25800   7.45000   0.00200  1.000  10.00000  N  ?  A  ?  .  N1    1
+  ATOM  14  C2    .  XRU  A  1  ?  27.20500   8.65800   0.69300  1.000  10.00000  C  ?  A  ?  .  C2    1
+  ATOM  15  O2    .  XRU  A  1  ?  26.19200   9.09300   1.23100  1.000  10.00000  O  ?  A  ?  .  O2    1
+  ATOM  16  N3    .  XRU  A  1  ?  28.39300   9.35100   0.74000  1.000  10.00000  N  ?  A  ?  .  N3    1
+  ATOM  17  C4    .  XRU  A  1  ?  29.60300   8.97800   0.18000  1.000  10.00000  C  ?  A  ?  .  C4    1
+  ATOM  18  O4    .  XRU  A  1  ?  30.58300   9.71200   0.31000  1.000  10.00000  O  ?  A  ?  .  O4    1
+  ATOM  19  C5    .  XRU  A  1  ?  29.57800   7.72500  -0.52000  1.000  10.00000  C  ?  A  ?  .  C5    1
+  ATOM  20  C6    .  XRU  A  1  ?  28.43300   7.02300  -0.58500  1.000  10.00000  C  ?  A  ?  .  C6    1
+  ATOM  21  H5'   .  XRU  A  1  ?  26.29300   2.63000   0.24200  1.000  10.00000  H  ?  A  ?  .  H5'   1
+  ATOM  22  H5''  .  XRU  A  1  ?  26.07800   2.47100  -1.34000  1.000  10.00000  H  ?  A  ?  .  H5''  1
+  ATOM  23  H4'   .  XRU  A  1  ?  24.78100   4.23800  -0.42200  1.000  10.00000  H  ?  A  ?  .  H4'   1
+  ATOM  24  H3'   .  XRU  A  1  ?  26.69200   5.13000  -2.37400  1.000  10.00000  H  ?  A  ?  .  H3'   1
+  ATOM  25  H2'   .  XRU  A  1  ?  25.91900   7.24600  -2.10100  1.000  10.00000  H  ?  A  ?  .  H2'   1
+  ATOM  26  HO2'  .  XRU  A  1  ?  23.94800   7.70700  -1.48800  1.000  10.00000  H  ?  A  ?  .  HO2'  1
+  ATOM  27  H1'   .  XRU  A  1  ?  25.33400   6.98600   0.50000  1.000  10.00000  H  ?  A  ?  .  H1'   1
+  ATOM  28  H5    .  XRU  A  1  ?  30.35400   7.40000  -0.92800  1.000  10.00000  H  ?  A  ?  .  H5    1
+  ATOM  29  H3    .  XRU  A  1  ?  28.37200  10.12400   1.18200  1.000  10.00000  H  ?  A  ?  .  H3    1
+  ATOM  30  H6    .  XRU  A  1  ?  28.43100   6.20600  -1.04500  1.000  10.00000  H  ?  A  ?  .  H6    1
+
+loop_
+  _chem_comp.id
+  XRU
+
+loop_
+  _struct_asym.id
+  A
+

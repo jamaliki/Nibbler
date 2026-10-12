@@ -68,9 +68,11 @@ NIBBLER_VALIDATION_CHEM_DATA=/absolute/chem_data \
 
 ## Coverage still requiring reference checks
 
-Automatic metal/glycosidic link selection and ASU transforms remain guarded.
-Modified nucleotide pucker rules, incomplete dictionaries, ambiguous conformer
-links and unsupported dictionary categories also remain incomplete or return
+The later [link extension](native-validation-links.md) covers weighted metal
+and glycosidic controls, a supplied nonstandard RNA component and disulfide
+image operators. General symmetry-linked chemistry, incomplete dictionaries,
+ambiguous conformer links and unsupported dictionary categories remain
+incomplete or return
 an explicit input error. This extension does not establish full native archive
 coverage, change geometry cutoffs, change training inputs or restart the
 cancelled scan.

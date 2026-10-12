@@ -143,7 +143,8 @@ pub(super) fn contacts(
     }
     let bonded = bonded_lists(
         flat.pos.len(),
-        graph.bonds.iter().map(|b| (b.indices[0], b.indices[1])),
+        graph.bonds.iter().map(|b| (b.indices[0], b.indices[1]))
+            .chain(graph.symmetry_bonds.iter().map(|b| (b.indices[0], b.indices[1]))),
     );
     let mut info = extra_atom_info_validation(
         structure,
@@ -258,7 +259,15 @@ pub(super) fn finish(
         result["atoms"] = json!(atoms.details);
         result["graph"] = json!({"hydrogen_flags": graph.hydrogen_flags,
             "bonds": restraints.bonds, "angles": restraints.angles,
-            "chiralities": restraints.chiralities, "planes": restraints.planes});
+            "chiralities": restraints.chiralities, "planes": restraints.planes,
+            "angle_origins": graph.angles.iter().map(|a| a.origin).collect::<Vec<_>>(),
+            "chirality_origins": graph.chiralities.iter().map(|c| c.origin).collect::<Vec<_>>(),
+            "bonds_asu": graph.symmetry_bonds.iter().map(|b| json!({
+                "i_seq": b.indices[0], "j_seq": b.indices[1],
+                "rotation": b.image.r, "translation": b.image.t,
+                "distance_ideal": b.ideal, "weight": b.weight, "slack":0.0,
+                "origin_id": b.origin,
+            })).collect::<Vec<_>>()});
         result["coverage"] = json!(
             graph
                 .coverage

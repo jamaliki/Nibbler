@@ -39,9 +39,11 @@ restraint definitions form private overlays; they do not change the shared
 library. Label normalization swaps sites and B factors on a disposable copy
 and records source atom rows. The source document stays unchanged.
 
-Unknown or CCD-derived components without full restraints, unvalidated
-automatic metal/glycosidic links, modified nucleotide pucker rules and ASU
-symmetry still need the reference path. Save-frame dictionaries, unsupported
+Weighted automatic dictionary, glycosidic, zinc and iron-sulfur links and
+disulfide image operators now have controls described in
+[Native link validation](native-validation-links.md). General symmetry-linked
+chemistry and unknown or CCD-derived components without full restraints still
+need reference checks. Save-frame dictionaries, unsupported
 energy categories and malformed link definitions fail explicitly. Invalid
 formal charges and multiple coordinate blocks return errors; callers must
 select each model or assembly view before validation.
