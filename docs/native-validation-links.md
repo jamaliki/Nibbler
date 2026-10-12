@@ -70,7 +70,7 @@ remove the absolute-deviation check to match the wrapper.
 The cancelled archive scan remains stopped. These local controls do not
 measure archive rejection rates or establish a new archive ETA.
 
-## Build and timing evidence
+## Earlier build and timing evidence
 
 The unpatched Nibbler build pins Reduce3
 `33a8795bea9b43447c852b5984b9cc4ebc18c608`. It passed 145 Python tests with
@@ -92,3 +92,29 @@ Native wall ranges were 5.935–6.868 ms, 0.709–1.016 ms and 0.584–0.981 ms.
 The result file records individual trials and CPU time. RSS comes from the
 shared process; it is not an isolated peak measurement for either backend.
 See [the recorded results](native-validation-link-results.json).
+
+## Completed native path, 12 October 2026
+
+The unpatched release build pins Reduce3
+`9bbb0423fc37c83216ed4e67a06325327bf2bdf7`. It passed 195 Python tests with
+zero skips, 109 Nibbler Rust tests and 60 backend Rust tests. Nibbler library
+Clippy passed. The full test-target Clippy run found inherited `expect` calls
+in the old geometry tests; it does not pass with warnings denied.
+
+Twenty alternating pairs per control used one thread per worker for Rayon,
+OpenMP, OpenBLAS and MKL. No builds or tests ran alongside the measurements.
+The shared laptop's one-minute load ranged from 6.937 to 8.359 on 16 logical
+CPUs. The full 642-atom protein also passed live graph and contact comparisons
+in electron and nuclear modes.
+
+| Control | Atoms | Reference median | Native median | Wall speedup | CPU speedup |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Protein, nuclear | 642 | 1.47374 s | 6.33602 ms | 232.60x | 232.08x |
+| Mixed Cys/His zinc, electron | 61 | 0.75624 s | 0.74075 ms | 1020.91x | 1004.74x |
+| FES, electron | 24 | 0.71516 s | 0.36233 ms | 1973.77x | 1932.77x |
+
+The measurements include input reads, parsing, fresh interpretation, restraints,
+contacts and normal reports in warm workers. They do not predict archive
+throughput. RSS shares a process between backends and does not measure their
+separate peaks. Individual trials, worker thread settings, source pins and
+binary hashes are in [the completed-path results](native-validation-complete-results.json).
