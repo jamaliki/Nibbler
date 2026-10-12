@@ -1,0 +1,63 @@
+data_phenix
+loop_
+  _atom_site.group_PDB
+  _atom_site.id
+  _atom_site.label_atom_id
+  _atom_site.label_alt_id
+  _atom_site.label_comp_id
+  _atom_site.auth_asym_id
+  _atom_site.auth_seq_id
+  _atom_site.pdbx_PDB_ins_code
+  _atom_site.Cartn_x
+  _atom_site.Cartn_y
+  _atom_site.Cartn_z
+  _atom_site.occupancy
+  _atom_site.B_iso_or_equiv
+  _atom_site.type_symbol
+  _atom_site.pdbx_formal_charge
+  _atom_site.label_asym_id
+  _atom_site.label_entity_id
+  _atom_site.label_seq_id
+  _atom_site.auth_atom_id
+  _atom_site.pdbx_PDB_model_num
+  ATOM   1  N    .  CYS  A  1  ?  20.52400  2.76000  3.99700  1.000   5.24000  N   ?  A  ?  1  N    1
+  ATOM   2  CA   .  CYS  A  1  ?  21.96300  2.43600  3.87200  1.000   5.39000  C   ?  A  ?  1  CA   1
+  ATOM   3  C    .  CYS  A  1  ?  22.72000  3.54800  4.57100  1.000   4.45000  C   ?  A  ?  1  C    1
+  ATOM   4  O    .  CYS  A  1  ?  22.40400  4.72900  4.32600  1.000   6.54000  O   ?  A  ?  1  O    1
+  ATOM   5  CB   .  CYS  A  1  ?  22.38100  2.38100  2.38100  1.000   5.99000  C   ?  A  ?  1  CB   1
+  ATOM   6  SG   .  CYS  A  1  ?  21.34500  1.34500  1.34500  1.000   7.01000  S   ?  A  ?  1  SG   1
+  ATOM   7  H    .  CYS  A  1  ?  20.33900  3.57100  3.77800  1.000   5.24000  H   ?  A  ?  1  H    1
+  ATOM   8  HA   .  CYS  A  1  ?  22.17000  1.57000  4.25800  1.000   5.39000  H   ?  A  ?  1  HA   1
+  ATOM   9  HB2  .  CYS  A  1  ?  22.34800  3.28000  2.01900  1.000   5.99000  H   ?  A  ?  1  HB2  1
+  ATOM  10  HB3  .  CYS  A  1  ?  23.28500  2.03400  2.32700  1.000   5.99000  H   ?  A  ?  1  HB3  1
+  ATOM  11  ZN   .  ZN   Z  1  ?   0.00000  0.00000  0.00000  1.000  10.00000  ZN  ?  B  ?  .  ZN   1
+
+loop_
+  _space_group_symop.id
+  _space_group_symop.operation_xyz
+  1  x,y,z
+
+_space_group.crystal_system       triclinic
+_space_group.IT_number            1
+_space_group.name_H-M_alt         'P 1'
+_space_group.name_Hall            ' P 1'
+_symmetry.space_group_name_H-M    'P 1'
+_symmetry.space_group_name_Hall   ' P 1'
+_symmetry.Int_Tables_number       1
+_cell.length_a                    20.000
+_cell.length_b                    40.000
+_cell.length_c                    40.000
+_cell.angle_alpha                 90.000
+_cell.angle_beta                  90.000
+_cell.angle_gamma                 90.000
+_cell.volume                      32000.000
+loop_
+  _chem_comp.id
+  CYS
+  ZN
+
+loop_
+  _struct_asym.id
+  A
+  B
+

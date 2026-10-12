@@ -36,8 +36,9 @@ def validate(
 ):
     """Check existing coordinates with native restraints and Probe contacts.
 
-    ``complete`` requires full chemical coverage. Unsupported checks and scores
-    near a cutoff need reference validation. This API neither adds hydrogens nor
+    ``complete`` requires full chemical coverage. Missing targets and scores near
+    a cutoff remain incomplete; the caller must retain that uncertainty.
+    This API neither adds hydrogens nor
     decides whether training should exclude an entry. ``chem_data`` must remain
     unchanged while the process runs because native dictionaries are cached.
 

@@ -1,0 +1,107 @@
+data_phenix
+loop_
+  _atom_site.group_PDB
+  _atom_site.id
+  _atom_site.label_atom_id
+  _atom_site.label_alt_id
+  _atom_site.label_comp_id
+  _atom_site.auth_asym_id
+  _atom_site.auth_seq_id
+  _atom_site.pdbx_PDB_ins_code
+  _atom_site.Cartn_x
+  _atom_site.Cartn_y
+  _atom_site.Cartn_z
+  _atom_site.occupancy
+  _atom_site.B_iso_or_equiv
+  _atom_site.type_symbol
+  _atom_site.pdbx_formal_charge
+  _atom_site.label_asym_id
+  _atom_site.label_entity_id
+  _atom_site.label_seq_id
+  _atom_site.auth_atom_id
+  _atom_site.pdbx_PDB_model_num
+  HETATM   1  S1   .  SF4  A  1  ?   2.57600   2.26700   2.34900  1.000   1.00000  S   ?  A  ?  .  S1   1
+  HETATM   2  S2   .  SF4  A  1  ?   0.27700   4.94900   1.14900  1.000   1.00000  S   ?  A  ?  .  S2   1
+  HETATM   3  S3   .  SF4  A  1  ?  -0.11600   3.58600   4.68100  1.000   1.00000  S   ?  A  ?  .  S3   1
+  HETATM   4  S4   .  SF4  A  1  ?  -1.03400   1.44600   1.74300  1.000   1.00000  S   ?  A  ?  .  S4   1
+  HETATM   5  FE1  .  SF4  A  1  ?  -1.00800   3.61600   2.54600  1.000   1.00000  FE  ?  A  ?  .  FE1  1
+  HETATM   6  FE2  .  SF4  A  1  ?   0.56600   1.77200   3.40000  1.000   1.00000  FE  ?  A  ?  .  FE2  1
+  HETATM   7  FE3  .  SF4  A  1  ?   0.76400   2.69000   0.97800  1.000   1.00000  FE  ?  A  ?  .  FE3  1
+  HETATM   8  FE4  .  SF4  A  1  ?   1.41600   4.16900   3.03100  1.000   1.00000  FE  ?  A  ?  .  FE4  1
+  ATOM     9  N    .  CYS  B  1  ?  35.98100   4.81600   5.64900  1.000   1.00000  N   ?  B  ?  1  N    1
+  ATOM    10  CA   .  CYS  B  1  ?  37.14200   5.45300   5.12600  1.000   1.00000  C   ?  B  ?  1  CA   1
+  ATOM    11  C    .  CYS  B  1  ?  37.25700   6.56200   6.14800  1.000   1.00000  C   ?  B  ?  1  C    1
+  ATOM    12  O    .  CYS  B  1  ?  36.32700   6.70900   6.94600  1.000   1.00000  O   ?  B  ?  1  O    1
+  ATOM    13  CB   .  CYS  B  1  ?  36.90600   5.99000   3.71600  1.000   1.00000  C   ?  B  ?  1  CB   1
+  ATOM    14  SG   .  CYS  B  1  ?  36.87800   4.57900   2.58500  1.000   1.00000  S   ?  B  ?  1  SG   1
+  ATOM    15  H    .  CYS  B  1  ?  35.43400   5.40900   5.94600  1.000   1.00000  H   ?  B  ?  1  H    1
+  ATOM    16  HA   .  CYS  B  1  ?  37.93300   4.90400   5.01100  1.000   1.00000  H   ?  B  ?  1  HA   1
+  ATOM    17  HB2  .  CYS  B  1  ?  36.05500   6.45300   3.67300  1.000   1.00000  H   ?  B  ?  1  HB2  1
+  ATOM    18  HB3  .  CYS  B  1  ?  37.62400   6.59100   3.46200  1.000   1.00000  H   ?  B  ?  1  HB3  1
+  ATOM    19  HG   .  CYS  B  1  ?  36.85900   3.64300   1.83500  1.000  10.00000  H   ?  B  ?  1  HG   1
+  ATOM    20  N    .  CYS  C  1  ?   1.18200   8.02000   2.44300  1.000   1.00000  N   ?  C  ?  1  N    1
+  ATOM    21  CA   .  CYS  C  1  ?   2.58600   8.03900   2.03100  1.000   1.00000  C   ?  C  ?  1  CA   1
+  ATOM    22  C    .  CYS  C  1  ?   2.75200   8.04000   0.48800  1.000   1.00000  C   ?  C  ?  1  C    1
+  ATOM    23  O    .  CYS  C  1  ?   3.73300   8.54500  -0.00900  1.000   1.00000  O   ?  C  ?  1  O    1
+  ATOM    24  CB   .  CYS  C  1  ?   3.40800   6.82900   2.54300  1.000   1.00000  C   ?  C  ?  1  CB   1
+  ATOM    25  SG   .  CYS  C  1  ?   2.65100   5.85900   3.93600  1.000   1.00000  S   ?  C  ?  1  SG   1
+  ATOM    26  H    .  CYS  C  1  ?   0.98900   7.37200   1.91200  1.000   1.00000  H   ?  C  ?  1  H    1
+  ATOM    27  HA   .  CYS  C  1  ?   2.93800   8.85300   2.42300  1.000   1.00000  H   ?  C  ?  1  HA   1
+  ATOM    28  HB2  .  CYS  C  1  ?   3.53600   6.21500   1.80300  1.000   1.00000  H   ?  C  ?  1  HB2  1
+  ATOM    29  HB3  .  CYS  C  1  ?   4.26600   7.15600   2.85500  1.000   1.00000  H   ?  C  ?  1  HB3  1
+  ATOM    30  HG   .  CYS  C  1  ?   2.16200   5.23300   4.83500  1.000  10.00000  H   ?  C  ?  1  HG   1
+  ATOM    31  N    .  CYS  D  1  ?   3.92100   2.96200  -1.98000  1.000   1.00000  N   ?  D  ?  1  N    1
+  ATOM    32  CA   .  CYS  D  1  ?   3.61700   1.67000  -2.54100  1.000   1.00000  C   ?  D  ?  1  CA   1
+  ATOM    33  C    .  CYS  D  1  ?   3.15200   1.74800  -3.99100  1.000   1.00000  C   ?  D  ?  1  C    1
+  ATOM    34  O    .  CYS  D  1  ?   3.30600   0.77600  -4.73000  1.000   1.00000  O   ?  D  ?  1  O    1
+  ATOM    35  CB   .  CYS  D  1  ?   2.58400   1.02800  -1.61600  1.000   1.00000  C   ?  D  ?  1  CB   1
+  ATOM    36  SG   .  CYS  D  1  ?   1.22400   2.18900  -1.25700  1.000   1.00000  S   ?  D  ?  1  SG   1
+  ATOM    37  H    .  CYS  D  1  ?   3.36600   2.88600  -1.32700  1.000   1.00000  H   ?  D  ?  1  H    1
+  ATOM    38  HA   .  CYS  D  1  ?   4.40600   1.10700  -2.58900  1.000   1.00000  H   ?  D  ?  1  HA   1
+  ATOM    39  HB2  .  CYS  D  1  ?   2.21300   0.24100  -2.04400  1.000   1.00000  H   ?  D  ?  1  HB2  1
+  ATOM    40  HB3  .  CYS  D  1  ?   3.00900   0.78200  -0.77900  1.000   1.00000  H   ?  D  ?  1  HB3  1
+  ATOM    41  HG   .  CYS  D  1  ?   0.32900   2.95300  -1.02100  1.000  10.00000  H   ?  D  ?  1  HG   1
+  ATOM    42  N    .  CYS  E  1  ?   3.07100   1.15600   6.52000  1.000   1.00000  N   ?  E  ?  1  N    1
+  ATOM    43  CA   .  CYS  E  1  ?   1.69500   1.30200   6.90300  1.000   1.00000  C   ?  E  ?  1  CA   1
+  ATOM    44  C    .  CYS  E  1  ?   1.78100   1.44600   8.40400  1.000   1.00000  C   ?  E  ?  1  C    1
+  ATOM    45  O    .  CYS  E  1  ?   2.59900   0.76400   9.01500  1.000   1.00000  O   ?  E  ?  1  O    1
+  ATOM    46  CB   .  CYS  E  1  ?   0.85200   0.07200   6.56200  1.000   1.00000  C   ?  E  ?  1  CB   1
+  ATOM    47  SG   .  CYS  E  1  ?   0.69500  -0.12500   4.75900  1.000   1.00000  S   ?  E  ?  1  SG   1
+  ATOM    48  H    .  CYS  E  1  ?   3.43200   0.39400   6.68900  1.000   1.00000  H   ?  E  ?  1  H    1
+  ATOM    49  HA   .  CYS  E  1  ?   1.25600   2.03700   6.44700  1.000   1.00000  H   ?  E  ?  1  HA   1
+  ATOM    50  HB2  .  CYS  E  1  ?   1.27700  -0.72100   6.92300  1.000   1.00000  H   ?  E  ?  1  HB2  1
+  ATOM    51  HB3  .  CYS  E  1  ?  -0.03600   0.17400   6.94000  1.000   1.00000  H   ?  E  ?  1  HB3  1
+  ATOM    52  HG   .  CYS  E  1  ?   0.59200  -0.25500   3.57100  1.000  10.00000  H   ?  E  ?  1  HG   1
+
+loop_
+  _space_group_symop.id
+  _space_group_symop.operation_xyz
+  1  x,y,z
+
+_space_group.crystal_system       triclinic
+_space_group.IT_number            1
+_space_group.name_H-M_alt         'P 1'
+_space_group.name_Hall            ' P 1'
+_symmetry.space_group_name_H-M    'P 1'
+_symmetry.space_group_name_Hall   ' P 1'
+_symmetry.Int_Tables_number       1
+_cell.length_a                    40.000
+_cell.length_b                    40.000
+_cell.length_c                    40.000
+_cell.angle_alpha                 90.000
+_cell.angle_beta                  90.000
+_cell.angle_gamma                 90.000
+_cell.volume                      64000.000
+loop_
+  _chem_comp.id
+  CYS
+  SF4
+
+loop_
+  _struct_asym.id
+  A
+  B
+  C
+  D
+  E
+

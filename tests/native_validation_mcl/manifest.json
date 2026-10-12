@@ -1,0 +1,456 @@
+{
+  "cases": [
+    {
+      "name": "F3S-electron",
+      "input": "F3S.cif",
+      "input_sha256": "2b755c64bd2b078c31407666e52d38b9f1d59847de6c018ea8f410a9ee4564a7",
+      "reference": "F3S-electron-reference.json.gz",
+      "reference_sha256": "020b9e12f4ffeb0dc3379f6080b7d8f5a7f4a32f8ab152ec1d05190067efefea",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "F3S-nuclear",
+      "input": "F3S.cif",
+      "input_sha256": "2b755c64bd2b078c31407666e52d38b9f1d59847de6c018ea8f410a9ee4564a7",
+      "reference": "F3S-nuclear-reference.json.gz",
+      "reference_sha256": "8bae01b45ed7757154e0f4717d714c3a30fc2c3bfa58d3aa5cbf7c15a963be8a",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "FES-electron",
+      "input": "FES.cif",
+      "input_sha256": "f22b997bf5a81b677b5e4eec3859d487230cfaf53811d4f2d4dd6b52b9844a40",
+      "reference": "FES-electron-reference.json.gz",
+      "reference_sha256": "b9a4f4fbd83bf2151d4d3cae207041a38c1c5e2fb81cc7be1c6075cdb3dd75fb",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "FES-nuclear",
+      "input": "FES.cif",
+      "input_sha256": "f22b997bf5a81b677b5e4eec3859d487230cfaf53811d4f2d4dd6b52b9844a40",
+      "reference": "FES-nuclear-reference.json.gz",
+      "reference_sha256": "8ebe64899ac20fbda0e19ef3109a4f2db180eddcc8076611fc8e010aa3f4c0c8",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "cluster-symmetry-reset-electron",
+      "input": "cluster-symmetry-reset.cif",
+      "input_sha256": "93f4dfc29d37a253a31654c4a48a05664fb9ed53a2763ed93426a2be106869ec",
+      "reference": "cluster-symmetry-reset-electron-reference.json.gz",
+      "reference_sha256": "db38efd694528df9960a79bd48879bc86ce8d3eb6d3b9d670461bf7b387e3c95",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "cluster-symmetry-reset-nuclear",
+      "input": "cluster-symmetry-reset.cif",
+      "input_sha256": "93f4dfc29d37a253a31654c4a48a05664fb9ed53a2763ed93426a2be106869ec",
+      "reference": "cluster-symmetry-reset-nuclear-reference.json.gz",
+      "reference_sha256": "31d675384f92095056131dc7c123ca4abd39873874e1e013fb45257389f8cc0a",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "modified-rna-electron",
+      "input": "modified-rna.cif",
+      "input_sha256": "cf285862998578ac2bdb763957bc7555da187cca6f814cb875706eabbb70665e",
+      "reference": "modified-rna-electron-reference.json.gz",
+      "reference_sha256": "29af9b090e8d8555a26b386805785a5b9f00016349d19412f589c0430226f3e2",
+      "dictionaries": [
+        {
+          "file": "modified-rna-dictionary.cif",
+          "sha256": "b9f9740db879c889a3583b24a7473552898e61fe6af21dfb5271bb3c1da46000"
+        }
+      ],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "modified-rna-nuclear",
+      "input": "modified-rna.cif",
+      "input_sha256": "cf285862998578ac2bdb763957bc7555da187cca6f814cb875706eabbb70665e",
+      "reference": "modified-rna-nuclear-reference.json.gz",
+      "reference_sha256": "48df77924c81b813b5a2565f44b4723c508778c673a434b46882aa929f6cbc23",
+      "dictionaries": [
+        {
+          "file": "modified-rna-dictionary.cif",
+          "sha256": "b9f9740db879c889a3583b24a7473552898e61fe6af21dfb5271bb3c1da46000"
+        }
+      ],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "symmetry-disulfide-electron",
+      "input": "symmetry-disulfide.cif",
+      "input_sha256": "e807bc2ef2c8f4dc31ae7449deed13ef987db308d65b03115a1a7222f7b5ec30",
+      "reference": "symmetry-disulfide-electron-reference.json.gz",
+      "reference_sha256": "2427da04d18f7753ad7093fe266039779944264b53c9907e10bc5a53b83284af",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "symmetry-disulfide-nuclear",
+      "input": "symmetry-disulfide.cif",
+      "input_sha256": "e807bc2ef2c8f4dc31ae7449deed13ef987db308d65b03115a1a7222f7b5ec30",
+      "reference": "symmetry-disulfide-nuclear-reference.json.gz",
+      "reference_sha256": "9619917baea670006bc4014d392199915aaeee1ce07e03f04a85671e49b53fa1",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-altloc-electron",
+      "input": "zinc-altloc.cif",
+      "input_sha256": "4c16fa27c9ec14e4cc0c10d2a22b6b567720184d93fa4e46036e1b5c006ac4ca",
+      "reference": "zinc-altloc-electron-reference.json.gz",
+      "reference_sha256": "7a852e805e783cb40de8f12463cc3ac8fdea52f52364e7decaf353a1145a8199",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-altloc-nuclear",
+      "input": "zinc-altloc.cif",
+      "input_sha256": "4c16fa27c9ec14e4cc0c10d2a22b6b567720184d93fa4e46036e1b5c006ac4ca",
+      "reference": "zinc-altloc-nuclear-reference.json.gz",
+      "reference_sha256": "25b0ed254226207837e75130ec14d2d001a97786ec9508476cdbfc82b1fe9d6a",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-competing-histidine-electron",
+      "input": "zinc-competing-histidine.cif",
+      "input_sha256": "cb35845fd566ccaf87585acd52af03de7233961fa536f1e421ed9d6a84c792c1",
+      "reference": "zinc-competing-histidine-electron-reference.json.gz",
+      "reference_sha256": "04e6bc12071e34ca60b5fca59e45b2f8f778f8fed43c33a660c343a1733d2c5f",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-competing-histidine-nuclear",
+      "input": "zinc-competing-histidine.cif",
+      "input_sha256": "cb35845fd566ccaf87585acd52af03de7233961fa536f1e421ed9d6a84c792c1",
+      "reference": "zinc-competing-histidine-nuclear-reference.json.gz",
+      "reference_sha256": "d97227e60356a3bc55e4c560955108669bdee4f126839a8e56a4d9c68ca5597c",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cutoff-2.999-electron",
+      "input": "zinc-cutoff-2.999.cif",
+      "input_sha256": "8cc969c75bcc9f12c3439c56839af385653fd4a7b988ccdeb75c1428c8727f73",
+      "reference": "zinc-cutoff-2.999-electron-reference.json.gz",
+      "reference_sha256": "58256e79e898bae8fb56933c7b11f413e553fd9352c1289b662a2982c53d9943",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cutoff-2.999-nuclear",
+      "input": "zinc-cutoff-2.999.cif",
+      "input_sha256": "8cc969c75bcc9f12c3439c56839af385653fd4a7b988ccdeb75c1428c8727f73",
+      "reference": "zinc-cutoff-2.999-nuclear-reference.json.gz",
+      "reference_sha256": "ea9b0a5973d5e2eddb525dc6d5fe2a59cf060786f0119a247b650ee5b20cb57c",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cutoff-3.001-electron",
+      "input": "zinc-cutoff-3.001.cif",
+      "input_sha256": "91a03e992ca29b5d09afa8e65daf7579f04b173938342c0866134cf2ceb82748",
+      "reference": "zinc-cutoff-3.001-electron-reference.json.gz",
+      "reference_sha256": "b6792ed14c8beeeeb566f2b6568da4463a942f5aa4bef7b24bdd61c5308acafa",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cutoff-3.001-nuclear",
+      "input": "zinc-cutoff-3.001.cif",
+      "input_sha256": "91a03e992ca29b5d09afa8e65daf7579f04b173938342c0866134cf2ceb82748",
+      "reference": "zinc-cutoff-3.001-nuclear-reference.json.gz",
+      "reference_sha256": "292f4ce30dbec3fa017ac348bc0572623de57e54871c8fbdccabbde4ccf7103e",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cys0-his1-ND1-electron",
+      "input": "zinc-cys0-his1-ND1.cif",
+      "input_sha256": "cb35845fd566ccaf87585acd52af03de7233961fa536f1e421ed9d6a84c792c1",
+      "reference": "zinc-cys0-his1-ND1-electron-reference.json.gz",
+      "reference_sha256": "f7d043f8a4d3f3847e19c4f7d9fc547afa9bda3847972f4f82e6d4ba19f373aa",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cys0-his1-ND1-nuclear",
+      "input": "zinc-cys0-his1-ND1.cif",
+      "input_sha256": "cb35845fd566ccaf87585acd52af03de7233961fa536f1e421ed9d6a84c792c1",
+      "reference": "zinc-cys0-his1-ND1-nuclear-reference.json.gz",
+      "reference_sha256": "789878e8524f3629dc3f1939f1d43fb75066ab8b5b0ae66be0bce746a1f2b9d0",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cys0-his4-NE2-electron",
+      "input": "zinc-cys0-his4-NE2.cif",
+      "input_sha256": "214967610e09250a4231daf76a583200a6b16a6324311ff28c13572c883c6a82",
+      "reference": "zinc-cys0-his4-NE2-electron-reference.json.gz",
+      "reference_sha256": "3751b2265905bc4df17531fc9d098ad1dc2c5880e75f95e264f1431d476fcf1c",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cys0-his4-NE2-nuclear",
+      "input": "zinc-cys0-his4-NE2.cif",
+      "input_sha256": "214967610e09250a4231daf76a583200a6b16a6324311ff28c13572c883c6a82",
+      "reference": "zinc-cys0-his4-NE2-nuclear-reference.json.gz",
+      "reference_sha256": "181b565fac8cbd897293875ada7c1c1e32b6aecbe4e57947cc5980d2b2b2e7c1",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cys1-electron",
+      "input": "zinc-cys1.cif",
+      "input_sha256": "dcd9e0f89d1039862a69a1b27146fa5918d0639f407b5f5a176f23efbf84f781",
+      "reference": "zinc-cys1-electron-reference.json.gz",
+      "reference_sha256": "aa77cd301626a3c0f308726002bcaf8d7616cb1068963ecf19c0e65d6f36e68d",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cys1-his3-NE2-electron",
+      "input": "zinc-cys1-his3-NE2.cif",
+      "input_sha256": "1fab328f7b12b4e0f63b65f0bc21b520202798ef54b7c805e5f21a4d039fce54",
+      "reference": "zinc-cys1-his3-NE2-electron-reference.json.gz",
+      "reference_sha256": "52430516e35ec2c72626138a3ef4408aa342eebfce759673e37c91490d29553e",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cys1-his3-NE2-nuclear",
+      "input": "zinc-cys1-his3-NE2.cif",
+      "input_sha256": "1fab328f7b12b4e0f63b65f0bc21b520202798ef54b7c805e5f21a4d039fce54",
+      "reference": "zinc-cys1-his3-NE2-nuclear-reference.json.gz",
+      "reference_sha256": "e9d72b8bde72bc291b38229007bdca21acf5d5912645b6cf21f96ac9e7e15f5b",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cys1-nuclear",
+      "input": "zinc-cys1.cif",
+      "input_sha256": "dcd9e0f89d1039862a69a1b27146fa5918d0639f407b5f5a176f23efbf84f781",
+      "reference": "zinc-cys1-nuclear-reference.json.gz",
+      "reference_sha256": "a80563d69c3fa1c4342b92509c27ffe92a6d5497f6b7de41d3af00e0a6e98b1e",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cys2-his2-ND1-NE2-electron",
+      "input": "zinc-cys2-his2-ND1-NE2.cif",
+      "input_sha256": "d93a49f8d820dad0a15d4f96806f1e8387ac97692207720cee59289f07f1926c",
+      "reference": "zinc-cys2-his2-ND1-NE2-electron-reference.json.gz",
+      "reference_sha256": "e4d0b984c339122263ad06f952b521067a9e1d059d89fb279b1770cc8b33ba3b",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cys2-his2-ND1-NE2-nuclear",
+      "input": "zinc-cys2-his2-ND1-NE2.cif",
+      "input_sha256": "d93a49f8d820dad0a15d4f96806f1e8387ac97692207720cee59289f07f1926c",
+      "reference": "zinc-cys2-his2-ND1-NE2-nuclear-reference.json.gz",
+      "reference_sha256": "349029e8489c34deeb06234215b6555a3039693a6131cc56df4620c46673cb3b",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cys2-his2-ND1-electron",
+      "input": "zinc-cys2-his2-ND1.cif",
+      "input_sha256": "c579d42038234a5d92ea8137c000037ea66f30e8fb3db6a1c9f66d7c41994985",
+      "reference": "zinc-cys2-his2-ND1-electron-reference.json.gz",
+      "reference_sha256": "e43fadba9777e79b69e1df5d00934dcc481ee149535d8cb03e9d8243c00bf207",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cys2-his2-ND1-nuclear",
+      "input": "zinc-cys2-his2-ND1.cif",
+      "input_sha256": "c579d42038234a5d92ea8137c000037ea66f30e8fb3db6a1c9f66d7c41994985",
+      "reference": "zinc-cys2-his2-ND1-nuclear-reference.json.gz",
+      "reference_sha256": "8ce91e0dc955f5087f6ef7707704dffaf0d1c99889d2bc2b29c9df2040462342",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cys3-his1-ND1-electron",
+      "input": "zinc-cys3-his1-ND1.cif",
+      "input_sha256": "93dec243cf1b3640427097ea8658bf40f0820c8d5ac0174505b81121d157c862",
+      "reference": "zinc-cys3-his1-ND1-electron-reference.json.gz",
+      "reference_sha256": "77d556b0fb57af235b0ed37c80cba561f4ccae0fa0193772920a8eaf03a734c6",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cys3-his1-ND1-nuclear",
+      "input": "zinc-cys3-his1-ND1.cif",
+      "input_sha256": "93dec243cf1b3640427097ea8658bf40f0820c8d5ac0174505b81121d157c862",
+      "reference": "zinc-cys3-his1-ND1-nuclear-reference.json.gz",
+      "reference_sha256": "ab4ac5c4cf1f027580ba52f80bc2dcaed6fa35f0e10667c030c5dbaee5836c1b",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cys4-electron",
+      "input": "zinc-cys4.cif",
+      "input_sha256": "7cabf7c92a14bdde2727aae94274cbae55381fbc56db60116fb26a77aedd14b1",
+      "reference": "zinc-cys4-electron-reference.json.gz",
+      "reference_sha256": "5e3aa21741103aba983dc2fd3ce944c1f4016716ca8c4de7d45e7ad782f2e809",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-cys4-nuclear",
+      "input": "zinc-cys4.cif",
+      "input_sha256": "7cabf7c92a14bdde2727aae94274cbae55381fbc56db60116fb26a77aedd14b1",
+      "reference": "zinc-cys4-nuclear-reference.json.gz",
+      "reference_sha256": "98c0bb623df4eca6029f08456b4fa5d80f6e592e8ffb1740bf89af0e21b3ee9d",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-declared-image-electron",
+      "input": "zinc-declared-image.cif",
+      "input_sha256": "618716f78d589bcf072cb778de41462f0485877ece0d52c9c7927c678165f4af",
+      "reference": "zinc-declared-image-electron-reference.json.gz",
+      "reference_sha256": "ca322398f76cdbda74a07383a380abf3b9300723070bfe0597eaef7e705fc4a7",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-declared-image-nuclear",
+      "input": "zinc-declared-image.cif",
+      "input_sha256": "618716f78d589bcf072cb778de41462f0485877ece0d52c9c7927c678165f4af",
+      "reference": "zinc-declared-image-nuclear-reference.json.gz",
+      "reference_sha256": "a942a1f959e49b0b631290dc75c3c88313ccda7d2bc5c2686355becad6af0782",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-oblique-symmetry-electron",
+      "input": "zinc-oblique-symmetry.cif",
+      "input_sha256": "3049e7f367bb46bfc94215f5c18d6e6b1f455d01595c1f5777903bd5250421fd",
+      "reference": "zinc-oblique-symmetry-electron-reference.json.gz",
+      "reference_sha256": "f59322ba6e9d42bb8bae1bb45399d9c54500401942b8a8fe6f214a56a431a860",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-oblique-symmetry-nuclear",
+      "input": "zinc-oblique-symmetry.cif",
+      "input_sha256": "3049e7f367bb46bfc94215f5c18d6e6b1f455d01595c1f5777903bd5250421fd",
+      "reference": "zinc-oblique-symmetry-nuclear-reference.json.gz",
+      "reference_sha256": "c6becaa7869f6ea1060af957eafd5640206d7b9ddc8d90d041cef897fc7f7d35",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-symmetry-electron",
+      "input": "zinc-symmetry.cif",
+      "input_sha256": "3b88c63fde91224f90c68a118abd33097cc7b6dbed52d9d0d410f3095003d1cf",
+      "reference": "zinc-symmetry-electron-reference.json.gz",
+      "reference_sha256": "7076dfc5fcc7f3793c0ca689614a91d575142f82eb2b3fecbad3bf10d945b1cf",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "zinc-symmetry-nuclear",
+      "input": "zinc-symmetry.cif",
+      "input_sha256": "3b88c63fde91224f90c68a118abd33097cc7b6dbed52d9d0d410f3095003d1cf",
+      "reference": "zinc-symmetry-nuclear-reference.json.gz",
+      "reference_sha256": "ddb49fd2e713653f15479559ce78923ded260aced71ad2a317ea35246e1a7284",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    }
+  ],
+  "reference": "CCTBX 2026.9 and Probe2",
+  "count": 40
+}

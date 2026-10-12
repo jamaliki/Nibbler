@@ -1,7 +1,7 @@
 //! Native chemical interpretation, restraint checks and Probe contacts.
 //!
-//! Reports retain unsupported coverage. Callers must run the reference backend
-//! for those checks; findings from a partial graph do not establish completion.
+//! Reports retain missing chemical coverage. A partial graph cannot establish
+//! completion; callers must supply defined targets or record an incomplete check.
 
 mod atoms;
 mod connections;
