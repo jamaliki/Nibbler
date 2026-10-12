@@ -1,0 +1,43 @@
+{
+  "schema": "nibbler.native-validation.results.v1",
+  "implementation_commit": "8541c03527bb4760b18d026500619fa7755c8a09",
+  "reduce3_commit": "4ebfea46adb4707f10441f2dd9f5c3d3cd260aff",
+  "reference_commits": ["cf43873b64b0943bb018c589f048a2ad21bcc57f", "89a792800b55b379115b7c08dee1ec7aa8c2f675"],
+  "final_wheel_sha256": "71a84ea5295b45c705c05dcaa47430d74c58f3437a3736b0194bcf3ee23a380a",
+  "tests": {"python_passed": 87, "python_skipped": 0, "rust_passed": 107},
+  "checks": ["bonds", "angles", "chiralities", "planarities", "hydrogens", "clashes"],
+  "validation": "Independent graphs, targets, weights, Probe atom typing, clash pairs and sigma5 findings agree on the declared controls and two whole proteins. This does not prove whole-PDB coverage.",
+  "chemistry_assets": {
+    "mon_lib_commit": "1c97ea23a7df06373ed01cd7c3156a1f8e9b27e3",
+    "geostd_commit": "f4d21cc5f4dbf84f55cc972fb6b287354300ab2d",
+    "reference_manifest": "tests/native_validation_reference_manifest.json",
+    "preparation_only_MBO_sha256": "9fab45f7746c8278219b1ac37365e50f08061585ed5e1b02763aaa571a1d89f2",
+    "preparation_only_MBO_source": "https://raw.githubusercontent.com/phenix-project/geostd/f4d21cc5f4dbf84f55cc972fb6b287354300ab2d/m/data_MBO.cif"
+  },
+  "timing": {
+    "trials_per_backend_per_fixture": 20,
+    "order": "Alternating reference/native and native/reference",
+    "scope": "Warm file reads, parsing, interpretation, restraint checks, Probe contacts and normal reporting",
+    "excluded": ["Hydrogen preparation", "Assembly expansion", "Archive staging", "Detailed graph capture"],
+    "logical_cpus": 16,
+    "one_minute_load_range": [29.54, 40.43],
+    "fixtures": [
+      {"name": "1CRN", "atoms": 642, "nuclear": true, "use_cdl": true,
+       "reference_median_seconds": 1.4422089169966057, "native_median_seconds": 0.006074936944060028,
+       "wall_speedup": 237.40310891733182, "cpu_speedup": 173.328902255645,
+       "records": "benchmarks/native-validation-results/1crn-nuclear-committed.json"},
+      {"name": "protein-2160", "atoms": 2160, "nuclear": false, "use_cdl": true,
+       "reference_median_seconds": 2.9861370206344873, "native_median_seconds": 0.018737041507847607,
+       "wall_speedup": 159.3707853709887, "cpu_speedup": 138.75469891894167,
+       "records": "benchmarks/native-validation-results/protein-2160-electron-committed.json"}
+    ]
+  },
+  "limits": [
+    "Unsupported chemistry and cutoff ambiguities need reference validation",
+    "The 2160-atom fixture uses explicitly recorded CCTBX-processed sites; original coordinates remain preserved separately",
+    "Shared-process RSS cannot measure isolated backend peak memory",
+    "Whole-archive throughput and fallback frequency remain unmeasured",
+    "All-target Clippy has eight pre-existing expect_used lints in tests/geometry.rs; library Clippy passed",
+    "No scan, training change or screening-policy change occurred"
+  ]
+}

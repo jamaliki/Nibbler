@@ -74,8 +74,8 @@ Twenty warm paired trials per fixture, with alternating backend order, gave:
 
 | Fixture | CCTBX/Probe2 median | Native median | Wall ratio | CPU ratio |
 | --- | ---: | ---: | ---: | ---: |
-| 1CRN, 642 atoms, nuclear H | 1.483 s | 6.084 ms | 243.8x | 180.6x |
-| Protein, 2160 atoms, electron H | 2.902 s | 18.596 ms | 156.0x | 136.6x |
+| 1CRN, 642 atoms, nuclear H | 1.442 s | 6.075 ms | 237.4x | 173.3x |
+| Protein, 2160 atoms, electron H | 2.986 s | 18.737 ms | 159.4x | 138.8x |
 
 The reference retains the archive scanner's unchanged-atom guard. Its normal
 path builds separate geometry and Probe models; native validation shares its
@@ -83,16 +83,19 @@ chemical graph. Both backends read files and emit normal reports. The larger
 fixture uses the declared CCTBX-processed sites, with the original input and
 every coordinate difference retained in the reference manifest.
 
-Native wall times ranged from 5.923 to 7.133 ms for 1CRN and 17.876 to
-63.259 ms for the larger fixture. Process CPU times ranged from 7.134 to
-10.091 ms and 20.271 to 27.147 ms. Laptop one-minute load ranged from
-13.05 to 16.92. No agent build or test ran during these measurements; other
-laptop work continued. The paired results retain every trial. These fixtures
+Native wall times ranged from 5.758 to 6.295 ms for 1CRN and 18.014 to
+19.737 ms for the larger fixture. Process CPU times ranged from 7.024 to
+8.888 ms and 20.000 to 23.030 ms. Laptop one-minute load ranged from
+29.54 to 40.43 on 16 logical CPUs. No agent build or test ran during these
+measurements; other laptop work continued. An earlier 20-pair run measured
+243.8x and 156.0x wall speedups, with CPU speedups of 180.6x and 136.6x.
+The paired results retain every trial. These fixtures
 do not establish archive throughput, large-assembly performance or the rate
 of reference fallbacks. Shared-process RSS snapshots cannot compare isolated
 backend peak memory.
 
-The independent suite passed 31 tests without skips, including full native
+The final wheel passed all 87 Python tests without skips. The independent
+suite accounts for 31 tests, including full native
 graph, Probe typing, clash pair and sigma5 scalar comparisons. The two protein
 fixtures agree on all four and 134 geometry outliers, respectively. Native API
 and numerical tests passed 36 tests, including concurrent calls and 750
@@ -107,3 +110,9 @@ missing MBO restraint file from GeoStd `f4d21cc5`. Its SHA256 is
 The benchmark tree stayed unchanged; hydrogen preparation code also stayed
 unchanged. The implementation pins Reduce3
 `4ebfea46adb4707f10441f2dd9f5c3d3cd260aff`.
+
+The committed-build summary and hashes are in
+[native-validation-results.json](native-validation-results.json). The full
+timing records are in `benchmarks/native-validation-results/`; both runs
+remain available. Reference tests check atom-level parity separately from
+timing, so an incomplete fast result cannot establish a speedup.
