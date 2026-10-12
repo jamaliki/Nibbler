@@ -93,6 +93,13 @@ def benchmark(args):
         reference_script_sha256=hashlib.sha256(
             args.reference_script.read_bytes()).hexdigest(),
         machine=platform.machine(), cpu_count=os.cpu_count(),
+        worker_threads={
+            name: os.environ.get(name)
+            for name in (
+                "RAYON_NUM_THREADS", "OMP_NUM_THREADS",
+                "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+            )
+        },
         scope="Warm workers include input reads, parsing, interpretation, geometry, "
               "contacts and normal reporting. Reference checks retain the scan's "
               "unchanged-atom guard. Detailed graph capture is outside timed regions. "

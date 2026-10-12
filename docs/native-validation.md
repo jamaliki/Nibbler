@@ -1,118 +1,99 @@
 # Native model validation
 
-`nibbler.geometry.validate` reads a parsed CIF document, builds chemical
-restraints and evaluates geometry and Probe contacts in Rust. It releases the
-GIL and caches immutable monomer libraries across calls and threads.
+`nibbler.geometry.validate` builds chemical restraints and evaluates bonds,
+angles, chirality, planes, supplied hydrogen parents and all-atom Probe contacts
+in Rust. It releases the GIL and caches immutable monomer libraries. It does not
+import CCTBX or launch Probe2.
 
 ```python
 from nibbler.geometry import validate
 
 report = validate(document, chem_data="/absolute/chem_data", nuclear=False)
-print(report["checks"])
-print(report["failures"])
+print(report["checks"], report["failures"])
 ```
 
-The checks cover bonds, angles, chirality, planes, supplied hydrogen parents
-and all-atom clashes. Protein targets include peptide link modifications,
-disulfide links and the conformation-dependent backbone library. Probe uses
-chemical atom types, surface dots, covalent exclusions, alternate locations,
-occupancy, hydrogen bonds, ionic contacts and temporary water hydrogens.
+`complete` means full coverage of these checks, not absence of defects. Findings
+include atom IDs, flat indices and zero-based source rows. IDs encode model,
+chain, residue number, insertion code, component, alternate location and atom
+name. Set `include_graph=True` for weighted targets, chemical sources, initial
+Probe typing and contact details.
 
-`complete` means that the checks have full native coverage. It does not mean
-that the model has no defects. Every finding includes atom IDs, flat indices
-and zero-based source atom rows; hydrogen findings also include parent IDs.
-The atom IDs encode model, chain, residue number, insertion code, component,
-alternate location and atom name as a JSON array string.
+Validation does not add real hydrogens or repair deposited coordinates.
+Hydrogen preparation remains `nibbler.reduce.run`. Symmetric label normalization
+swaps sites and B factors on a disposable copy and records those swaps.
 
-Set `include_graph=True` to inspect the independently built weighted graph,
-chemical dictionary sources, initial Probe typing, directed contacts and
-temporary contact atoms. The normal path does not build this full atom dump.
-Validation neither adds real hydrogens nor repairs source coordinates.
-Hydrogen preparation remains the separate `nibbler.reduce.run` operation.
+## Chemistry and limits
 
-## Reference coverage
+The native path includes protein CDL and peptide modifications, RNA/DNA pucker
+targets, private component/link/modification dictionaries, glycosidic links,
+zinc coordination, iron-sulfur clusters and declared crystal-image connections.
+Metal validation has a separate candidate search from hydrogen preparation.
+Inline definitions do not change the shared library.
 
-Unknown components, unvalidated automatic links, ASU symmetry, nucleotide
-pucker rules, cross-residue chirality and enol peptide targets remain explicit
-fallback cases. Inputs needing CCTBX's symmetric atom-name swaps also require
-the reference path. Custom restraint targets or atom-energy definitions in an
-input document cannot disappear from coverage. Invalid formal charges and
-multiple coordinate blocks return errors; callers must select each model or
-assembly view before validation.
+Missing typed restraints or annotated link targets remain incomplete.
+Save-frame dictionaries, unsupported energy categories, malformed links,
+invalid formal charges and multiple coordinate blocks fail explicitly.
+Callers must select each training model or assembly view. Scores near a cutoff
+also prevent a full-coverage claim. This API does not assign training exclusions.
 
-An incomplete check or a score near a cutoff must use reference validation.
-Do not treat its diagnostic findings as evidence that all checks ran. This
-API does not select training entries, change screening criteria or assign a
-whole-entry rejection policy.
+The default report follows mmtbx origin-0 selection for bonds, angles and
+chirality. The numeric graph retains metal and other link restraints; the
+explicit graph evaluator can check all supplied restraints. A scanner must
+choose that reporting scope.
 
-The reference harness compares native-built graphs against CCTBX 2026.9
-targets and weights, then checks atom typing and Probe2 pairs independently.
-Separate numerical tests cover the restraint evaluator and charged Probe
-physics. These checks do not establish parity across the entire PDB archive.
+Native planes use maximum absolute standardized deviation. The mmtbx wrapper
+uses maximum signed deviation. The recorded 1DWL ASP B66 control gives 15.6355
+versus 8.78267 sigma; the direct CCTBX primitive agrees with native scoring.
+Native can therefore report additional plane findings. The annotated
+MET-SD/HEC-FE connection in 1DWL lacks a weighted target in the captured reference
+graph too. Neither case establishes whole-entry report equivalence.
 
-CCTBX can round prepared hydrogen sites and swap symmetric atom labels during
-model processing. Native validation keeps the supplied coordinates. Reference
-fixtures that use processed sites include a manifest of every changed site
-and the original source hash; the raw-input comparison remains separate.
+## Independent test data
 
-## Performance checks
+The extension suite retains all 84 CCTBX 2026.9/Probe2 controls in a separate
+[versioned data asset](https://github.com/jamaliki/Nibbler/releases/tag/native-validation-data-20261012-v1).
+Inputs with identical bytes share one stored file. The bundle preserves the
+original input, dictionary and reference hashes; no expected value comes from
+the implementation under test. Raw timing records and capture generators
+remain in its `evidence/` directory, outside the Git source tree.
 
-`benchmarks/native_validation_timing.py` measures the full input read, parse,
-interpretation, restraint, contact and reporting path in warm workers. It
-alternates backend order and records every trial, process CPU time, laptop
-load and RSS. Run it after the same fixture passes independent parity and
-after builds and tests finish. Fresh-process capture timing is separate and
-includes imports and extra diagnostic output.
+Fetch explicitly before running the suite. Tests never download data.
 
-The Rust dependency uses an immutable Reduce3 revision. Its Apache and CCTBX
-license notices ship with the wheel. No native speed measurement authorizes a
-new scan or changes the training filter.
+```sh
+python -m tools.fetch_validation_data
+NIBBLER_VALIDATION_CHEM_DATA=/absolute/chem_data \
+    python -m pytest -q tests/test_native_validation_extensions.py
+```
 
-## Local results, 12 October 2026
+The fetch command pins the archive size and SHA256, verifies fixture hashes
+and rejects unsafe archive paths. Its default destination is
+`.cache/native-validation-v1`. Use `--archive` for a local bundle,
+`--destination` for another cache and `NIBBLER_VALIDATION_DATA` to point tests
+there. With configured chemistry, missing test data fails rather than silently
+omitting these controls. Without chemistry, the suite reports explicit skips.
 
-Twenty warm paired trials per fixture, with alternating backend order, gave:
+Controls compare atom identities and sites, graph targets and weights,
+chirality flags, image operators, Probe typing, clash pairs and scalar findings.
+They include modified residues, nucleotides, ligands, metals, alternate
+conformers, supplied targets and cutoff cases. They do not establish archive-wide
+coverage. MonomerLibrary and GeoStd pins are `1c97ea23` and `f4d21cc5`.
 
-| Fixture | CCTBX/Probe2 median | Native median | Wall ratio | CPU ratio |
-| --- | ---: | ---: | ---: | ---: |
-| 1CRN, 642 atoms, nuclear H | 1.442 s | 6.075 ms | 237.4x | 173.3x |
-| Protein, 2160 atoms, electron H | 2.986 s | 18.737 ms | 159.4x | 138.8x |
+## Performance evidence
 
-The reference retains the archive scanner's unchanged-atom guard. Its normal
-path builds separate geometry and Probe models; native validation shares its
-chemical graph. Both backends read files and emit normal reports. The larger
-fixture uses the declared CCTBX-processed sites, with the original input and
-every coordinate difference retained in the reference manifest.
+Twenty alternating warm pairs used one thread per worker for Rayon, OpenMP,
+OpenBLAS and MKL. Measurements included reads, parsing, fresh interpretation,
+geometry, contacts and normal reports. No builds or tests ran alongside them;
+the shared laptop's one-minute load ranged from 6.937 to 8.359 on 16 logical CPUs.
 
-Native wall times ranged from 5.758 to 6.295 ms for 1CRN and 18.014 to
-19.737 ms for the larger fixture. Process CPU times ranged from 7.024 to
-8.888 ms and 20.000 to 23.030 ms. Laptop one-minute load ranged from
-29.54 to 40.43 on 16 logical CPUs. No agent build or test ran during these
-measurements; other laptop work continued. An earlier 20-pair run measured
-243.8x and 156.0x wall speedups, with CPU speedups of 180.6x and 136.6x.
-The paired results retain every trial. These fixtures
-do not establish archive throughput, large-assembly performance or the rate
-of reference fallbacks. Shared-process RSS snapshots cannot compare isolated
-backend peak memory.
+| Control | Atoms | Reference median | Native median | Wall ratio | CPU ratio |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Protein, nuclear | 642 | 1.47374 s | 6.33602 ms | 232.60x | 232.08x |
+| Mixed Cys/His zinc, electron | 61 | 0.75624 s | 0.74075 ms | 1020.91x | 1004.74x |
+| FES, electron | 24 | 0.71516 s | 0.36233 ms | 1973.77x | 1932.77x |
 
-The final wheel passed all 87 Python tests without skips. The independent
-suite accounts for 31 tests, including full native
-graph, Probe typing, clash pair and sigma5 scalar comparisons. The two protein
-fixtures agree on all four and 134 geometry outliers, respectively. Native API
-and numerical tests passed 36 tests, including concurrent calls and 750
-seeded CCTBX primitive comparisons. All 107 Rust tests passed with the declared
-chemistry tree, and library Clippy and formatting checks passed. All-target
-Clippy still reports eight pre-existing `expect_used` lints in the earlier
-`tests/geometry.rs` tests.
-
-The 20 preparation tests passed in a separate chemistry tree containing the
-missing MBO restraint file from GeoStd `f4d21cc5`. Its SHA256 is
-`9fab45f7746c8278219b1ac37365e50f08061585ed5e1b02763aaa571a1d89f2`.
-The benchmark tree stayed unchanged; hydrogen preparation code also stayed
-unchanged. The implementation pins Reduce3
-`4ebfea46adb4707f10441f2dd9f5c3d3cd260aff`.
-
-The committed-build summary and hashes are in
-[native-validation-results.json](native-validation-results.json). The full
-timing records are in `benchmarks/native-validation-results/`; both runs
-remain available. Reference tests check atom-level parity separately from
-timing, so an incomplete fast result cannot establish a speedup.
+The full protein passed live comparisons in both hydrogen modes. These results
+do not predict archive throughput or include hydrogen preparation.
+Shared-process RSS does not measure each backend's isolated peak. All trials,
+source pins and binary hashes remain in the external data asset. The runtime
+pins Reduce3 `9bbb0423fc37c83216ed4e67a06325327bf2bdf7`; its Apache and CCTBX
+notices ship with the wheel. The cancelled scan remains stopped.

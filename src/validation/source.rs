@@ -1,6 +1,6 @@
 use reduce3::cifsource::{CifSource, CifTable};
 
-use crate::cif::{CifBlock, CifDocument};
+use crate::cif::{CifBlock, CifDocument, CifEntry};
 use crate::reduce::BlockSource;
 
 pub(super) fn validate_charges(block: &CifBlock) -> Result<(), String> {
@@ -22,26 +22,36 @@ pub(super) fn validate_charges(block: &CifBlock) -> Result<(), String> {
 
 // Reduce3's preparation hierarchy omits these interpretation inputs. Check the
 // original document before validation so they cannot disappear from coverage.
-pub(super) fn unsupported(document: &CifDocument, block: &CifBlock) -> Vec<String> {
+pub(super) fn unsupported(block: &CifBlock) -> Vec<String> {
     let mut reasons = Vec::new();
-    if let Some(table) = BlockSource::new(block).table("struct_conn") {
-        for name in ["ptnr1_symmetry", "ptnr2_symmetry"] {
-            let Some(column) = table.column(name) else {
-                continue;
-            };
-            for row in 0..table.row_count() {
-                let value = table.cell(row, column);
-                if !matches!(value.trim(), "1_555" | ".") {
-                    reasons.push(format!(
-                        "Connection row {row} has unsupported {name}={value}"
-                    ));
-                }
-            }
-        }
+    if block
+        .entries()
+        .iter()
+        .any(|entry| matches!(entry, CifEntry::Frame(_)))
+    {
+        reasons.push("Save-frame restraint inputs need reference interpretation".into());
     }
-    for data_block in document.blocks() {
+    reasons
+}
+
+pub(super) fn has_restraints(document: &CifDocument) -> bool {
+    document.blocks().iter().any(|data_block| {
+        let declared = |tag: &str| {
+            let tag = tag.to_ascii_lowercase();
+            tag.starts_with("_lib_")
+                || tag.starts_with("_chem_link")
+                || tag.starts_with("_chem_mod")
+        };
+        if data_block.entries().iter().any(|entry| match entry {
+            CifEntry::Item(item) => declared(item.tag()),
+            CifEntry::Loop(table) => table.tags().iter().any(|tag| declared(tag)),
+            CifEntry::Frame(_) => false,
+        }) {
+            return true;
+        }
         let source = BlockSource::new(data_block);
-        if [
+        [
+            ("lib_atom", "type"),
             ("chem_comp_bond", "value_dist"),
             ("chem_comp_bond", "value_dist_esd"),
             ("chem_comp_atom", "type_energy"),
@@ -66,27 +76,34 @@ pub(super) fn unsupported(document: &CifDocument, block: &CifBlock) -> Vec<Strin
             source
                 .table(name)
                 .is_some_and(|t| t.column(target).is_some())
-        }) {
-            reasons.push("Input restraint dictionaries need reference interpretation".into());
-            break;
-        }
-    }
-    reasons
+        })
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{unsupported, validate_charges};
+    use super::{has_restraints, unsupported, validate_charges};
     use crate::cif::parse;
 
     #[test]
-    fn connection_symmetry_cannot_disappear_into_the_preparation_model()
+    fn source_check_leaves_connection_images_to_weighted_coverage()
     -> Result<(), Box<dyn std::error::Error>> {
         let input = b"data_test\nloop_\n_struct_conn.ptnr1_symmetry\n_struct_conn.ptnr2_symmetry\n1_555 2_555\n";
         let document = parse(input)?;
-        let reasons = unsupported(&document, &document.blocks()[0]);
-        assert_eq!(reasons.len(), 1);
-        assert!(reasons[0].contains("ptnr2_symmetry=2_555"));
+        let reasons = unsupported(&document.blocks()[0]);
+        assert!(reasons.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn unknown_energy_and_link_categories_cannot_disappear()
+    -> Result<(), Box<dyn std::error::Error>> {
+        for source in [
+            b"data_test\nloop_\n_lib_bond.type\nC\n".as_slice(),
+            b"data_test\nloop_\n_chem_link_plane_atom.dist_esd\n.02\n",
+        ] {
+            assert!(has_restraints(&parse(source)?));
+        }
         Ok(())
     }
 
@@ -103,11 +120,11 @@ mod tests {
     fn ccd_bond_order_metadata_is_not_a_custom_restraint() -> Result<(), Box<dyn std::error::Error>>
     {
         let document = parse(b"data_test\nloop_\n_chem_comp_bond.comp_id\n_chem_comp_bond.atom_id_1\n_chem_comp_bond.atom_id_2\n_chem_comp_bond.value_order\nALA N CA SING\n")?;
-        assert!(unsupported(&document, &document.blocks()[0]).is_empty());
+        assert!(!has_restraints(&document));
         let document = parse(
             b"data_test\nloop_\n_chem_comp_bond.comp_id\n_chem_comp_bond.value_dist\nALA 1.5\n",
         )?;
-        assert_eq!(unsupported(&document, &document.blocks()[0]).len(), 1);
+        assert!(has_restraints(&document));
         Ok(())
     }
 }

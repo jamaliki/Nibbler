@@ -628,7 +628,7 @@ dependencies = [
 [[package]]
 name = "reduce3"
 version = "0.1.0"
-source = "git+https://github.com/jamaliki/reduce3?rev=4ebfea46adb4707f10441f2dd9f5c3d3cd260aff#4ebfea46adb4707f10441f2dd9f5c3d3cd260aff"
+source = "git+https://github.com/jamaliki/reduce3?rev=9bbb0423fc37c83216ed4e67a06325327bf2bdf7#9bbb0423fc37c83216ed4e67a06325327bf2bdf7"
 dependencies = [
  "rayon",
  "rustc-hash",

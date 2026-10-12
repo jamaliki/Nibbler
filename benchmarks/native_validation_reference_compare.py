@@ -9,6 +9,18 @@ from pathlib import Path
 from native_validation_reference_atoms import atom_key
 
 
+def canonical_chirality(keys, values):
+    keys, values = list(keys), list(values)
+    for i in range(1, 4):
+        for j in range(i + 1, 4):
+            if keys[i] > keys[j]:
+                keys[i], keys[j] = keys[j], keys[i]
+                values[0] = -values[0]
+    if len(values) > 2 and values[2]:
+        values[0] = abs(values[0])
+    return tuple(keys), values
+
+
 def load_report(file):
     opener = gzip.open if file.suffix == ".gz" else Path.open
     with opener(file, "rt") as stream:
@@ -36,11 +48,13 @@ def graph_rows(report, reference):
                         "angles": lambda proxy=proxy: [
                             proxy["angle_ideal"],
                             proxy["weight"],
+                            proxy.get("origin_id", 0) == 0,
                         ],
                         "chiralities": lambda proxy=proxy: [
                             proxy["volume_ideal"],
                             proxy["weight"],
                             proxy["both_signs"],
+                            proxy.get("origin_id", 0) == 0,
                         ],
                         "planes": lambda proxy=proxy: list(proxy["weights"]),
                     }[category]
@@ -51,7 +65,17 @@ def graph_rows(report, reference):
                 values = proxy[1] if category == "planes" else proxy[arity:]
                 if category == "chiralities":
                     values = values[:3]
+                if category in ("angles", "chiralities"):
+                    origins = graph.get(
+                        "angle_origins" if category == "angles" else "chirality_origins"
+                    )
+                    values = [
+                        *values,
+                        origins[len(rows)] == 0 if origins is not None else True,
+                    ]
             keys = tuple(atoms[index] for index in indices)
+            if category == "chiralities":
+                keys, values = canonical_chirality(keys, values)
             if category in ("bonds", "angles"):
                 keys = min(keys, tuple(reversed(keys)))
             if category == "planes":
@@ -120,12 +144,18 @@ def compare_graph(reference, native):
             extra=list(candidate.keys() - old.keys()),
             target_weight_mismatches=mismatch,
         )
-    result["unsupported_asu_proxy_count"] = len(reference["graph"].get("bonds_asu", []))
+    old_asu = reference["graph"].get("bonds_asu", [])
+    asu = compare_asu_bonds(reference, native)
+    result["symmetry_bonds"] = asu
+    result["unsupported_asu_proxy_count"] = sum(
+        "rotation" not in row or "translation" not in row for row in old_asu
+    )
     result["graph_parity"] = (
         not missing_atoms
         and not extra_atoms
         and max_coordinate_error <= 1e-10
         and not result["unsupported_asu_proxy_count"]
+        and asu["parity"]
         and all(
             not any(
                 row[field]
@@ -142,13 +172,15 @@ def compare_graph(reference, native):
     )
     result["graph_target_weight_parity"] = result["graph_parity"]
     old_flags = {
-        tuple(atom_key(reference["atoms"][i]) for i in proxy["i_seqs"]): proxy.get(
-            "pseudochiral"
-        )
+        canonical_chirality(
+            tuple(atom_key(reference["atoms"][i]) for i in proxy["i_seqs"]), [0]
+        )[0]: proxy.get("pseudochiral")
         for proxy in reference["graph"].get("chiralities", [])
     }
     new_flags = {
-        tuple(atom_key(native["atoms"][i]) for i in proxy[:4]): proxy[7]
+        canonical_chirality(
+            tuple(atom_key(native["atoms"][i]) for i in proxy[:4]), [0]
+        )[0]: proxy[7]
         for proxy in native["graph"].get("chiralities", [])
     }
     result["missing_reference_pseudochiral_flags"] = sum(
@@ -164,6 +196,51 @@ def compare_graph(reference, native):
         and not result["pseudochiral_flag_mismatches"]
     )
     return result
+
+
+def compare_asu_bonds(reference, native):
+    def rows(report):
+        atoms = [atom_key(atom) for atom in report["atoms"]]
+        result = []
+        for row in report["graph"].get("bonds_asu", []):
+            if "rotation" not in row or "translation" not in row:
+                continue
+            result.append(
+                (
+                    atoms[row["i_seq"]],
+                    atoms[row["j_seq"]],
+                    tuple(value for line in row["rotation"] for value in line),
+                    tuple(row["translation"]),
+                    row["distance_ideal"],
+                    row["weight"],
+                    row.get("slack", 0),
+                    row.get("origin_id", 0) == 0,
+                )
+            )
+        return sorted(result)
+
+    old, new = rows(reference), rows(native)
+    mismatches = []
+    for first, second in zip(old, new, strict=False):
+        if (
+            first[:2] != second[:2]
+            or first[-1] != second[-1]
+            or any(
+                not math.isclose(x, y, abs_tol=1e-10, rel_tol=1e-9)
+                for x, y in zip(
+                    (*first[2], *first[3], *first[4:7]),
+                    (*second[2], *second[3], *second[4:7]),
+                    strict=True,
+                )
+            )
+        ):
+            mismatches.append(dict(reference=first, native=second))
+    return dict(
+        reference_count=len(old),
+        native_count=len(new),
+        mismatches=mismatches,
+        parity=len(old) == len(new) and not mismatches,
+    )
 
 
 def compare_typing(reference, native):
@@ -282,6 +359,12 @@ def compare(reference, native):
     result["mode_match"] = all(
         reference.get(name) == native.get(name) for name in ("nuclear", "use_cdl")
     )
+    result["dictionary_sources_match"] = [
+        row["sha256"] for row in reference.get("restraint_dictionaries", [])
+    ] == [row["sha256"] for row in native.get("restraint_dictionaries", [])]
+    result["requested_links_match"] = [
+        list(row) for row in reference.get("requested_links", [])
+    ] == [list(row) for row in native.get("requested_links", [])]
     result["all_required_parity"] = bool(
         reference.get("complete")
         and native.get("complete")
@@ -290,6 +373,8 @@ def compare(reference, native):
         and result["clash_pair_parity"]
         and result["source_bytes_match"]
         and result["mode_match"]
+        and result["dictionary_sources_match"]
+        and result["requested_links_match"]
         and result["restraint_decisions"]["decision_scalar_parity"]
     )
     result["scope"] = (

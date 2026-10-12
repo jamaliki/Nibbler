@@ -142,6 +142,14 @@ def restraint_graph(model):
         "are captured; no unexposed covariance matrix is assumed.",
     )
     atoms = model.get_hierarchy().atoms()
+    mappings = pairs.bond_proxies.asu_mappings()
+    for row, proxy in zip(result["bonds_asu"], pairs.bond_proxies.asu, strict=True):
+        image = (
+            mappings.get_rt_mx_i(proxy).inverse().multiply(mappings.get_rt_mx_j(proxy))
+        )
+        rotation = list(image.r().as_double())
+        row["rotation"] = [rotation[i : i + 3] for i in range(0, 9, 3)]
+        row["translation"] = list(image.t().as_double())
     for proxy in result["chiralities"]:
         atom = atoms[proxy["i_seqs"][0]]
         proxy["pseudochiral"] = chirality(
@@ -154,7 +162,30 @@ def restraint_graph(model):
     return result
 
 
-def probe_capture(file, nuclear):
+def apply_links(params, hierarchy, links):
+    import copy
+
+    if not links:
+        return
+    atoms = hierarchy.atoms()
+    template = params.pdb_interpretation.apply_cif_link[0]
+    result = []
+    for name, first, second in links:
+        application = copy.deepcopy(template)
+        application.data_link = name
+        for side, row in ((1, first), (2, second)):
+            labels = atoms[row].fetch_labels()
+            residue = atoms[row].parent().parent().resid()
+            selection = (
+                f"chain {labels.chain_id!r} and resid {residue!r} "
+                f"and resname {labels.resname!r}"
+            )
+            setattr(application, f"residue_selection_{side}", selection)
+        result.append(application)
+    params.pdb_interpretation.apply_cif_link = result
+
+
+def probe_capture(file, nuclear, dictionaries=(), links=()):
     from iotbx.cli_parser import CCTBXParser
     from mmtbx.programs import probe2
     from mmtbx.programs.clashscore2 import Program
@@ -164,17 +195,34 @@ def probe_capture(file, nuclear):
     parser = CCTBXParser(program_class=Program, logger=log)
     args = [
         str(file),
+        *(str(value) for value in dictionaries),
         "keep_hydrogens=True",
         "do_flips=False",
         f"nuclear={nuclear}",
         "ignore_missing_restraints=False",
     ]
     parser.parse_args(args)
+    if dictionaries:
+        import iotbx.cif
+
+        parser.data_manager.get_model().set_restraint_objects(
+            [
+                (str(value), iotbx.cif.reader(file_path=str(value)).model())
+                for value in dictionaries
+            ]
+        )
     before = atom_rows(parser.data_manager.get_model().get_hierarchy().atoms())
     params = parser.working_phil.extract()
     initial, runs = [], []
     original_info = probe2.Helpers.getExtraAtomInfo
     original_run = probe2.Program.run
+    original_params = probe2.getPdbInterpretationParams
+
+    def linked_params(*args, **kwargs):
+        value = original_params(*args, **kwargs)
+        apply_links(value, parser.data_manager.get_model().get_hierarchy(), links)
+        return value
+
     fields = dict(
         vdw_radius="vdwRadius",
         is_acceptor="isAcceptor",
@@ -191,6 +239,19 @@ def probe_capture(file, nuclear):
         indices = {atom: index for index, atom in enumerate(atoms)}
         initial.append(
             dict(
+                warnings=result.warnings,
+                polar_hydrogens=[
+                    dict(
+                        index=index,
+                        element_raw=atom.element,
+                        hydrogen=atom.element_is_hydrogen(),
+                        polar=probe2.Helpers.isPolarHydrogen(
+                            atom, kwargs["bondedNeighborLists"]
+                        ),
+                    )
+                    for index, atom in enumerate(atoms)
+                    if atom.element_is_hydrogen()
+                ],
                 atoms=atom_rows(atoms),
                 extra_atom_info=[
                     dict(
@@ -246,6 +307,8 @@ def probe_capture(file, nuclear):
         return value
 
     probe2.Helpers.getExtraAtomInfo, probe2.Program.run = capture_info, capture_run
+    if links:
+        probe2.getPdbInterpretationParams = linked_params
     try:
         value = clashscore2(
             params.probe,
@@ -261,7 +324,15 @@ def probe_capture(file, nuclear):
             original_info,
             original_run,
         )
+        probe2.getPdbInterpretationParams = original_params
+    fallback_warnings = [
+        call["warnings"]
+        for call in initial
+        if "Warning: Could not find atom info" in call.get("warnings", "")
+    ]
     return dict(
+        typed_coverage_complete=not fallback_warnings,
+        atom_info_fallbacks=fallback_warnings,
         clashscore=value.get_clashscore(),
         pairs=[json.loads(row.as_JSON()) for row in value.results],
         input_atoms=before,
@@ -274,7 +345,7 @@ def probe_capture(file, nuclear):
     )
 
 
-def capture(file, chem_data, nuclear=False, use_cdl=True):
+def capture(file, chem_data, nuclear=False, use_cdl=True, dictionaries=(), links=()):
     started, log = time.perf_counter(), io.StringIO()
     result = dict(
         schema="nibbler.native-validation.reference.v1",
@@ -285,10 +356,16 @@ def capture(file, chem_data, nuclear=False, use_cdl=True):
         executable=str(Path(sys.executable).resolve()),
         cctbx_version=importlib.metadata.version("cctbx-base"),
         complete=False,
+        restraint_dictionaries=[
+            dict(sha256=digest(value), file=str(value.resolve()))
+            for value in dictionaries
+        ],
+        requested_links=list(links),
     )
     try:
         with contextlib.redirect_stdout(log):
             result["chemistry_sources"] = chemistry(chem_data)
+            import iotbx.cif
             import iotbx.pdb
             import mmtbx.model
             from mmtbx.validation import restraints
@@ -303,10 +380,16 @@ def capture(file, chem_data, nuclear=False, use_cdl=True):
                 process_biomt=False,
                 stop_for_unknowns=True,
                 log=log,
+                restraint_objects=[
+                    (str(value), iotbx.cif.reader(file_path=str(value)).model())
+                    for value in dictionaries
+                ]
+                or None,
             )
             params = model.get_default_pdb_interpretation_params()
             params.pdb_interpretation.use_neutron_distances = nuclear
             params.pdb_interpretation.restraints_library.cdl = use_cdl
+            apply_links(params, original, links)
             result["interpretation_phil"] = (
                 model.get_default_pdb_interpretation_scope()
                 .format(python_object=params)
@@ -342,8 +425,10 @@ def capture(file, chem_data, nuclear=False, use_cdl=True):
                 )
                 for name in ("bonds", "angles", "chiralities", "planarities")
             }
-            result["probe2"] = probe_capture(file, nuclear)
-            result["complete"] = True
+            result["probe2"] = probe_capture(file, nuclear, dictionaries, links)
+            result["complete"] = result["probe2"]["typed_coverage_complete"]
+            if not result["complete"]:
+                result["error"] = "Probe used fallback atom information"
     except Exception as error:
         result["error"] = f"{type(error).__name__}: {error}"
     result.update(
@@ -359,8 +444,11 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--nuclear", action="store_true")
     parser.add_argument("--no-cdl", action="store_true")
+    parser.add_argument("--dictionary", type=Path, action="append", default=[])
     args = parser.parse_args()
-    report = capture(args.input, args.chem_data, args.nuclear, not args.no_cdl)
+    report = capture(
+        args.input, args.chem_data, args.nuclear, not args.no_cdl, args.dictionary
+    )
     with args.output.open("x") as stream:
         json.dump(report, stream, indent=2, allow_nan=False)
     print(json.dumps({key: report[key] for key in ("complete", "elapsed_seconds")}))
