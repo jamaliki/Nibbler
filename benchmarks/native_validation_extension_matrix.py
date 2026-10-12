@@ -39,6 +39,12 @@ def matrix(args):
                 [fixtures / "enol-THR.cif"],
                 [],
             ),
+            (
+                "enol-override",
+                fixtures / "enol-isolated.cif",
+                [fixtures / "enol-target-override.cif"],
+                [],
+            ),
         ]
     )
     for name, folder in (

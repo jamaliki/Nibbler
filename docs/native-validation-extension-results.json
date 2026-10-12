@@ -7,11 +7,11 @@
   "installed_python_source_matches_commit": true,
   "local_dependency_override": false,
   "tests": {
-    "python_passed": 131,
+    "python_passed": 133,
     "python_skipped": 0,
     "nibbler_rust_passed": 108,
     "reduce3_rust_passed": 55,
-    "new_reference_cases": 30
+    "new_reference_cases": 32
   },
   "reference_manifest": "tests/native_validation_extensions/manifest.json",
   "chemistry_sources": {

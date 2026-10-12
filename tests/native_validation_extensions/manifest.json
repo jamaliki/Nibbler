@@ -403,8 +403,40 @@
       "links": [],
       "nuclear": true,
       "use_cdl": true
+    },
+    {
+      "name": "enol-override-electron",
+      "input": "enol-isolated.cif",
+      "input_sha256": "779ee9a0d297395af8ad60bdfa7c5bc98e2c6efd9e45e0a7570d111b80059477",
+      "reference": "enol-override-electron-reference.json.gz",
+      "reference_sha256": "a4a8e759f591a7647d275be8b4fcbaa09b18e0e0e0d718a257d797a5fd31e8ce",
+      "dictionaries": [
+        {
+          "file": "enol-target-override.cif",
+          "sha256": "83d8648c31f77c738dad679c7b75af54892e25b34361bcebc9f79becc08c627c"
+        }
+      ],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "enol-override-nuclear",
+      "input": "enol-isolated.cif",
+      "input_sha256": "779ee9a0d297395af8ad60bdfa7c5bc98e2c6efd9e45e0a7570d111b80059477",
+      "reference": "enol-override-nuclear-reference.json.gz",
+      "reference_sha256": "d7049161cc291786a8b24b8aad7820bddb99460c31e546f3d59ec129fec17138",
+      "dictionaries": [
+        {
+          "file": "enol-target-override.cif",
+          "sha256": "83d8648c31f77c738dad679c7b75af54892e25b34361bcebc9f79becc08c627c"
+        }
+      ],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
     }
   ],
   "reference": "CCTBX 2026.9 and Probe2",
-  "count": 30
+  "count": 32
 }
