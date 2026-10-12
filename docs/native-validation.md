@@ -32,13 +32,19 @@ Hydrogen preparation remains the separate `nibbler.reduce.run` operation.
 
 ## Reference coverage
 
-Unknown components, unvalidated automatic links, ASU symmetry, nucleotide
-pucker rules, cross-residue chirality and enol peptide targets remain explicit
-fallback cases. Inputs needing CCTBX's symmetric atom-name swaps also require
-the reference path. Custom restraint targets or atom-energy definitions in an
-input document cannot disappear from coverage. Invalid formal charges and
-multiple coordinate blocks return errors; callers must select each model or
-assembly view before validation.
+Standard RNA/DNA pucker targets, symmetric atom-label conventions, supplied
+component dictionaries and declared cross-residue links now have native paths.
+Links can apply residue modifications and signed chirality targets. Inline
+restraint definitions form private overlays; they do not change the shared
+library. Label normalization swaps sites and B factors on a disposable copy
+and records source atom rows. The source document stays unchanged.
+
+Unknown or CCD-derived components without full restraints, unvalidated
+automatic metal/glycosidic links, modified nucleotide pucker rules and ASU
+symmetry still need the reference path. Save-frame dictionaries, unsupported
+energy categories and malformed link definitions fail explicitly. Invalid
+formal charges and multiple coordinate blocks return errors; callers must
+select each model or assembly view before validation.
 
 An incomplete check or a score near a cutoff must use reference validation.
 Do not treat its diagnostic findings as evidence that all checks ran. This
@@ -51,7 +57,8 @@ Separate numerical tests cover the restraint evaluator and charged Probe
 physics. These checks do not establish parity across the entire PDB archive.
 
 CCTBX can round prepared hydrogen sites and swap symmetric atom labels during
-model processing. Native validation keeps the supplied coordinates. Reference
+model processing. Native validation preserves the source and records label
+swaps on its working copy. It does not round hydrogen coordinates. Reference
 fixtures that use processed sites include a manifest of every changed site
 and the original source hash; the raw-input comparison remains separate.
 
@@ -69,6 +76,9 @@ license notices ship with the wheel. No native speed measurement authorizes a
 new scan or changes the training filter.
 
 ## Local results, 12 October 2026
+
+The table below describes the earlier pinned build. New extension tests and
+fresh timings appear in [native-validation-extensions.md](native-validation-extensions.md).
 
 Twenty warm paired trials per fixture, with alternating backend order, gave:
 

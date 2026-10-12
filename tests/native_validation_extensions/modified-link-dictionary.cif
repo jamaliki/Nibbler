@@ -1,0 +1,123 @@
+data_comp_XAA
+loop_
+  _chem_comp.id
+  _chem_comp.group
+  XAA  non-polymer
+
+loop_
+  _chem_comp_atom.comp_id
+  _chem_comp_atom.atom_id
+  _chem_comp_atom.type_symbol
+  _chem_comp_atom.type_energy
+  XAA  C1  C  C
+  XAA  C2  C  C
+  XAA  C3  C  C
+
+loop_
+  _chem_comp_bond.comp_id
+  _chem_comp_bond.atom_id_1
+  _chem_comp_bond.atom_id_2
+  _chem_comp_bond.type
+  _chem_comp_bond.value_dist
+  _chem_comp_bond.value_dist_esd
+  XAA  C1  C2  single  1.5  .02
+  XAA  C1  C3  single  1.5  .02
+
+loop_
+  _chem_comp_angle.comp_id
+  _chem_comp_angle.atom_id_1
+  _chem_comp_angle.atom_id_2
+  _chem_comp_angle.atom_id_3
+  _chem_comp_angle.value_angle
+  _chem_comp_angle.value_angle_esd
+  XAA  C2  C1  C3  90  3
+
+data_comp_XBB
+loop_
+  _chem_comp.id
+  _chem_comp.group
+  XBB  non-polymer
+
+loop_
+  _chem_comp_atom.comp_id
+  _chem_comp_atom.atom_id
+  _chem_comp_atom.type_symbol
+  _chem_comp_atom.type_energy
+  XBB  C4  C  C
+  XBB  H4  H  HCH1
+
+loop_
+  _chem_comp_bond.comp_id
+  _chem_comp_bond.atom_id_1
+  _chem_comp_bond.atom_id_2
+  _chem_comp_bond.type
+  _chem_comp_bond.value_dist
+  _chem_comp_bond.value_dist_esd
+  XBB  C4  H4  single  .97  .02
+
+data_link_list
+loop_
+  _chem_link.id
+  _chem_link.comp_id_1
+  _chem_link.mod_id_1
+  _chem_link.group_comp_1
+  _chem_link.comp_id_2
+  _chem_link.mod_id_2
+  _chem_link.group_comp_2
+  _chem_link.name
+  XLINK  XAA  .  .  XBB  XBB-H  .  XLINK
+
+data_link_XLINK
+loop_
+  _chem_link_bond.link_id
+  _chem_link_bond.atom_1_comp_id
+  _chem_link_bond.atom_id_1
+  _chem_link_bond.atom_2_comp_id
+  _chem_link_bond.atom_id_2
+  _chem_link_bond.value_dist
+  _chem_link_bond.value_dist_esd
+  XLINK  1  C1  2  C4  1.5  .02
+
+loop_
+  _chem_link_angle.link_id
+  _chem_link_angle.atom_1_comp_id
+  _chem_link_angle.atom_id_1
+  _chem_link_angle.atom_2_comp_id
+  _chem_link_angle.atom_id_2
+  _chem_link_angle.atom_3_comp_id
+  _chem_link_angle.atom_id_3
+  _chem_link_angle.value_angle
+  _chem_link_angle.value_angle_esd
+  XLINK  1  C2  1  C1  2  C4  90  3
+  XLINK  1  C3  1  C1  2  C4  90  3
+
+loop_
+  _chem_link_chir.link_id
+  _chem_link_chir.atom_centre_comp_id
+  _chem_link_chir.atom_id_centre
+  _chem_link_chir.atom_1_comp_id
+  _chem_link_chir.atom_id_1
+  _chem_link_chir.atom_2_comp_id
+  _chem_link_chir.atom_id_2
+  _chem_link_chir.atom_3_comp_id
+  _chem_link_chir.atom_id_3
+  _chem_link_chir.volume_sign
+  XLINK  1  C1  1  C2  1  C3  2  C4  positive
+
+data_mod_XBB-H
+loop_
+  _chem_mod_atom.mod_id
+  _chem_mod_atom.function
+  _chem_mod_atom.atom_id
+  _chem_mod_atom.new_type_energy
+  XBB-H  change  H4  HCH3
+
+loop_
+  _chem_mod_bond.mod_id
+  _chem_mod_bond.function
+  _chem_mod_bond.atom_id_1
+  _chem_mod_bond.atom_id_2
+  _chem_mod_bond.new_value_dist
+  _chem_mod_bond.new_value_dist_esd
+  XBB-H  change  C4  H4  .95  .01
+

@@ -1,0 +1,63 @@
+data_phenix
+loop_
+  _atom_site.group_PDB
+  _atom_site.id
+  _atom_site.label_atom_id
+  _atom_site.label_alt_id
+  _atom_site.label_comp_id
+  _atom_site.auth_asym_id
+  _atom_site.auth_seq_id
+  _atom_site.pdbx_PDB_ins_code
+  _atom_site.Cartn_x
+  _atom_site.Cartn_y
+  _atom_site.Cartn_z
+  _atom_site.occupancy
+  _atom_site.B_iso_or_equiv
+  _atom_site.type_symbol
+  _atom_site.pdbx_formal_charge
+  _atom_site.label_asym_id
+  _atom_site.label_entity_id
+  _atom_site.label_seq_id
+  _atom_site.auth_atom_id
+  _atom_site.pdbx_PDB_model_num
+  ATOM   2  P     .  DT  A  1  ?  -8.81300  3.24600   4.15100  1.000  10.00000  P  ?  A  ?  1  P     1
+  ATOM   3  OP1   .  DT  A  1  ?  -9.79000  3.68900   5.22300  1.000  10.00000  O  ?  A  ?  1  OP1   1
+  ATOM   4  OP2   .  DT  A  1  ?  -8.73800  4.21400   2.98600  1.000  10.00000  O  ?  A  ?  1  OP2   1
+  ATOM   5  O5'   .  DT  A  1  ?  -7.35600  3.27700   4.84300  1.000  10.00000  O  ?  A  ?  1  O5'   1
+  ATOM   6  C5'   .  DT  A  1  ?  -7.09800  2.39700   5.96700  1.000  10.00000  C  ?  A  ?  1  C5'   1
+  ATOM   7  C4'   .  DT  A  1  ?  -5.68800  2.61000   6.46200  1.000  10.00000  C  ?  A  ?  1  C4'   1
+  ATOM   8  O4'   .  DT  A  1  ?  -4.75400  2.34500   5.39100  1.000  10.00000  O  ?  A  ?  1  O4'   1
+  ATOM   9  C3'   .  DT  A  1  ?  -5.39100  4.02400   6.97000  1.000  10.00000  C  ?  A  ?  1  C3'   1
+  ATOM  10  O3'   .  DT  A  1  ?  -4.76600  3.98900   8.25100  1.000  10.00000  O  ?  A  ?  1  O3'   1
+  ATOM  11  C2'   .  DT  A  1  ?  -4.43700  4.59900   5.93000  1.000  10.00000  C  ?  A  ?  1  C2'   1
+  ATOM  12  C1'   .  DT  A  1  ?  -3.76000  3.35900   5.36700  1.000  10.00000  C  ?  A  ?  1  C1'   1
+  ATOM  13  N1    .  DT  A  1  ?  -3.27000  3.50200   3.96600  1.000  10.00000  N  ?  A  ?  1  N1    1
+  ATOM  14  C2    .  DT  A  1  ?  -1.90500  3.47400   3.71300  1.000  10.00000  C  ?  A  ?  1  C2    1
+  ATOM  15  O2    .  DT  A  1  ?  -1.05300  3.33200   4.58300  1.000  10.00000  O  ?  A  ?  1  O2    1
+  ATOM  16  N3    .  DT  A  1  ?  -1.55900  3.61800   2.38800  1.000  10.00000  N  ?  A  ?  1  N3    1
+  ATOM  17  C4    .  DT  A  1  ?  -2.41400  3.78600   1.31000  1.000  10.00000  C  ?  A  ?  1  C4    1
+  ATOM  18  O4    .  DT  A  1  ?  -1.94800  3.90300   0.17200  1.000  10.00000  O  ?  A  ?  1  O4    1
+  ATOM  19  C5    .  DT  A  1  ?  -3.82400  3.80900   1.64000  1.000  10.00000  C  ?  A  ?  1  C5    1
+  ATOM  20  C5M   .  DT  A  1  ?  -4.82400  3.98800   0.53500  1.000  10.00000  C  ?  A  ?  1  C5M   1
+  ATOM  21  C6    .  DT  A  1  ?  -4.17800  3.66900   2.93200  1.000  10.00000  C  ?  A  ?  1  C6    1
+  ATOM  22  H5'   .  DT  A  1  ?  -7.21300  1.45500   5.68900  1.000  10.00000  H  ?  A  ?  1  H5'   1
+  ATOM  23  H5''  .  DT  A  1  ?  -7.73800  2.58800   6.69600  1.000  10.00000  H  ?  A  ?  1  H5''  1
+  ATOM  24  H4'   .  DT  A  1  ?  -5.52000  1.96400   7.19000  1.000  10.00000  H  ?  A  ?  1  H4'   1
+  ATOM  25  H3'   .  DT  A  1  ?  -6.22100  4.55900   7.01000  1.000  10.00000  H  ?  A  ?  1  H3'   1
+  ATOM  27  H2'   .  DT  A  1  ?  -3.78200  5.20300   6.34200  1.000  10.00000  H  ?  A  ?  1  H2'   1
+  ATOM  28  H2''  .  DT  A  1  ?  -4.92600  5.08800   5.23300  1.000  10.00000  H  ?  A  ?  1  H2''  1
+  ATOM  29  H1'   .  DT  A  1  ?  -3.01400  3.09200   5.96700  1.000  10.00000  H  ?  A  ?  1  H1'   1
+  ATOM  30  H3    .  DT  A  1  ?  -0.68200  3.60000   2.21500  1.000  10.00000  H  ?  A  ?  1  H3    1
+  ATOM  31  H5M1  .  DT  A  1  ?  -5.70500  3.72400   0.84500  1.000  10.00000  H  ?  A  ?  1  H5M1  1
+  ATOM  32  H5M2  .  DT  A  1  ?  -4.57400  3.43700  -0.22400  1.000  10.00000  H  ?  A  ?  1  H5M2  1
+  ATOM  33  H5M3  .  DT  A  1  ?  -4.84600  4.92000   0.26300  1.000  10.00000  H  ?  A  ?  1  H5M3  1
+  ATOM  34  H6    .  DT  A  1  ?  -5.10300  3.68600   3.15200  1.000  10.00000  H  ?  A  ?  1  H6    1
+
+loop_
+  _chem_comp.id
+  DT
+
+loop_
+  _struct_asym.id
+  A
+

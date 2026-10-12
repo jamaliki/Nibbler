@@ -8,10 +8,10 @@ use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
 use crate::python::PyCifDocument;
-use crate::validation::{Options, load_library, run};
+use crate::validation::{Options, load_with_dictionaries, run};
 
 #[pyfunction]
-#[pyo3(signature = (document, chem_data, nuclear=false, use_cdl=true, sigma_cutoff=5.0, include_graph=false))]
+#[pyo3(signature = (document, chem_data, nuclear=false, use_cdl=true, sigma_cutoff=5.0, include_graph=false, restraint_dictionaries=None, restraint_links=None))]
 fn validate_geometry_document(
     py: Python<'_>,
     document: &PyCifDocument,
@@ -20,10 +20,17 @@ fn validate_geometry_document(
     use_cdl: bool,
     sigma_cutoff: f64,
     include_graph: bool,
+    restraint_dictionaries: Option<Vec<Py<PyCifDocument>>>,
+    restraint_links: Option<Vec<(String, u32, u32)>>,
 ) -> PyResult<String> {
     let source = Arc::clone(document.document());
+    let dictionaries: Vec<_> = restraint_dictionaries
+        .unwrap_or_default()
+        .iter()
+        .map(|document| Arc::clone(document.borrow(py).document()))
+        .collect();
     py.detach(move || {
-        let library = load_library(&chem_data)?;
+        let library = load_with_dictionaries(&chem_data, &dictionaries)?;
         let result = run(
             &source,
             &library,
@@ -32,6 +39,7 @@ fn validate_geometry_document(
                 use_cdl,
                 sigma_cutoff,
                 include_graph,
+                restraint_links: restraint_links.unwrap_or_default(),
             },
         )?;
         serde_json::to_string(&result).map_err(|error| error.to_string())

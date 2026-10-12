@@ -13,6 +13,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--nuclear", action="store_true")
     parser.add_argument("--no-cdl", action="store_true")
+    parser.add_argument("--dictionary", type=Path, action="append", default=[])
     args = parser.parse_args()
     started = time.perf_counter()
     import nibbler._core
@@ -24,6 +25,7 @@ if __name__ == "__main__":
         nuclear=args.nuclear,
         use_cdl=not args.no_cdl,
         include_graph=True,
+        restraint_dictionaries=args.dictionary,
     )
     report.update(
         elapsed_seconds=time.perf_counter() - started,
