@@ -142,6 +142,14 @@ def restraint_graph(model):
         "are captured; no unexposed covariance matrix is assumed.",
     )
     atoms = model.get_hierarchy().atoms()
+    mappings = pairs.bond_proxies.asu_mappings()
+    for row, proxy in zip(result["bonds_asu"], pairs.bond_proxies.asu, strict=True):
+        image = (
+            mappings.get_rt_mx_i(proxy).inverse().multiply(mappings.get_rt_mx_j(proxy))
+        )
+        rotation = list(image.r().as_double())
+        row["rotation"] = [rotation[i : i + 3] for i in range(0, 9, 3)]
+        row["translation"] = list(image.t().as_double())
     for proxy in result["chiralities"]:
         atom = atoms[proxy["i_seqs"][0]]
         proxy["pseudochiral"] = chirality(

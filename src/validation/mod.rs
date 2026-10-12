@@ -156,7 +156,27 @@ pub fn run(document: &CifDocument, library: &MonLib, options: &Options) -> Resul
         restraints.planes,
     )?;
     let sites: Vec<_> = graph.sites.iter().map(|p| [p.x, p.y, p.z]).collect();
-    let evaluation = evaluator.evaluate(&sites, options.sigma_cutoff)?;
+    let mut evaluation = evaluator.evaluate(&sites, options.sigma_cutoff)?;
+    evaluation.findings.retain(|finding| match finding.check {
+        "angles" => graph.angles[finding.proxy_index].origin == 0,
+        "chiralities" => graph.chiralities[finding.proxy_index].origin == 0,
+        _ => true,
+    });
+    if !graph.symmetry_bonds.is_empty() {
+        let (cell, _) = reduce3::cell::crystal_operators(&structure)
+            .ok_or("Symmetry bonds require a valid crystal cell and space group")?;
+        for bond in &graph.symmetry_bonds {
+            let first = graph.sites[bond.indices[0] as usize];
+            let second = cell.orthogonalize(bond.image.apply(cell.fractionalize(graph.sites[bond.indices[1] as usize])));
+            let delta = bond.ideal - first.dist(second);
+            if !delta.is_finite() || !(delta * delta * bond.weight).is_finite() {
+                return Err("Symmetry bond evaluation overflowed".into());
+            }
+        }
+        if let Some((_, count)) = evaluation.counts.iter_mut().find(|(name, _)| *name == "bonds") {
+            *count += graph.symmetry_bonds.len();
+        }
+    }
     let contacts = report::contacts(&structure, &flat, library, &graph, options);
     let mut result = report::finish(&graph, atoms, &evaluator, evaluation, contacts, options);
     result["normalization"] = serde_json::json!(normalization.iter().map(|change| {
