@@ -50,3 +50,26 @@ the absolute-deviation check.
 
 The cancelled archive scan remains stopped. These local controls do not
 measure archive rejection rates or establish a new archive ETA.
+
+## Build and timing evidence
+
+The unpatched Nibbler build pins Reduce3
+`33a8795bea9b43447c852b5984b9cc4ebc18c608`. It passed 145 Python tests with
+zero skips, 106 Nibbler Rust tests and 57 owning backend tests. Nibbler library
+Clippy passed; inherited backend warnings remain outside the new modules.
+
+Twenty alternating paired trials included reads, parsing, interpretation,
+geometry, Probe contacts and normal report output in warm workers. No agent
+builds or tests ran during timing. The laptop remained shared; load ranged from
+7.646 to 8.482 on 16 logical CPUs.
+
+| Control | Atoms | Reference median | Native median | Wall speedup | CPU speedup |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Protein, nuclear | 642 | 1.46869 s | 6.26319 ms | 234.49x | 159.50x |
+| Glycosidic, electron | 57 | 0.783635 s | 0.797958 ms | 982.05x | 272.02x |
+| SF4, electron | 48 | 0.754951 s | 0.716834 ms | 1053.17x | 244.45x |
+
+Native wall ranges were 5.935–6.868 ms, 0.709–1.016 ms and 0.584–0.981 ms.
+The result file records individual trials and CPU time. RSS comes from the
+shared process; it is not an isolated peak measurement for either backend.
+See [the recorded results](native-validation-link-results.json).
