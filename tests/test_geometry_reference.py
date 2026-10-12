@@ -1,9 +1,7 @@
 """Compare native primitives against CCTBX, without chemistry interpretation."""
 
-import json
 import math
 import random
-from pathlib import Path
 
 import pytest
 
@@ -95,13 +93,14 @@ def test_randomized_weighted_plane_parity():
 
 
 def test_recorded_plane_uses_absolute_primitive_deviation():
-    control = json.loads(
-        (
-            Path(__file__).with_name("native_validation_reference_cases")
-            / "plane-signed-wrapper.json"
-        ).read_text()
-    )
-    sites, weights = control["sites"], control["weights"]
+    # CCTBX 2026.9, 1DWL ASP B66 plane; retain captured coordinates exactly.
+    sites = [
+        [12.016, 21.19, -7.137],
+        [13.023, 22.43700000000001, -7.250000000000002],
+        [14.245, 22.17, -7.092000000000001],
+        [11.134000000000004, 24.111000000000004, -5.689000000000002],
+    ]
+    weights = [2500.0] * 4
     indices = list(range(len(sites)))
     reference = restraints.planarity(
         sites_cart=flex.vec3_double(sites),
@@ -111,10 +110,10 @@ def test_recorded_plane_uses_absolute_primitive_deviation():
         abs(d) * math.sqrt(w) for d, w in zip(reference.deltas(), weights, strict=True)
     )
     row = graph(sites, planes=[(indices, weights)]).evaluate(sites)["failures"][0]
-    assert score == pytest.approx(control["score"], rel=1e-10)
+    assert score == pytest.approx(15.635496356967945, rel=1e-10)
     assert row["score"] == pytest.approx(score, rel=1e-10)
     assert row["residual"] == pytest.approx(reference.residual(), rel=1e-10)
-    assert row["score"] > control["signed_wrapper_score"] + 1
+    assert row["score"] > 8.782670349982311 + 1
 
 
 @pytest.mark.parametrize("delta", [0.49999999, 0.5, 0.50000001])
