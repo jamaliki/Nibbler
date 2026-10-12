@@ -1,0 +1,6 @@
+*.json
+!*conversion.json
+!protein-2160-sites-manifest.json
+!unknown_component.json
+!bond-cutoff-manifest.json
+bond-cutoff/*.json

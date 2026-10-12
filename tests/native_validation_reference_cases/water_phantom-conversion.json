@@ -1,0 +1,10 @@
+{
+  "source": "tests/native_validation_reference_cases/water_phantom.pdb",
+  "source_sha256": "8aad127dcbc569f3db7ed5464933203dbfc52942a2028cb2772eb2131a8309b4",
+  "output": "tests/native_validation_reference_cases/water_phantom.cif",
+  "output_sha256": "a83ec2cd1c6039ee43262345ded6f4638ba7c211edbc87c9675d9035ef6bd854",
+  "atoms": 11,
+  "coordinates_and_ids_unchanged": true,
+  "identity_scope": "Model/chain/residue/component/altloc/name/element after stripping fixed-width label padding; coordinates must match exactly.",
+  "scope": "Serialization only; no hydrogen addition, restraint processing or repair."
+}

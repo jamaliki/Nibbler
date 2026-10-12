@@ -1,0 +1,10 @@
+{
+  "source": "tests/native_validation_reference_cases/collapsed_stereocentre.pdb",
+  "source_sha256": "67600377ab4760f2d9cc3ac7543903d5dfb6d73b6b99861d1ac8525715c6260d",
+  "output": "tests/native_validation_reference_cases/collapsed_stereocentre.cif",
+  "output_sha256": "377a24eccf54113b91b3551a2eb205c3b35cc0e6700222fa335b12cdb0bd9d01",
+  "atoms": 10,
+  "coordinates_and_ids_unchanged": true,
+  "identity_scope": "Model/chain/residue/component/altloc/name/element after stripping fixed-width label padding; coordinates must match exactly.",
+  "scope": "Serialization only; no hydrogen addition, restraint processing or repair."
+}

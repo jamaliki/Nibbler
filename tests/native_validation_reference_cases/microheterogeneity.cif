@@ -1,0 +1,43 @@
+data_phenix
+loop_
+  _atom_site.group_PDB
+  _atom_site.id
+  _atom_site.label_atom_id
+  _atom_site.label_alt_id
+  _atom_site.label_comp_id
+  _atom_site.auth_asym_id
+  _atom_site.auth_seq_id
+  _atom_site.pdbx_PDB_ins_code
+  _atom_site.Cartn_x
+  _atom_site.Cartn_y
+  _atom_site.Cartn_z
+  _atom_site.occupancy
+  _atom_site.B_iso_or_equiv
+  _atom_site.type_symbol
+  _atom_site.pdbx_formal_charge
+  _atom_site.label_asym_id
+  _atom_site.label_entity_id
+  _atom_site.label_seq_id
+  _atom_site.auth_atom_id
+  _atom_site.pdbx_PDB_model_num
+  ATOM   1  N   A  ALA  A  28  ?  37.49900  25.74300  14.57100  0.600   6.61000  N  ?  A  ?  1  N   1
+  ATOM   2  CA  A  ALA  A  28  ?  38.79400  25.76100  13.88000  0.600   7.74000  C  ?  A  ?  1  CA  1
+  ATOM   3  C   A  ALA  A  28  ?  38.72800  26.59100  12.61100  0.600   9.17000  C  ?  A  ?  1  C   1
+  ATOM   4  O   A  ALA  A  28  ?  39.70400  27.34600  12.27700  0.600  11.45000  O  ?  A  ?  1  O   1
+  ATOM   5  CB  A  ALA  A  28  ?  39.28500  24.33600  13.56600  0.600   7.68000  C  ?  A  ?  1  CB  1
+  ATOM   6  N   B  SER  A  28  ?  37.59900  25.74300  14.57100  0.400   6.61000  N  ?  A  ?  1  N   1
+  ATOM   7  CA  B  SER  A  28  ?  38.89400  25.76100  13.88000  0.400   7.74000  C  ?  A  ?  1  CA  1
+  ATOM   8  C   B  SER  A  28  ?  38.82800  26.59100  12.61100  0.400   9.17000  C  ?  A  ?  1  C   1
+  ATOM   9  O   B  SER  A  28  ?  39.80400  27.34600  12.27700  0.400  11.45000  O  ?  A  ?  1  O   1
+  ATOM  10  CB  B  SER  A  28  ?  39.38500  24.33600  13.56600  0.400   7.68000  C  ?  A  ?  1  CB  1
+  ATOM  11  OG  B  SER  A  28  ?  40.08500  23.53600  13.06600  0.400   7.68000  O  ?  A  ?  1  OG  1
+
+loop_
+  _chem_comp.id
+  ALA
+  SER
+
+loop_
+  _struct_asym.id
+  A
+

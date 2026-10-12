@@ -1,0 +1,9 @@
+{
+  "source": "tests/native_validation_reference_cases/microheterogeneity.pdb",
+  "source_sha256": "5b732a5362f0600b8db248235c20d3768f8e65e554ea82de39edc1f7101ccdb9",
+  "output": "tests/native_validation_reference_cases/microheterogeneity.cif",
+  "output_sha256": "854d59a583d21643eccef2bdf72c164c3d5d5f60604aafaeafe1a34c9d60afb8",
+  "atoms": 11,
+  "coordinates_and_ids_unchanged": true,
+  "scope": "Serialization only; no hydrogen addition, restraint processing or repair."
+}

@@ -1,0 +1,9 @@
+{
+  "source": "tests/native_validation_reference_cases/valid_alanine.pdb",
+  "source_sha256": "142c2f010f236054459c5af0ec313caa8ea7ed636494afe14135310ead0e6d87",
+  "output": "tests/native_validation_reference_cases/valid_alanine.cif",
+  "output_sha256": "93c381e915efeb407cf63f3533261eaed99786d95595b4448e63353ec0bd9652",
+  "atoms": 10,
+  "coordinates_and_ids_unchanged": true,
+  "scope": "Serialization only; no hydrogen addition, restraint processing or repair."
+}
