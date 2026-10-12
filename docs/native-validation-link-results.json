@@ -1,0 +1,3318 @@
+{
+  "implementation": "174e0ebcdb2f0ea223f346000125b119952d76c6",
+  "backend": "33a8795bea9b43447c852b5984b9cc4ebc18c608",
+  "unpatched_immutable_build": true,
+  "full_replacement_complete": false,
+  "tests": {
+    "python": 145,
+    "python_skips": 0,
+    "nibbler_rust": 106,
+    "backend": 57,
+    "live_new_reference_controls": 12
+  },
+  "library_clippy": "passed",
+  "backend_clippy": "inherited warnings remain",
+  "timings": {
+    "crambin": {
+      "schema": "nibbler.native-validation.timing.v1",
+      "records": [
+        {
+          "repeat": 0,
+          "backend": "reference",
+          "wall_seconds": 1.4543267078697681,
+          "cpu_seconds": 1.4519009999999999,
+          "load_before": [
+            8.33203125,
+            8.345703125,
+            8.7158203125
+          ],
+          "load_after": [
+            8.14501953125,
+            8.306640625,
+            8.69970703125
+          ],
+          "rss_bytes": 291438592,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 0,
+          "backend": "native",
+          "wall_seconds": 0.0068683328572660685,
+          "cpu_seconds": 0.009688999999999837,
+          "load_before": [
+            8.14501953125,
+            8.306640625,
+            8.69970703125
+          ],
+          "load_after": [
+            8.14501953125,
+            8.306640625,
+            8.69970703125
+          ],
+          "rss_bytes": 291487744,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 1,
+          "backend": "native",
+          "wall_seconds": 0.006208290811628103,
+          "cpu_seconds": 0.008750000000000036,
+          "load_before": [
+            8.14501953125,
+            8.306640625,
+            8.69970703125
+          ],
+          "load_after": [
+            8.14501953125,
+            8.306640625,
+            8.69970703125
+          ],
+          "rss_bytes": 291553280,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 1,
+          "backend": "reference",
+          "wall_seconds": 1.4734937080647796,
+          "cpu_seconds": 1.4705640000000004,
+          "load_before": [
+            8.14501953125,
+            8.306640625,
+            8.69970703125
+          ],
+          "load_after": [
+            8.14501953125,
+            8.306640625,
+            8.69970703125
+          ],
+          "rss_bytes": 322764800,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 2,
+          "backend": "reference",
+          "wall_seconds": 1.478411165997386,
+          "cpu_seconds": 1.4766900000000005,
+          "load_before": [
+            8.14501953125,
+            8.306640625,
+            8.69970703125
+          ],
+          "load_after": [
+            8.14501953125,
+            8.306640625,
+            8.69970703125
+          ],
+          "rss_bytes": 340967424,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 2,
+          "backend": "native",
+          "wall_seconds": 0.006319832988083363,
+          "cpu_seconds": 0.008797000000000388,
+          "load_before": [
+            8.14501953125,
+            8.306640625,
+            8.69970703125
+          ],
+          "load_after": [
+            8.14501953125,
+            8.306640625,
+            8.69970703125
+          ],
+          "rss_bytes": 340983808,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 3,
+          "backend": "native",
+          "wall_seconds": 0.006280916975811124,
+          "cpu_seconds": 0.00929800000000025,
+          "load_before": [
+            8.14501953125,
+            8.306640625,
+            8.69970703125
+          ],
+          "load_after": [
+            8.14501953125,
+            8.306640625,
+            8.69970703125
+          ],
+          "rss_bytes": 340983808,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 3,
+          "backend": "reference",
+          "wall_seconds": 1.4482077499851584,
+          "cpu_seconds": 1.4461739999999992,
+          "load_before": [
+            8.14501953125,
+            8.306640625,
+            8.69970703125
+          ],
+          "load_after": [
+            8.37353515625,
+            8.35107421875,
+            8.712890625
+          ],
+          "rss_bytes": 354762752,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 4,
+          "backend": "reference",
+          "wall_seconds": 1.4662557919509709,
+          "cpu_seconds": 1.4633130000000003,
+          "load_before": [
+            8.37353515625,
+            8.35107421875,
+            8.712890625
+          ],
+          "load_after": [
+            8.37353515625,
+            8.35107421875,
+            8.712890625
+          ],
+          "rss_bytes": 356794368,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 4,
+          "backend": "native",
+          "wall_seconds": 0.0064801250118762255,
+          "cpu_seconds": 0.009197000000000344,
+          "load_before": [
+            8.37353515625,
+            8.35107421875,
+            8.712890625
+          ],
+          "load_after": [
+            8.37353515625,
+            8.35107421875,
+            8.712890625
+          ],
+          "rss_bytes": 356810752,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 5,
+          "backend": "native",
+          "wall_seconds": 0.006184458965435624,
+          "cpu_seconds": 0.008913999999998978,
+          "load_before": [
+            8.37353515625,
+            8.35107421875,
+            8.712890625
+          ],
+          "load_after": [
+            8.37353515625,
+            8.35107421875,
+            8.712890625
+          ],
+          "rss_bytes": 356876288,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 5,
+          "backend": "reference",
+          "wall_seconds": 1.4550760830752552,
+          "cpu_seconds": 1.4536069999999999,
+          "load_before": [
+            8.37353515625,
+            8.35107421875,
+            8.712890625
+          ],
+          "load_after": [
+            8.37353515625,
+            8.35107421875,
+            8.712890625
+          ],
+          "rss_bytes": 363266048,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 6,
+          "backend": "reference",
+          "wall_seconds": 1.4737889170646667,
+          "cpu_seconds": 1.4714229999999997,
+          "load_before": [
+            8.37353515625,
+            8.35107421875,
+            8.712890625
+          ],
+          "load_after": [
+            8.37353515625,
+            8.35107421875,
+            8.712890625
+          ],
+          "rss_bytes": 366739456,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 6,
+          "backend": "native",
+          "wall_seconds": 0.006333749974146485,
+          "cpu_seconds": 0.00973399999999991,
+          "load_before": [
+            8.37353515625,
+            8.35107421875,
+            8.712890625
+          ],
+          "load_after": [
+            8.37353515625,
+            8.35107421875,
+            8.712890625
+          ],
+          "rss_bytes": 366739456,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 7,
+          "backend": "native",
+          "wall_seconds": 0.0062120831571519375,
+          "cpu_seconds": 0.009218999999999866,
+          "load_before": [
+            8.37353515625,
+            8.35107421875,
+            8.712890625
+          ],
+          "load_after": [
+            8.37353515625,
+            8.35107421875,
+            8.712890625
+          ],
+          "rss_bytes": 366755840,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 7,
+          "backend": "reference",
+          "wall_seconds": 1.451569375116378,
+          "cpu_seconds": 1.4491989999999983,
+          "load_before": [
+            8.37353515625,
+            8.35107421875,
+            8.712890625
+          ],
+          "load_after": [
+            8.26318359375,
+            8.32861328125,
+            8.70263671875
+          ],
+          "rss_bytes": 375947264,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 8,
+          "backend": "reference",
+          "wall_seconds": 1.4432481250260025,
+          "cpu_seconds": 1.441173000000001,
+          "load_before": [
+            8.26318359375,
+            8.32861328125,
+            8.70263671875
+          ],
+          "load_after": [
+            8.26318359375,
+            8.32861328125,
+            8.70263671875
+          ],
+          "rss_bytes": 375177216,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 8,
+          "backend": "native",
+          "wall_seconds": 0.006347291870042682,
+          "cpu_seconds": 0.008779999999999788,
+          "load_before": [
+            8.26318359375,
+            8.32861328125,
+            8.70263671875
+          ],
+          "load_after": [
+            8.26318359375,
+            8.32861328125,
+            8.70263671875
+          ],
+          "rss_bytes": 375193600,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 9,
+          "backend": "native",
+          "wall_seconds": 0.006091624964028597,
+          "cpu_seconds": 0.009304000000000201,
+          "load_before": [
+            8.26318359375,
+            8.32861328125,
+            8.70263671875
+          ],
+          "load_after": [
+            8.26318359375,
+            8.32861328125,
+            8.70263671875
+          ],
+          "rss_bytes": 375193600,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 9,
+          "backend": "reference",
+          "wall_seconds": 1.4748481661081314,
+          "cpu_seconds": 1.4717769999999977,
+          "load_before": [
+            8.26318359375,
+            8.32861328125,
+            8.70263671875
+          ],
+          "load_after": [
+            8.26318359375,
+            8.32861328125,
+            8.70263671875
+          ],
+          "rss_bytes": 383680512,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 10,
+          "backend": "reference",
+          "wall_seconds": 1.4755548748653382,
+          "cpu_seconds": 1.4740899999999968,
+          "load_before": [
+            8.26318359375,
+            8.32861328125,
+            8.70263671875
+          ],
+          "load_after": [
+            8.48193359375,
+            8.37255859375,
+            8.7158203125
+          ],
+          "rss_bytes": 393838592,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 10,
+          "backend": "native",
+          "wall_seconds": 0.006453374866396189,
+          "cpu_seconds": 0.009411000000000058,
+          "load_before": [
+            8.48193359375,
+            8.37255859375,
+            8.7158203125
+          ],
+          "load_after": [
+            8.48193359375,
+            8.37255859375,
+            8.7158203125
+          ],
+          "rss_bytes": 393838592,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 11,
+          "backend": "native",
+          "wall_seconds": 0.00593487499281764,
+          "cpu_seconds": 0.008539999999999992,
+          "load_before": [
+            8.48193359375,
+            8.37255859375,
+            8.7158203125
+          ],
+          "load_after": [
+            8.48193359375,
+            8.37255859375,
+            8.7158203125
+          ],
+          "rss_bytes": 393838592,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 11,
+          "backend": "reference",
+          "wall_seconds": 1.4888604581356049,
+          "cpu_seconds": 1.4830059999999996,
+          "load_before": [
+            8.48193359375,
+            8.37255859375,
+            8.7158203125
+          ],
+          "load_after": [
+            8.48193359375,
+            8.37255859375,
+            8.7158203125
+          ],
+          "rss_bytes": 393854976,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 12,
+          "backend": "reference",
+          "wall_seconds": 1.461200874997303,
+          "cpu_seconds": 1.4582879999999996,
+          "load_before": [
+            8.48193359375,
+            8.37255859375,
+            8.7158203125
+          ],
+          "load_after": [
+            8.48193359375,
+            8.37255859375,
+            8.7158203125
+          ],
+          "rss_bytes": 396787712,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 12,
+          "backend": "native",
+          "wall_seconds": 0.006245458032935858,
+          "cpu_seconds": 0.009064999999999657,
+          "load_before": [
+            8.48193359375,
+            8.37255859375,
+            8.7158203125
+          ],
+          "load_after": [
+            8.48193359375,
+            8.37255859375,
+            8.7158203125
+          ],
+          "rss_bytes": 396787712,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 13,
+          "backend": "native",
+          "wall_seconds": 0.005979917012155056,
+          "cpu_seconds": 0.008815000000002016,
+          "load_before": [
+            8.48193359375,
+            8.37255859375,
+            8.7158203125
+          ],
+          "load_after": [
+            8.48193359375,
+            8.37255859375,
+            8.7158203125
+          ],
+          "rss_bytes": 396787712,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 13,
+          "backend": "reference",
+          "wall_seconds": 1.4614270001184195,
+          "cpu_seconds": 1.4592659999999995,
+          "load_before": [
+            8.48193359375,
+            8.37255859375,
+            8.7158203125
+          ],
+          "load_after": [
+            8.48193359375,
+            8.37255859375,
+            8.7158203125
+          ],
+          "rss_bytes": 396689408,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 14,
+          "backend": "reference",
+          "wall_seconds": 1.4585087921004742,
+          "cpu_seconds": 1.456306999999999,
+          "load_before": [
+            8.48193359375,
+            8.37255859375,
+            8.7158203125
+          ],
+          "load_after": [
+            8.44287109375,
+            8.3662109375,
+            8.71142578125
+          ],
+          "rss_bytes": 394952704,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 14,
+          "backend": "native",
+          "wall_seconds": 0.006498291855677962,
+          "cpu_seconds": 0.010197999999999041,
+          "load_before": [
+            8.44287109375,
+            8.3662109375,
+            8.71142578125
+          ],
+          "load_after": [
+            8.44287109375,
+            8.3662109375,
+            8.71142578125
+          ],
+          "rss_bytes": 394985472,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 15,
+          "backend": "native",
+          "wall_seconds": 0.006131999893113971,
+          "cpu_seconds": 0.009184000000001191,
+          "load_before": [
+            8.44287109375,
+            8.3662109375,
+            8.71142578125
+          ],
+          "load_after": [
+            8.44287109375,
+            8.3662109375,
+            8.71142578125
+          ],
+          "rss_bytes": 394985472,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 15,
+          "backend": "reference",
+          "wall_seconds": 1.4606002080254257,
+          "cpu_seconds": 1.4591670000000008,
+          "load_before": [
+            8.44287109375,
+            8.3662109375,
+            8.71142578125
+          ],
+          "load_after": [
+            8.44287109375,
+            8.3662109375,
+            8.71142578125
+          ],
+          "rss_bytes": 396279808,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 16,
+          "backend": "reference",
+          "wall_seconds": 1.471115707885474,
+          "cpu_seconds": 1.4685099999999984,
+          "load_before": [
+            8.44287109375,
+            8.3662109375,
+            8.71142578125
+          ],
+          "load_after": [
+            8.44287109375,
+            8.3662109375,
+            8.71142578125
+          ],
+          "rss_bytes": 393281536,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 16,
+          "backend": "native",
+          "wall_seconds": 0.006334624951705337,
+          "cpu_seconds": 0.009360999999998398,
+          "load_before": [
+            8.44287109375,
+            8.3662109375,
+            8.71142578125
+          ],
+          "load_after": [
+            8.44287109375,
+            8.3662109375,
+            8.71142578125
+          ],
+          "rss_bytes": 393297920,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 17,
+          "backend": "native",
+          "wall_seconds": 0.006220625014975667,
+          "cpu_seconds": 0.008908999999999168,
+          "load_before": [
+            8.44287109375,
+            8.3662109375,
+            8.71142578125
+          ],
+          "load_after": [
+            8.44287109375,
+            8.3662109375,
+            8.71142578125
+          ],
+          "rss_bytes": 393297920,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 17,
+          "backend": "reference",
+          "wall_seconds": 1.5027507909107953,
+          "cpu_seconds": 1.4981950000000026,
+          "load_before": [
+            8.44287109375,
+            8.3662109375,
+            8.71142578125
+          ],
+          "load_after": [
+            8.2470703125,
+            8.32666015625,
+            8.6953125
+          ],
+          "rss_bytes": 400556032,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 18,
+          "backend": "reference",
+          "wall_seconds": 1.479506584117189,
+          "cpu_seconds": 1.4768989999999995,
+          "load_before": [
+            8.2470703125,
+            8.32666015625,
+            8.6953125
+          ],
+          "load_after": [
+            8.2470703125,
+            8.32666015625,
+            8.6953125
+          ],
+          "rss_bytes": 403439616,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 18,
+          "backend": "native",
+          "wall_seconds": 0.0063264581840485334,
+          "cpu_seconds": 0.008936999999999529,
+          "load_before": [
+            8.2470703125,
+            8.32666015625,
+            8.6953125
+          ],
+          "load_after": [
+            8.2470703125,
+            8.32666015625,
+            8.6953125
+          ],
+          "rss_bytes": 403439616,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 19,
+          "backend": "native",
+          "wall_seconds": 0.006231209030374885,
+          "cpu_seconds": 0.009216999999999587,
+          "load_before": [
+            8.2470703125,
+            8.32666015625,
+            8.6953125
+          ],
+          "load_after": [
+            8.2470703125,
+            8.32666015625,
+            8.6953125
+          ],
+          "rss_bytes": 403439616,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": 0
+          },
+          "failure_count": 4
+        },
+        {
+          "repeat": 19,
+          "backend": "reference",
+          "wall_seconds": 1.4831766248680651,
+          "cpu_seconds": 1.4807440000000014,
+          "load_before": [
+            8.2470703125,
+            8.32666015625,
+            8.6953125
+          ],
+          "load_after": [
+            8.2470703125,
+            8.32666015625,
+            8.6953125
+          ],
+          "rss_bytes": 403881984,
+          "counts": {
+            "bonds": 652,
+            "angles": 1183,
+            "chiralities": 56,
+            "planarities": 101,
+            "hydrogens": 315,
+            "clashes": null
+          },
+          "failure_count": 4
+        }
+      ],
+      "median_seconds": {
+        "reference": 1.4686857499182224,
+        "native": 0.006263187504373491
+      },
+      "reference_over_native": 234.49493550890196,
+      "summary": {
+        "reference": {
+          "wall_seconds": {
+            "median": 1.4686857499182224,
+            "minimum": 1.4432481250260025,
+            "maximum": 1.5027507909107953
+          },
+          "cpu_seconds": {
+            "median": 1.4659114999999994,
+            "minimum": 1.441173000000001,
+            "maximum": 1.4981950000000026
+          },
+          "rss_bytes": {
+            "median": 388481024.0,
+            "minimum": 291438592,
+            "maximum": 403881984
+          }
+        },
+        "native": {
+          "wall_seconds": {
+            "median": 0.006263187504373491,
+            "minimum": 0.00593487499281764,
+            "maximum": 0.0068683328572660685
+          },
+          "cpu_seconds": {
+            "median": 0.009190500000000767,
+            "minimum": 0.008539999999999992,
+            "maximum": 0.010197999999999041
+          },
+          "rss_bytes": {
+            "median": 384245760.0,
+            "minimum": 291487744,
+            "maximum": 403439616
+          }
+        }
+      },
+      "cpu_reference_over_native": 159.50291061420782,
+      "input": {
+        "file": "/Users/kiarash.jamali/Documents/ChatGPT/Nibbler/tests/native_validation_reference_cases/1crn-prepared.cif",
+        "sha256": "cb10d4f750b57100360676ad7f223f7b032d3e90ee7f32f957b776ae63e9d9d1",
+        "nuclear": true,
+        "use_cdl": true,
+        "sigma_cutoff": 5.0
+      },
+      "reference_script_sha256": "a13769b0fb4c92e49d5a718c1fe7cc3d8e054fca7ded7bdeae69a101fca2ccd0",
+      "machine": "arm64",
+      "cpu_count": 16,
+      "scope": "Warm workers include input reads, parsing, interpretation, geometry, contacts and normal reporting. Reference checks retain the scan's unchanged-atom guard. Detailed graph capture is outside timed regions. Atom-level parity must pass separately; timing alone does not prove it."
+    },
+    "glycosidic": {
+      "schema": "nibbler.native-validation.timing.v1",
+      "records": [
+        {
+          "repeat": 0,
+          "backend": "reference",
+          "wall_seconds": 0.783763499930501,
+          "cpu_seconds": 0.782413,
+          "load_before": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "load_after": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "rss_bytes": 249331712,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 0,
+          "backend": "native",
+          "wall_seconds": 0.0008762499783188105,
+          "cpu_seconds": 0.0032650000000002954,
+          "load_before": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "load_after": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "rss_bytes": 249331712,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 1,
+          "backend": "native",
+          "wall_seconds": 0.0007396249566227198,
+          "cpu_seconds": 0.002726000000000006,
+          "load_before": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "load_after": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "rss_bytes": 249331712,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 1,
+          "backend": "reference",
+          "wall_seconds": 0.7735199998132885,
+          "cpu_seconds": 0.7724129999999998,
+          "load_before": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "load_after": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "rss_bytes": 286457856,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 2,
+          "backend": "reference",
+          "wall_seconds": 0.769795082975179,
+          "cpu_seconds": 0.7684849999999996,
+          "load_before": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "load_after": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "rss_bytes": 301285376,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 2,
+          "backend": "native",
+          "wall_seconds": 0.001016041962429881,
+          "cpu_seconds": 0.003257999999999761,
+          "load_before": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "load_after": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "rss_bytes": 301334528,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 3,
+          "backend": "native",
+          "wall_seconds": 0.0007090000435709953,
+          "cpu_seconds": 0.0023769999999996294,
+          "load_before": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "load_after": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "rss_bytes": 301383680,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 3,
+          "backend": "reference",
+          "wall_seconds": 0.7672365410253406,
+          "cpu_seconds": 0.7662009999999997,
+          "load_before": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "load_after": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "rss_bytes": 307625984,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 4,
+          "backend": "reference",
+          "wall_seconds": 0.7775573749095201,
+          "cpu_seconds": 0.7757839999999998,
+          "load_before": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "load_after": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "rss_bytes": 312098816,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 4,
+          "backend": "native",
+          "wall_seconds": 0.000881291925907135,
+          "cpu_seconds": 0.003134000000000192,
+          "load_before": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "load_after": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "rss_bytes": 312147968,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 5,
+          "backend": "native",
+          "wall_seconds": 0.0007210830226540565,
+          "cpu_seconds": 0.0026119999999991705,
+          "load_before": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "load_after": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "rss_bytes": 312147968,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 5,
+          "backend": "reference",
+          "wall_seconds": 0.7995536250527948,
+          "cpu_seconds": 0.7980330000000002,
+          "load_before": [
+            8.14697265625,
+            8.30419921875,
+            8.68505859375
+          ],
+          "load_after": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "rss_bytes": 308199424,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 6,
+          "backend": "reference",
+          "wall_seconds": 0.7728213327936828,
+          "cpu_seconds": 0.7718159999999994,
+          "load_before": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "load_after": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "rss_bytes": 338395136,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 6,
+          "backend": "native",
+          "wall_seconds": 0.0008720839396119118,
+          "cpu_seconds": 0.00279100000000021,
+          "load_before": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "load_after": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "rss_bytes": 338444288,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 7,
+          "backend": "native",
+          "wall_seconds": 0.0007507908158004284,
+          "cpu_seconds": 0.002849999999999575,
+          "load_before": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "load_after": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "rss_bytes": 338444288,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 7,
+          "backend": "reference",
+          "wall_seconds": 0.7750900411047041,
+          "cpu_seconds": 0.7741540000000002,
+          "load_before": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "load_after": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "rss_bytes": 341721088,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 8,
+          "backend": "reference",
+          "wall_seconds": 0.7790570829529315,
+          "cpu_seconds": 0.7781120000000001,
+          "load_before": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "load_after": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "rss_bytes": 341622784,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 8,
+          "backend": "native",
+          "wall_seconds": 0.0008678750600665808,
+          "cpu_seconds": 0.0034239999999989834,
+          "load_before": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "load_after": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "rss_bytes": 341622784,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 9,
+          "backend": "native",
+          "wall_seconds": 0.0008029998280107975,
+          "cpu_seconds": 0.003638000000000474,
+          "load_before": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "load_after": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "rss_bytes": 341622784,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 9,
+          "backend": "reference",
+          "wall_seconds": 0.7835067501291633,
+          "cpu_seconds": 0.7778729999999996,
+          "load_before": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "load_after": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "rss_bytes": 345292800,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 10,
+          "backend": "reference",
+          "wall_seconds": 0.8218580840621144,
+          "cpu_seconds": 0.8204840000000004,
+          "load_before": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "load_after": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "rss_bytes": 345767936,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 10,
+          "backend": "native",
+          "wall_seconds": 0.0008032920304685831,
+          "cpu_seconds": 0.002326999999999302,
+          "load_before": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "load_after": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "rss_bytes": 345767936,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 11,
+          "backend": "native",
+          "wall_seconds": 0.0007190830074250698,
+          "cpu_seconds": 0.0028810000000003555,
+          "load_before": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "load_after": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "rss_bytes": 345800704,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 11,
+          "backend": "reference",
+          "wall_seconds": 0.7859338328707963,
+          "cpu_seconds": 0.7845929999999992,
+          "load_before": [
+            7.974609375,
+            8.265625,
+            8.6689453125
+          ],
+          "load_after": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "rss_bytes": 352829440,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 12,
+          "backend": "reference",
+          "wall_seconds": 0.7864698749035597,
+          "cpu_seconds": 0.7850010000000012,
+          "load_before": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "load_after": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "rss_bytes": 364052480,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 12,
+          "backend": "native",
+          "wall_seconds": 0.0007825829088687897,
+          "cpu_seconds": 0.0028260000000006613,
+          "load_before": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "load_after": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "rss_bytes": 364052480,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 13,
+          "backend": "native",
+          "wall_seconds": 0.0007162089459598064,
+          "cpu_seconds": 0.0028290000000001925,
+          "load_before": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "load_after": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "rss_bytes": 364052480,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 13,
+          "backend": "reference",
+          "wall_seconds": 0.8070565410889685,
+          "cpu_seconds": 0.8042350000000003,
+          "load_before": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "load_after": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "rss_bytes": 362921984,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 14,
+          "backend": "reference",
+          "wall_seconds": 0.7950354581698775,
+          "cpu_seconds": 0.7935280000000002,
+          "load_before": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "load_after": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "rss_bytes": 361447424,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 14,
+          "backend": "native",
+          "wall_seconds": 0.0008144169114530087,
+          "cpu_seconds": 0.003187000000000495,
+          "load_before": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "load_after": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "rss_bytes": 361447424,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 15,
+          "backend": "native",
+          "wall_seconds": 0.0008149580098688602,
+          "cpu_seconds": 0.00314300000000145,
+          "load_before": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "load_after": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "rss_bytes": 361447424,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 15,
+          "backend": "reference",
+          "wall_seconds": 0.8039275407791138,
+          "cpu_seconds": 0.8028290000000009,
+          "load_before": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "load_after": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "rss_bytes": 358957056,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 16,
+          "backend": "reference",
+          "wall_seconds": 0.7828098328318447,
+          "cpu_seconds": 0.782019,
+          "load_before": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "load_after": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "rss_bytes": 362151936,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 16,
+          "backend": "native",
+          "wall_seconds": 0.0007877079769968987,
+          "cpu_seconds": 0.0030130000000010426,
+          "load_before": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "load_after": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "rss_bytes": 362151936,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 17,
+          "backend": "native",
+          "wall_seconds": 0.0007220420520752668,
+          "cpu_seconds": 0.0033209999999996853,
+          "load_before": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "load_after": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "rss_bytes": 362151936,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 17,
+          "backend": "reference",
+          "wall_seconds": 0.7882419580128044,
+          "cpu_seconds": 0.7870830000000009,
+          "load_before": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "load_after": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "rss_bytes": 364281856,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 18,
+          "backend": "reference",
+          "wall_seconds": 0.7841696669347584,
+          "cpu_seconds": 0.7833959999999998,
+          "load_before": [
+            7.896484375,
+            8.244140625,
+            8.65869140625
+          ],
+          "load_after": [
+            7.744140625,
+            8.20654296875,
+            8.64306640625
+          ],
+          "rss_bytes": 362954752,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 18,
+          "backend": "native",
+          "wall_seconds": 0.0008457500953227282,
+          "cpu_seconds": 0.0028710000000025104,
+          "load_before": [
+            7.744140625,
+            8.20654296875,
+            8.64306640625
+          ],
+          "load_after": [
+            7.744140625,
+            8.20654296875,
+            8.64306640625
+          ],
+          "rss_bytes": 362954752,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 19,
+          "backend": "native",
+          "wall_seconds": 0.0007929170969873667,
+          "cpu_seconds": 0.002821999999998326,
+          "load_before": [
+            7.744140625,
+            8.20654296875,
+            8.64306640625
+          ],
+          "load_after": [
+            7.744140625,
+            8.20654296875,
+            8.64306640625
+          ],
+          "rss_bytes": 362954752,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": 3
+          },
+          "failure_count": 3
+        },
+        {
+          "repeat": 19,
+          "backend": "reference",
+          "wall_seconds": 0.7830728339031339,
+          "cpu_seconds": 0.7822420000000001,
+          "load_before": [
+            7.744140625,
+            8.20654296875,
+            8.64306640625
+          ],
+          "load_after": [
+            7.744140625,
+            8.20654296875,
+            8.64306640625
+          ],
+          "rss_bytes": 362954752,
+          "counts": {
+            "bonds": 58,
+            "angles": 105,
+            "chiralities": 10,
+            "planarities": 2,
+            "hydrogens": 28,
+            "clashes": null
+          },
+          "failure_count": 3
+        }
+      ],
+      "median_seconds": {
+        "reference": 0.7836351250298321,
+        "native": 0.0007979584624990821
+      },
+      "reference_over_native": 982.0500212199123,
+      "summary": {
+        "reference": {
+          "wall_seconds": {
+            "median": 0.7836351250298321,
+            "minimum": 0.7672365410253406,
+            "maximum": 0.8218580840621144
+          },
+          "cpu_seconds": {
+            "median": 0.7823275000000001,
+            "minimum": 0.7662009999999997,
+            "maximum": 0.8204840000000004
+          },
+          "rss_bytes": {
+            "median": 345530368.0,
+            "minimum": 249331712,
+            "maximum": 364281856
+          }
+        },
+        "native": {
+          "wall_seconds": {
+            "median": 0.0007979584624990821,
+            "minimum": 0.0007090000435709953,
+            "maximum": 0.001016041962429881
+          },
+          "cpu_seconds": {
+            "median": 0.002876000000001433,
+            "minimum": 0.002326999999999302,
+            "maximum": 0.003638000000000474
+          },
+          "rss_bytes": {
+            "median": 343695360.0,
+            "minimum": 249331712,
+            "maximum": 364052480
+          }
+        }
+      },
+      "cpu_reference_over_native": 272.0192976354695,
+      "input": {
+        "file": "/Users/kiarash.jamali/Documents/ChatGPT/Nibbler/tests/native_validation_remaining/glycosidic.cif",
+        "sha256": "6f38bbc6b653815b5f799ce22d61055678038349dbd9903681de718ed4953aa1",
+        "nuclear": false,
+        "use_cdl": true,
+        "sigma_cutoff": 5.0
+      },
+      "reference_script_sha256": "a13769b0fb4c92e49d5a718c1fe7cc3d8e054fca7ded7bdeae69a101fca2ccd0",
+      "machine": "arm64",
+      "cpu_count": 16,
+      "scope": "Warm workers include input reads, parsing, interpretation, geometry, contacts and normal reporting. Reference checks retain the scan's unchanged-atom guard. Detailed graph capture is outside timed regions. Atom-level parity must pass separately; timing alone does not prove it."
+    },
+    "iron_sulfur": {
+      "schema": "nibbler.native-validation.timing.v1",
+      "records": [
+        {
+          "repeat": 0,
+          "backend": "reference",
+          "wall_seconds": 0.767315125092864,
+          "cpu_seconds": 0.7663850000000001,
+          "load_before": [
+            7.744140625,
+            8.20654296875,
+            8.64306640625
+          ],
+          "load_after": [
+            7.744140625,
+            8.20654296875,
+            8.64306640625
+          ],
+          "rss_bytes": 255590400,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 0,
+          "backend": "native",
+          "wall_seconds": 0.0007754999678581953,
+          "cpu_seconds": 0.003409999999999691,
+          "load_before": [
+            7.744140625,
+            8.20654296875,
+            8.64306640625
+          ],
+          "load_after": [
+            7.744140625,
+            8.20654296875,
+            8.64306640625
+          ],
+          "rss_bytes": 255590400,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 1,
+          "backend": "native",
+          "wall_seconds": 0.0006602918729186058,
+          "cpu_seconds": 0.0032319999999996796,
+          "load_before": [
+            7.744140625,
+            8.20654296875,
+            8.64306640625
+          ],
+          "load_after": [
+            7.744140625,
+            8.20654296875,
+            8.64306640625
+          ],
+          "rss_bytes": 255590400,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 1,
+          "backend": "reference",
+          "wall_seconds": 0.7577666668221354,
+          "cpu_seconds": 0.7564489999999999,
+          "load_before": [
+            7.744140625,
+            8.20654296875,
+            8.64306640625
+          ],
+          "load_after": [
+            7.744140625,
+            8.20654296875,
+            8.64306640625
+          ],
+          "rss_bytes": 290177024,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 2,
+          "backend": "reference",
+          "wall_seconds": 0.7661403748206794,
+          "cpu_seconds": 0.7651729999999999,
+          "load_before": [
+            7.744140625,
+            8.20654296875,
+            8.64306640625
+          ],
+          "load_after": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "rss_bytes": 296255488,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 2,
+          "backend": "native",
+          "wall_seconds": 0.000980583019554615,
+          "cpu_seconds": 0.002945999999999671,
+          "load_before": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "load_after": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "rss_bytes": 296255488,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 3,
+          "backend": "native",
+          "wall_seconds": 0.0005839578807353973,
+          "cpu_seconds": 0.0027129999999999654,
+          "load_before": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "load_after": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "rss_bytes": 296304640,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 3,
+          "backend": "reference",
+          "wall_seconds": 0.7552259999793023,
+          "cpu_seconds": 0.7537419999999999,
+          "load_before": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "load_after": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "rss_bytes": 313655296,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 4,
+          "backend": "reference",
+          "wall_seconds": 0.7454842498991638,
+          "cpu_seconds": 0.7445939999999993,
+          "load_before": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "load_after": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "rss_bytes": 314818560,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 4,
+          "backend": "native",
+          "wall_seconds": 0.0007803328335285187,
+          "cpu_seconds": 0.0035800000000003607,
+          "load_before": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "load_after": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "rss_bytes": 314834944,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 5,
+          "backend": "native",
+          "wall_seconds": 0.0006442079320549965,
+          "cpu_seconds": 0.0030809999999998894,
+          "load_before": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "load_after": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "rss_bytes": 314834944,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 5,
+          "backend": "reference",
+          "wall_seconds": 0.75438924995251,
+          "cpu_seconds": 0.7535210000000001,
+          "load_before": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "load_after": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "rss_bytes": 313229312,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 6,
+          "backend": "reference",
+          "wall_seconds": 0.7719862500671297,
+          "cpu_seconds": 0.7710870000000005,
+          "load_before": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "load_after": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "rss_bytes": 316440576,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 6,
+          "backend": "native",
+          "wall_seconds": 0.0007871249690651894,
+          "cpu_seconds": 0.0034530000000003724,
+          "load_before": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "load_after": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "rss_bytes": 316440576,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 7,
+          "backend": "native",
+          "wall_seconds": 0.0006199171766638756,
+          "cpu_seconds": 0.002931000000000239,
+          "load_before": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "load_after": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "rss_bytes": 316440576,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 7,
+          "backend": "reference",
+          "wall_seconds": 0.7540981250349432,
+          "cpu_seconds": 0.7531759999999998,
+          "load_before": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "load_after": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "rss_bytes": 330694656,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 8,
+          "backend": "reference",
+          "wall_seconds": 0.7616229171399027,
+          "cpu_seconds": 0.7607720000000002,
+          "load_before": [
+            7.76416015625,
+            8.20263671875,
+            8.63916015625
+          ],
+          "load_after": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "rss_bytes": 343031808,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 8,
+          "backend": "native",
+          "wall_seconds": 0.0007908749394118786,
+          "cpu_seconds": 0.0032930000000011006,
+          "load_before": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "load_after": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "rss_bytes": 343031808,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 9,
+          "backend": "native",
+          "wall_seconds": 0.0006640830542892218,
+          "cpu_seconds": 0.0029129999999994993,
+          "load_before": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "load_after": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "rss_bytes": 343031808,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 9,
+          "backend": "reference",
+          "wall_seconds": 0.7486254170071334,
+          "cpu_seconds": 0.7476290000000017,
+          "load_before": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "load_after": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "rss_bytes": 350257152,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 10,
+          "backend": "reference",
+          "wall_seconds": 0.7506462910678238,
+          "cpu_seconds": 0.7495820000000002,
+          "load_before": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "load_after": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "rss_bytes": 348487680,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 10,
+          "backend": "native",
+          "wall_seconds": 0.0007916248869150877,
+          "cpu_seconds": 0.0030859999999997,
+          "load_before": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "load_after": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "rss_bytes": 348487680,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 11,
+          "backend": "native",
+          "wall_seconds": 0.0006367920432239771,
+          "cpu_seconds": 0.0024599999999992406,
+          "load_before": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "load_after": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "rss_bytes": 348487680,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 11,
+          "backend": "reference",
+          "wall_seconds": 0.7742027919739485,
+          "cpu_seconds": 0.7734760000000005,
+          "load_before": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "load_after": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "rss_bytes": 348241920,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 12,
+          "backend": "reference",
+          "wall_seconds": 0.7546752498019487,
+          "cpu_seconds": 0.7536590000000007,
+          "load_before": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "load_after": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "rss_bytes": 366002176,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 12,
+          "backend": "native",
+          "wall_seconds": 0.0007253338117152452,
+          "cpu_seconds": 0.0033100000000008123,
+          "load_before": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "load_after": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "rss_bytes": 366002176,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 13,
+          "backend": "native",
+          "wall_seconds": 0.0007274169474840164,
+          "cpu_seconds": 0.0034050000000007685,
+          "load_before": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "load_after": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "rss_bytes": 366002176,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 13,
+          "backend": "reference",
+          "wall_seconds": 0.767508499789983,
+          "cpu_seconds": 0.7641740000000006,
+          "load_before": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "load_after": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "rss_bytes": 366231552,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 14,
+          "backend": "reference",
+          "wall_seconds": 0.7544831251725554,
+          "cpu_seconds": 0.7537900000000004,
+          "load_before": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "load_after": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "rss_bytes": 366870528,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 14,
+          "backend": "native",
+          "wall_seconds": 0.0007766659837216139,
+          "cpu_seconds": 0.0027840000000001197,
+          "load_before": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "load_after": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "rss_bytes": 366870528,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 15,
+          "backend": "native",
+          "wall_seconds": 0.0006211251020431519,
+          "cpu_seconds": 0.0030000000000001137,
+          "load_before": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "load_after": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "rss_bytes": 366870528,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 15,
+          "backend": "reference",
+          "wall_seconds": 0.7429901668801904,
+          "cpu_seconds": 0.7421050000000005,
+          "load_before": [
+            7.70263671875,
+            8.1826171875,
+            8.62939453125
+          ],
+          "load_after": [
+            7.64599609375,
+            8.16259765625,
+            8.61962890625
+          ],
+          "rss_bytes": 368852992,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 16,
+          "backend": "reference",
+          "wall_seconds": 0.7721098749898374,
+          "cpu_seconds": 0.7713610000000006,
+          "load_before": [
+            7.64599609375,
+            8.16259765625,
+            8.61962890625
+          ],
+          "load_after": [
+            7.64599609375,
+            8.16259765625,
+            8.61962890625
+          ],
+          "rss_bytes": 366952448,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 16,
+          "backend": "native",
+          "wall_seconds": 0.0007083339150995016,
+          "cpu_seconds": 0.0031239999999996826,
+          "load_before": [
+            7.64599609375,
+            8.16259765625,
+            8.61962890625
+          ],
+          "load_after": [
+            7.64599609375,
+            8.16259765625,
+            8.61962890625
+          ],
+          "rss_bytes": 366985216,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 17,
+          "backend": "native",
+          "wall_seconds": 0.0006986248772591352,
+          "cpu_seconds": 0.002779000000000309,
+          "load_before": [
+            7.64599609375,
+            8.16259765625,
+            8.61962890625
+          ],
+          "load_after": [
+            7.64599609375,
+            8.16259765625,
+            8.61962890625
+          ],
+          "rss_bytes": 366985216,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 17,
+          "backend": "reference",
+          "wall_seconds": 0.7584369168616831,
+          "cpu_seconds": 0.7575039999999991,
+          "load_before": [
+            7.64599609375,
+            8.16259765625,
+            8.61962890625
+          ],
+          "load_after": [
+            7.64599609375,
+            8.16259765625,
+            8.61962890625
+          ],
+          "rss_bytes": 369016832,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 18,
+          "backend": "reference",
+          "wall_seconds": 0.7508390420116484,
+          "cpu_seconds": 0.7497230000000012,
+          "load_before": [
+            7.64599609375,
+            8.16259765625,
+            8.61962890625
+          ],
+          "load_after": [
+            7.64599609375,
+            8.16259765625,
+            8.61962890625
+          ],
+          "rss_bytes": 376176640,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 18,
+          "backend": "native",
+          "wall_seconds": 0.0007349171210080385,
+          "cpu_seconds": 0.0031280000000002417,
+          "load_before": [
+            7.64599609375,
+            8.16259765625,
+            8.61962890625
+          ],
+          "load_after": [
+            7.64599609375,
+            8.16259765625,
+            8.61962890625
+          ],
+          "rss_bytes": 376176640,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 19,
+          "backend": "native",
+          "wall_seconds": 0.0006788750179111958,
+          "cpu_seconds": 0.002786999999999651,
+          "load_before": [
+            7.64599609375,
+            8.16259765625,
+            8.61962890625
+          ],
+          "load_after": [
+            7.64599609375,
+            8.16259765625,
+            8.61962890625
+          ],
+          "rss_bytes": 376209408,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": 1
+          },
+          "failure_count": 5
+        },
+        {
+          "repeat": 19,
+          "backend": "reference",
+          "wall_seconds": 0.7498319169972092,
+          "cpu_seconds": 0.7478949999999998,
+          "load_before": [
+            7.64599609375,
+            8.16259765625,
+            8.61962890625
+          ],
+          "load_after": [
+            7.64599609375,
+            8.16259765625,
+            8.61962890625
+          ],
+          "rss_bytes": 373997568,
+          "counts": {
+            "bonds": 52,
+            "angles": 92,
+            "chiralities": 8,
+            "planarities": 0,
+            "hydrogens": 16,
+            "clashes": null
+          },
+          "failure_count": 5
+        }
+      ],
+      "median_seconds": {
+        "reference": 0.7549506248906255,
+        "native": 0.0007168338634073734
+      },
+      "reference_over_native": 1053.1737734906512,
+      "summary": {
+        "reference": {
+          "wall_seconds": {
+            "median": 0.7549506248906255,
+            "minimum": 0.7429901668801904,
+            "maximum": 0.7742027919739485
+          },
+          "cpu_seconds": {
+            "median": 0.7537660000000002,
+            "minimum": 0.7421050000000005,
+            "maximum": 0.7734760000000005
+          },
+          "rss_bytes": {
+            "median": 348364800.0,
+            "minimum": 255590400,
+            "maximum": 376176640
+          }
+        },
+        "native": {
+          "wall_seconds": {
+            "median": 0.0007168338634073734,
+            "minimum": 0.0005839578807353973,
+            "maximum": 0.000980583019554615
+          },
+          "cpu_seconds": {
+            "median": 0.0030834999999997947,
+            "minimum": 0.0024599999999992406,
+            "maximum": 0.0035800000000003607
+          },
+          "rss_bytes": {
+            "median": 345759744.0,
+            "minimum": 255590400,
+            "maximum": 376209408
+          }
+        }
+      },
+      "cpu_reference_over_native": 244.45143505758077,
+      "input": {
+        "file": "/Users/kiarash.jamali/Documents/ChatGPT/Nibbler/tests/native_validation_remaining/iron-sulfur.cif",
+        "sha256": "b82898cda2ebd84db5ea094e8bb23ed127eb0a5246aeb27faa88fa76b6ca2b73",
+        "nuclear": false,
+        "use_cdl": true,
+        "sigma_cutoff": 5.0
+      },
+      "reference_script_sha256": "a13769b0fb4c92e49d5a718c1fe7cc3d8e054fca7ded7bdeae69a101fca2ccd0",
+      "machine": "arm64",
+      "cpu_count": 16,
+      "scope": "Warm workers include input reads, parsing, interpretation, geometry, contacts and normal reporting. Reference checks retain the scan's unchanged-atom guard. Detailed graph capture is outside timed regions. Atom-level parity must pass separately; timing alone does not prove it."
+    }
+  },
+  "limits": [
+    "General symmetry-linked covalent and metal chemistry remains unvalidated",
+    "Broader metal partner-selection controls remain required",
+    "Legacy maximum-signed plane reports can differ from native maximum-absolute reports",
+    "Small warm controls do not establish archive throughput or rejection rates"
+  ],
+  "native_binary_sha256": "b325760457143444f24ab5c43d3013e2a52302f8da0cdd923a097f3b8b37b3f4"
+}
