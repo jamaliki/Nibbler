@@ -168,4 +168,6 @@ def reduce_document(
 def validate_geometry_document(
     document: CifDocument, chem_data: str, nuclear: bool = False,
     use_cdl: bool = True, sigma_cutoff: float = 5.0, include_graph: bool = False,
+    restraint_dictionaries: list[CifDocument] | None = None,
+    restraint_links: list[tuple[str, int, int]] | None = None,
 ) -> str: ...

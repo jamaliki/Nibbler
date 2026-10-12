@@ -282,6 +282,14 @@ def compare(reference, native):
     result["mode_match"] = all(
         reference.get(name) == native.get(name) for name in ("nuclear", "use_cdl")
     )
+    result["dictionary_sources_match"] = (
+        [row["sha256"] for row in reference.get("restraint_dictionaries", [])]
+        == [row["sha256"] for row in native.get("restraint_dictionaries", [])]
+    )
+    result["requested_links_match"] = (
+        [list(row) for row in reference.get("requested_links", [])]
+        == [list(row) for row in native.get("requested_links", [])]
+    )
     result["all_required_parity"] = bool(
         reference.get("complete")
         and native.get("complete")
@@ -290,6 +298,8 @@ def compare(reference, native):
         and result["clash_pair_parity"]
         and result["source_bytes_match"]
         and result["mode_match"]
+        and result["dictionary_sources_match"]
+        and result["requested_links_match"]
         and result["restraint_decisions"]["decision_scalar_parity"]
     )
     result["scope"] = (

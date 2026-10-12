@@ -1,0 +1,166 @@
+data_comp_list
+loop_
+  _chem_comp.id
+  _chem_comp.three_letter_code
+  _chem_comp.name
+  _chem_comp.group
+  _chem_comp.number_atoms_all
+  _chem_comp.number_atoms_nh
+  _chem_comp.desc_level
+  _chem_comp.initial_date
+  _chem_comp.modified_date
+  _chem_comp.source
+  ENT  ENT  'THREONINE                           '  L-peptide  14  7  .  2009-08-12  2023-10-30  
+;
+Copy of CCP4 Monomer Library entry with added rotamer_info.
+Added neutron distances
+Added dihedrals for adding hydrogens : 2023-10-30
+;
+
+data_comp_ENT
+loop_
+  _chem_comp_atom.comp_id
+  _chem_comp_atom.atom_id
+  _chem_comp_atom.type_symbol
+  _chem_comp_atom.type_energy
+  _chem_comp_atom.partial_charge
+  ENT  N     N  NH1   -0.204
+  ENT  H     H  HNH1   0.204
+  ENT  CA    C  CH1    0.058
+  ENT  HA    H  HCH1   0.046
+  ENT  CB    C  CH1    0.089
+  ENT  HB    H  HCH1   0.050
+  ENT  OG1   O  OH1   -0.441
+  ENT  HG1   H  HOH1   0.302
+  ENT  CG2   C  CH3   -0.120
+  ENT  HG21  H  HCH3   0.040
+  ENT  HG22  H  HCH3   0.040
+  ENT  HG23  H  HCH3   0.040
+  ENT  C     C  C      0.318
+  ENT  O     O  O     -0.422
+  ENT  HNO   H  HOH1       .
+
+loop_
+  _chem_comp_tree.comp_id
+  _chem_comp_tree.atom_id
+  _chem_comp_tree.atom_back
+  _chem_comp_tree.atom_forward
+  _chem_comp_tree.connect_type
+  ENT  N     n/a  CA    START
+  ENT  H     N    .     .
+  ENT  CA    N    C     .
+  ENT  HA    CA   .     .
+  ENT  CB    CA   CG2   .
+  ENT  HB    CB   .     .
+  ENT  OG1   CB   HG1   .
+  ENT  HG1   OG1  .     .
+  ENT  CG2   CB   HG23  .
+  ENT  HG21  CG2  .     .
+  ENT  HG22  CG2  .     .
+  ENT  HG23  CG2  .     .
+  ENT  C     CA   .     END
+  ENT  O     C    .     .
+
+loop_
+  _chem_comp_bond.comp_id
+  _chem_comp_bond.atom_id_1
+  _chem_comp_bond.atom_id_2
+  _chem_comp_bond.type
+  _chem_comp_bond.value_dist
+  _chem_comp_bond.value_dist_esd
+  _chem_comp_bond.value_dist_neutron
+  ENT  N    H     coval   0.860  0.020  1.020
+  ENT  N    CA    coval   1.458  0.019  1.458
+  ENT  CA   HA    coval   0.970  0.020  1.090
+  ENT  CA   CB    coval   1.540  0.027  1.540
+  ENT  CB   HB    coval   0.970  0.020  1.090
+  ENT  CB   OG1   coval   1.433  0.016  1.433
+  ENT  OG1  HG1   coval   0.840  0.020  0.980
+  ENT  CB   CG2   coval   1.521  0.033  1.521
+  ENT  CG2  HG21  coval   0.970  0.020  1.090
+  ENT  CG2  HG22  coval   0.970  0.020  1.090
+  ENT  CG2  HG23  coval   0.970  0.020  1.090
+  ENT  CA   C     coval   1.525  0.021  1.525
+  ENT  C    O     coval    1.43    .02   1.43
+  ENT  HNO  O     single    .97    .02    .97
+
+loop_
+  _chem_comp_angle.comp_id
+  _chem_comp_angle.atom_id_1
+  _chem_comp_angle.atom_id_2
+  _chem_comp_angle.atom_id_3
+  _chem_comp_angle.value_angle
+  _chem_comp_angle.value_angle_esd
+  ENT  H     N    CA    114.000  3.000
+  ENT  HA    CA   CB    109.000  3.000
+  ENT  CB    CA   C     109.100  2.200
+  ENT  HA    CA   C     109.000  3.000
+  ENT  N     CA   HA    110.000  3.000
+  ENT  N     CA   CB    111.500  1.700
+  ENT  HB    CB   OG1   109.000  3.000
+  ENT  OG1   CB   CG2   109.300  2.000
+  ENT  HB    CB   CG2   108.000  3.000
+  ENT  CA    CB   HB    109.000  3.000
+  ENT  CA    CB   OG1   109.600  1.500
+  ENT  CB    OG1  HG1   110.000  3.000
+  ENT  CA    CB   CG2   110.500  1.700
+  ENT  HG21  CG2  HG22  109.000  3.000
+  ENT  HG22  CG2  HG23  109.000  3.000
+  ENT  HG21  CG2  HG23  109.000  3.000
+  ENT  CB    CG2  HG21  110.000  3.000
+  ENT  CB    CG2  HG22  110.000  3.000
+  ENT  CB    CG2  HG23  110.000  3.000
+  ENT  N     CA   C     111.000  2.800
+  ENT  CA    C    O     120.800  1.700
+  ENT  HNO   O    C         120      3
+
+loop_
+  _chem_comp_tor.comp_id
+  _chem_comp_tor.id
+  _chem_comp_tor.atom_id_1
+  _chem_comp_tor.atom_id_2
+  _chem_comp_tor.atom_id_3
+  _chem_comp_tor.atom_id_4
+  _chem_comp_tor.value_angle
+  _chem_comp_tor.value_angle_esd
+  _chem_comp_tor.period
+  ENT  chi1    N   CA  CB   OG1   180.000   15.000   3
+  ENT  hh1     CA  CB  OG1  HG1   180.000   30.000   3
+  ENT  hh2     CA  CB  CG2  HG23   60.000   30.000   3
+  ENT  Var_01  C   CA  N    H     170.000  180.000  72
+
+loop_
+  _chem_comp_chir.comp_id
+  _chem_comp_chir.id
+  _chem_comp_chir.atom_id_centre
+  _chem_comp_chir.atom_id_1
+  _chem_comp_chir.atom_id_2
+  _chem_comp_chir.atom_id_3
+  _chem_comp_chir.volume_sign
+  ENT  chir_01  CA  N   CB   C    negativ
+  ENT  chir_02  CB  CA  OG1  CG2  positiv
+
+loop_
+  _chem_comp_rotamer_info.comp_id
+  _chem_comp_rotamer_info.phil_str
+  ENT  
+;
+tor_ids = chi1 hh1 hh2
+tor_atom_ids = chi1 N CA CB OG1
+rotamer {
+ id = p
+ frequency = 0.4812
+ angles = 61.4 180 60
+}
+rotamer {
+ id = t
+ frequency = 0.0696
+ angles = -172.7 180 60
+}
+rotamer {
+ id = m
+ frequency = 0.4461
+ angles = -60.1 180 60
+}
+;
+

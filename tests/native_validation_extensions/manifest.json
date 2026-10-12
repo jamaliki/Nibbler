@@ -1,0 +1,410 @@
+{
+  "cases": [
+    {
+      "name": "cross-link-electron",
+      "input": "cross-link.cif",
+      "input_sha256": "1f433168ff6e2e094dc73228f5046c06d73da23feebffe973fa239136d7a58a0",
+      "reference": "cross-link-electron-reference.json.gz",
+      "reference_sha256": "afc8b745d556ead4e258d18862ddf03e45951f151ca8dde9135c438a46945f78",
+      "dictionaries": [
+        {
+          "file": "cross-link-dictionary.cif",
+          "sha256": "c2d1e9c97426ee6acbe8fc7c4905438f68602f025afc6796c07dd65e3f0a01f9"
+        }
+      ],
+      "links": [
+        [
+          "XLINK",
+          0,
+          3
+        ]
+      ],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "cross-link-nuclear",
+      "input": "cross-link.cif",
+      "input_sha256": "1f433168ff6e2e094dc73228f5046c06d73da23feebffe973fa239136d7a58a0",
+      "reference": "cross-link-nuclear-reference.json.gz",
+      "reference_sha256": "7f01fe64a3c4a981ebc7db57acd64c4d28af23e2c7bae3e65a7504106256f884",
+      "dictionaries": [
+        {
+          "file": "cross-link-dictionary.cif",
+          "sha256": "c2d1e9c97426ee6acbe8fc7c4905438f68602f025afc6796c07dd65e3f0a01f9"
+        }
+      ],
+      "links": [
+        [
+          "XLINK",
+          0,
+          3
+        ]
+      ],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "custom-ZZZ-electron",
+      "input": "custom-ZZZ-model.cif",
+      "input_sha256": "222baa7374707ae775b724a845ecc6c6175160df40381a13529ab0e48d604ed0",
+      "reference": "custom-ZZZ-electron-reference.json.gz",
+      "reference_sha256": "2f0f2ac4825af0060a0c9d727ed9d8516f13e0a44042768993c879ef7e516105",
+      "dictionaries": [
+        {
+          "file": "custom-ZZZ.cif",
+          "sha256": "6c5c2339f37b1e4fcfa3eac2ccf935aea8748334c6ae72f10d230f478f5de447"
+        }
+      ],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "custom-ZZZ-nuclear",
+      "input": "custom-ZZZ-model.cif",
+      "input_sha256": "222baa7374707ae775b724a845ecc6c6175160df40381a13529ab0e48d604ed0",
+      "reference": "custom-ZZZ-nuclear-reference.json.gz",
+      "reference_sha256": "c025834a16b49ecebb5459b181438d54198dde18b8034e01ae237b799e01abe2",
+      "dictionaries": [
+        {
+          "file": "custom-ZZZ.cif",
+          "sha256": "6c5c2339f37b1e4fcfa3eac2ccf935aea8748334c6ae72f10d230f478f5de447"
+        }
+      ],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "enol-isolated-electron",
+      "input": "enol-isolated.cif",
+      "input_sha256": "779ee9a0d297395af8ad60bdfa7c5bc98e2c6efd9e45e0a7570d111b80059477",
+      "reference": "enol-isolated-electron-reference.json.gz",
+      "reference_sha256": "3afe77fb3ba61c4f7894c9ec8aa22feaf5275d345b0207bf7b750f4f15214ac9",
+      "dictionaries": [
+        {
+          "file": "enol-ALA.cif",
+          "sha256": "fe0447b1feab79f932489335d11b4686b6880c02f93f28dd710ec85928f11e14"
+        }
+      ],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "enol-isolated-nuclear",
+      "input": "enol-isolated.cif",
+      "input_sha256": "779ee9a0d297395af8ad60bdfa7c5bc98e2c6efd9e45e0a7570d111b80059477",
+      "reference": "enol-isolated-nuclear-reference.json.gz",
+      "reference_sha256": "d94df5e4c149fc7c77aa5a89c3296e370952430004f3451c9800e129b5394979",
+      "dictionaries": [
+        {
+          "file": "enol-ALA.cif",
+          "sha256": "fe0447b1feab79f932489335d11b4686b6880c02f93f28dd710ec85928f11e14"
+        }
+      ],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "enol-linked-electron",
+      "input": "enol-linked.cif",
+      "input_sha256": "bca45e3ce3d4932421fcc8d5d5432c4c9e5663541db5495ec8c53ed89306b1ff",
+      "reference": "enol-linked-electron-reference.json.gz",
+      "reference_sha256": "5164cf8f740f07f54dd1eacc3a082d765e7aea86acf780936ff36c366d00004f",
+      "dictionaries": [
+        {
+          "file": "enol-THR.cif",
+          "sha256": "df4fe0c9a4865cd74ccddf2f131c1cf5ee0a9164c2bfd54f7caee422c97003ae"
+        }
+      ],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "enol-linked-nuclear",
+      "input": "enol-linked.cif",
+      "input_sha256": "bca45e3ce3d4932421fcc8d5d5432c4c9e5663541db5495ec8c53ed89306b1ff",
+      "reference": "enol-linked-nuclear-reference.json.gz",
+      "reference_sha256": "9790e90ad8276e1f30f44a55ae610dc236872e99358396aadd3d0f8665e7e0a7",
+      "dictionaries": [
+        {
+          "file": "enol-THR.cif",
+          "sha256": "df4fe0c9a4865cd74ccddf2f131c1cf5ee0a9164c2bfd54f7caee422c97003ae"
+        }
+      ],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "modified-link-electron",
+      "input": "modified-link.cif",
+      "input_sha256": "1f433168ff6e2e094dc73228f5046c06d73da23feebffe973fa239136d7a58a0",
+      "reference": "modified-link-electron-reference.json.gz",
+      "reference_sha256": "4b0a81d7cfbe10bc210daeaf3f618dc724214e016859e3186c8e390222e2106e",
+      "dictionaries": [
+        {
+          "file": "modified-link-dictionary.cif",
+          "sha256": "446462586dd0bd8dd50c96d7765e579aab2b248f2c4fbdb97066fe37f2fa061a"
+        }
+      ],
+      "links": [
+        [
+          "XLINK",
+          0,
+          3
+        ]
+      ],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "modified-link-nuclear",
+      "input": "modified-link.cif",
+      "input_sha256": "1f433168ff6e2e094dc73228f5046c06d73da23feebffe973fa239136d7a58a0",
+      "reference": "modified-link-nuclear-reference.json.gz",
+      "reference_sha256": "5c55847b129f792db844e85ded8412721726b72aa570162815931ea998c365c3",
+      "dictionaries": [
+        {
+          "file": "modified-link-dictionary.cif",
+          "sha256": "446462586dd0bd8dd50c96d7765e579aab2b248f2c4fbdb97066fe37f2fa061a"
+        }
+      ],
+      "links": [
+        [
+          "XLINK",
+          0,
+          3
+        ]
+      ],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "nucleotide-A-electron",
+      "input": "nucleotide-A.cif",
+      "input_sha256": "d8190ddffbdf0cc569fcb26c64cd8002a0987ede8fc4b7695f8cf0864ef259b3",
+      "reference": "nucleotide-A-electron-reference.json.gz",
+      "reference_sha256": "e729d8fe9b6b61afd5bc1b1fd5591a8e1054fa90e6f4b6ddd621c2aa0f50957c",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "nucleotide-A-nuclear",
+      "input": "nucleotide-A.cif",
+      "input_sha256": "d8190ddffbdf0cc569fcb26c64cd8002a0987ede8fc4b7695f8cf0864ef259b3",
+      "reference": "nucleotide-A-nuclear-reference.json.gz",
+      "reference_sha256": "269a6faf65fe94ed4e523aa7e65cf8bfc5ec186201b32256a6f54a7f48833860",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "nucleotide-A-pair-electron",
+      "input": "nucleotide-A-pair.cif",
+      "input_sha256": "c6a8d99e08ba720a00db0a4f52152aa89e72e905d19ab2d39cf6e7fdad190ce2",
+      "reference": "nucleotide-A-pair-electron-reference.json.gz",
+      "reference_sha256": "532de1ddd5967839c2994d1c65f2f5beaef79789ff980fd438b5573dd738773c",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "nucleotide-A-pair-nuclear",
+      "input": "nucleotide-A-pair.cif",
+      "input_sha256": "c6a8d99e08ba720a00db0a4f52152aa89e72e905d19ab2d39cf6e7fdad190ce2",
+      "reference": "nucleotide-A-pair-nuclear-reference.json.gz",
+      "reference_sha256": "6a0fd24f8b93eea0249b56a2d1102663417be936ab7ad8e93cf766ce56d4c98f",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "nucleotide-C-electron",
+      "input": "nucleotide-C.cif",
+      "input_sha256": "94e4cdc31d6e1f6633b1fb4c221152097ab2b732d5ed7fa7d81b8afcacc9863e",
+      "reference": "nucleotide-C-electron-reference.json.gz",
+      "reference_sha256": "14d1c499c721e9fc57785d15128932433ca474d2a8fff78ba0c5c480101c6902",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "nucleotide-C-nuclear",
+      "input": "nucleotide-C.cif",
+      "input_sha256": "94e4cdc31d6e1f6633b1fb4c221152097ab2b732d5ed7fa7d81b8afcacc9863e",
+      "reference": "nucleotide-C-nuclear-reference.json.gz",
+      "reference_sha256": "07dd74c9792410239c23286fbc71bb19d06470cd4452ba02cba9f26514d8a218",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "nucleotide-DA-electron",
+      "input": "nucleotide-DA.cif",
+      "input_sha256": "28f2268fbf801cb0c7ee3deac0f4e5e63fb74f906c025196cb23e91c0b80291b",
+      "reference": "nucleotide-DA-electron-reference.json.gz",
+      "reference_sha256": "7f9640eff40339398dcafc11c043bdb5f42eddfb0827d5a6650b8183ecf2f110",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "nucleotide-DA-nuclear",
+      "input": "nucleotide-DA.cif",
+      "input_sha256": "28f2268fbf801cb0c7ee3deac0f4e5e63fb74f906c025196cb23e91c0b80291b",
+      "reference": "nucleotide-DA-nuclear-reference.json.gz",
+      "reference_sha256": "8ae31c3af854eb06e8f04f7443d5840acb80bf263539f4851a01ba0b82d91f91",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "nucleotide-DC-electron",
+      "input": "nucleotide-DC.cif",
+      "input_sha256": "65064a06f270ce89750b43894778326261e935398b06742b103adc2107016117",
+      "reference": "nucleotide-DC-electron-reference.json.gz",
+      "reference_sha256": "5b5b56f6e9112550dd992f5842cc92c04f668ea26674fa0fad9dbe0f5b6e7e45",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "nucleotide-DC-nuclear",
+      "input": "nucleotide-DC.cif",
+      "input_sha256": "65064a06f270ce89750b43894778326261e935398b06742b103adc2107016117",
+      "reference": "nucleotide-DC-nuclear-reference.json.gz",
+      "reference_sha256": "eef3941a7f92a41c9a9f16dd6556c96f1b4cb9f64d027e481d2a01a220f26e20",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "nucleotide-DG-electron",
+      "input": "nucleotide-DG.cif",
+      "input_sha256": "a26a642c51d17ca6ed776a1f4a5064770ab3c8718d52c1de11b98ea4d510cbda",
+      "reference": "nucleotide-DG-electron-reference.json.gz",
+      "reference_sha256": "1f3747dc59bb27878dbcd77cace4255d6fc98f14f58d5ecd4d1a06f306ed957a",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "nucleotide-DG-nuclear",
+      "input": "nucleotide-DG.cif",
+      "input_sha256": "a26a642c51d17ca6ed776a1f4a5064770ab3c8718d52c1de11b98ea4d510cbda",
+      "reference": "nucleotide-DG-nuclear-reference.json.gz",
+      "reference_sha256": "7a5f9375de701bda6f55629350117d029ebef6c68cfa15ec5e27488a088c4e6f",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "nucleotide-DT-electron",
+      "input": "nucleotide-DT.cif",
+      "input_sha256": "72c28add5dc68d3229626140cd53b86334afe7c2b71043e66b69ddc030d019a1",
+      "reference": "nucleotide-DT-electron-reference.json.gz",
+      "reference_sha256": "c5eea54d8d4b4385c533ee4c966b7af511492250c40ae7ed6bffd92dcddcaf08",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "nucleotide-DT-nuclear",
+      "input": "nucleotide-DT.cif",
+      "input_sha256": "72c28add5dc68d3229626140cd53b86334afe7c2b71043e66b69ddc030d019a1",
+      "reference": "nucleotide-DT-nuclear-reference.json.gz",
+      "reference_sha256": "2eb5fb58f66cfbb1e39b15f714adc0532ea4f7aa52b4034d5d62dfd6f0eb1935",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "nucleotide-G-electron",
+      "input": "nucleotide-G.cif",
+      "input_sha256": "b6d9353f3d20a8abd0904fb40663a38756ef0cda4bf0a6333fdfcf40095fd9b7",
+      "reference": "nucleotide-G-electron-reference.json.gz",
+      "reference_sha256": "b57c82fc3fff2146c994ffc3056c7884836eb21c9243e215dd6b1ab9bc8b5790",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "nucleotide-G-nuclear",
+      "input": "nucleotide-G.cif",
+      "input_sha256": "b6d9353f3d20a8abd0904fb40663a38756ef0cda4bf0a6333fdfcf40095fd9b7",
+      "reference": "nucleotide-G-nuclear-reference.json.gz",
+      "reference_sha256": "86886b868fd15eff903eb5e5f71135a20fce25c1d054eec39899a293bed7642f",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "nucleotide-U-electron",
+      "input": "nucleotide-U.cif",
+      "input_sha256": "c43399e23ee151ad45760271c0d9607da11e8de974c47dd30a61bfb024979f74",
+      "reference": "nucleotide-U-electron-reference.json.gz",
+      "reference_sha256": "e97ff606685b55e96bb1c167d60712a22ece1e4e55385f447c13eaccb3a8605c",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "nucleotide-U-nuclear",
+      "input": "nucleotide-U.cif",
+      "input_sha256": "c43399e23ee151ad45760271c0d9607da11e8de974c47dd30a61bfb024979f74",
+      "reference": "nucleotide-U-nuclear-reference.json.gz",
+      "reference_sha256": "fbf3e5e14db5c93c3e0ef6d840b8e3f17ddb22814e7fc1948e1edabe9242cb44",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    },
+    {
+      "name": "swapped-val-electron",
+      "input": "crambin-swapped-val.cif",
+      "input_sha256": "887302f84de46a153c36d1a0a8bab1603f3ca5d73ac1dcd86071dc01a5d040ac",
+      "reference": "swapped-val-electron-reference.json.gz",
+      "reference_sha256": "a2473d399fb75a194dc4b527fc657cc8b424fb09606ae46c892a6d1fea6f26fc",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": false,
+      "use_cdl": true
+    },
+    {
+      "name": "swapped-val-nuclear",
+      "input": "crambin-swapped-val.cif",
+      "input_sha256": "887302f84de46a153c36d1a0a8bab1603f3ca5d73ac1dcd86071dc01a5d040ac",
+      "reference": "swapped-val-nuclear-reference.json.gz",
+      "reference_sha256": "a9b1742cae7907a126f77d1c45983c7b52a0617882f7f9aa60eab8357c8e01b0",
+      "dictionaries": [],
+      "links": [],
+      "nuclear": true,
+      "use_cdl": true
+    }
+  ],
+  "reference": "CCTBX 2026.9 and Probe2",
+  "count": 30
+}
