@@ -31,21 +31,6 @@ pub(super) fn unsupported(block: &CifBlock) -> Vec<String> {
     {
         reasons.push("Save-frame restraint inputs need reference interpretation".into());
     }
-    if let Some(table) = BlockSource::new(block).table("struct_conn") {
-        for name in ["ptnr1_symmetry", "ptnr2_symmetry"] {
-            let Some(column) = table.column(name) else {
-                continue;
-            };
-            for row in 0..table.row_count() {
-                let value = table.cell(row, column);
-                if !matches!(value.trim(), "1_555" | ".") {
-                    reasons.push(format!(
-                        "Connection row {row} has unsupported {name}={value}"
-                    ));
-                }
-            }
-        }
-    }
     reasons
 }
 
@@ -101,13 +86,12 @@ mod tests {
     use crate::cif::parse;
 
     #[test]
-    fn connection_symmetry_cannot_disappear_into_the_preparation_model()
+    fn source_check_leaves_connection_images_to_weighted_coverage()
     -> Result<(), Box<dyn std::error::Error>> {
         let input = b"data_test\nloop_\n_struct_conn.ptnr1_symmetry\n_struct_conn.ptnr2_symmetry\n1_555 2_555\n";
         let document = parse(input)?;
         let reasons = unsupported(&document.blocks()[0]);
-        assert_eq!(reasons.len(), 1);
-        assert!(reasons[0].contains("ptnr2_symmetry=2_555"));
+        assert!(reasons.is_empty());
         Ok(())
     }
 

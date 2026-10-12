@@ -41,15 +41,17 @@ and records source atom rows. The source document stays unchanged.
 
 Weighted automatic dictionary, glycosidic, zinc and iron-sulfur links and
 disulfide image operators now have controls described in
-[Native link validation](native-validation-links.md). General symmetry-linked
-chemistry and unknown or CCD-derived components without full restraints still
-need reference checks. Save-frame dictionaries, unsupported
+[Native link validation](native-validation-links.md). The six checks now run
+through native interpretation, weighted geometry and Probe contacts without
+CCTBX imports or a Probe2 process. Unknown or CCD-derived components without
+full typed restraints remain incomplete. Save-frame dictionaries, unsupported
 energy categories and malformed link definitions fail explicitly. Invalid
 formal charges and multiple coordinate blocks return errors; callers must
 select each model or assembly view before validation.
 
-An incomplete check or a score near a cutoff must use reference validation.
-Do not treat its diagnostic findings as evidence that all checks ran. This
+An incomplete check or a score near a cutoff cannot establish full coverage.
+Supply the missing chemical targets or retain an incomplete result. Do not
+treat its diagnostic findings as evidence that all checks ran. This
 API does not select training entries, change screening criteria or assign a
 whole-entry rejection policy.
 

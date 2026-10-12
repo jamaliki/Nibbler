@@ -1,0 +1,54 @@
+data_phenix
+loop_
+  _atom_site.group_PDB
+  _atom_site.id
+  _atom_site.label_atom_id
+  _atom_site.label_alt_id
+  _atom_site.label_comp_id
+  _atom_site.auth_asym_id
+  _atom_site.auth_seq_id
+  _atom_site.pdbx_PDB_ins_code
+  _atom_site.Cartn_x
+  _atom_site.Cartn_y
+  _atom_site.Cartn_z
+  _atom_site.occupancy
+  _atom_site.B_iso_or_equiv
+  _atom_site.type_symbol
+  _atom_site.pdbx_formal_charge
+  _atom_site.label_asym_id
+  _atom_site.label_entity_id
+  _atom_site.label_seq_id
+  _atom_site.auth_atom_id
+  _atom_site.pdbx_PDB_model_num
+  ATOM   1  N    .  HIS  A  1  ?  4.79900   0.29900   3.95000  1.000  10.00000  N   ?  A  ?  1  N    1
+  ATOM   2  CA   .  HIS  A  1  ?  4.16600   0.96900   2.77900  1.000  10.00000  C   ?  A  ?  1  CA   1
+  ATOM   3  C    .  HIS  A  1  ?  5.06600   2.12000   2.31200  1.000  10.00000  C   ?  A  ?  1  C    1
+  ATOM   4  O    .  HIS  A  1  ?  5.29400   3.03500   3.13400  1.000  10.00000  O   ?  A  ?  1  O    1
+  ATOM   5  CB   .  HIS  A  1  ?  2.75100   1.44200   3.13300  1.000  10.00000  C   ?  A  ?  1  CB   1
+  ATOM   6  CG   .  HIS  A  1  ?  1.97400   1.97400   1.97400  1.000  10.00000  C   ?  A  ?  1  CG   1
+  ATOM   7  ND1  .  HIS  A  1  ?  1.17800   1.17800   1.17800  1.000  10.00000  N   ?  A  ?  1  ND1  1
+  ATOM   8  CD2  .  HIS  A  1  ?  1.87200   3.21300   1.47700  1.000  10.00000  C   ?  A  ?  1  CD2  1
+  ATOM   9  CE1  .  HIS  A  1  ?  0.61800   1.92300   0.23600  1.000  10.00000  C   ?  A  ?  1  CE1  1
+  ATOM  10  NE2  .  HIS  A  1  ?  1.02500   3.16300   0.39900  1.000  10.00000  N   ?  A  ?  1  NE2  1
+  ATOM  11  OXT  .  HIS  A  1  ?  5.50400   2.06000   1.14100  1.000  10.00000  O   ?  A  ?  1  OXT  1
+  ATOM  12  H    .  HIS  A  1  ?  4.89600   0.88800   4.62700  1.000  10.00000  H   ?  A  ?  1  H    1
+  ATOM  13  H2   .  HIS  A  1  ?  5.61000  -0.02300   3.72100  1.000  10.00000  H   ?  A  ?  1  H2   1
+  ATOM  14  H3   .  HIS  A  1  ?  4.28000  -0.38400   4.22900  1.000  10.00000  H   ?  A  ?  1  H3   1
+  ATOM  15  HA   .  HIS  A  1  ?  4.10600   0.30700   2.04700  1.000  10.00000  H   ?  A  ?  1  HA   1
+  ATOM  16  HB3  .  HIS  A  1  ?  2.81700   2.14200   3.81900  1.000  10.00000  H   ?  A  ?  1  HB3  1
+  ATOM  17  HB2  .  HIS  A  1  ?  2.25800   0.68900   3.52600  1.000  10.00000  H   ?  A  ?  1  HB2  1
+  ATOM  18  HD2  .  HIS  A  1  ?  2.29700   3.98300   1.80100  1.000  10.00000  H   ?  A  ?  1  HD2  1
+  ATOM  19  HE1  .  HIS  A  1  ?  0.03000   1.61600  -0.43300  1.000  10.00000  H   ?  A  ?  1  HE1  1
+  ATOM  20  HE2  .  HIS  A  1  ?  0.77900   3.86200  -0.09700  1.000  10.00000  H   ?  A  ?  1  HE2  1
+  ATOM  21  ZN   .  ZN   Z  1  ?  0.00000   0.00000   0.00000  1.000  10.00000  ZN  ?  B  ?  .  ZN   1
+
+loop_
+  _chem_comp.id
+  HIS
+  ZN
+
+loop_
+  _struct_asym.id
+  A
+  B
+

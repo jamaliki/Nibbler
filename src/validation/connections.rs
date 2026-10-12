@@ -4,6 +4,7 @@ use reduce3::model::Structure;
 
 use crate::cif::CifBlock;
 use crate::reduce::BlockSource;
+mod images;
 
 /// Preserve annotated bonds that the preparation hierarchy does not import.
 pub(super) fn uncovered(
@@ -22,9 +23,19 @@ pub(super) fn uncovered(
         let kind = connections
             .column("conn_type_id")
             .map(|column| connections.cell(row, column));
-        if kind.is_some_and(|value| !matches!(value.trim(), "covale" | "disulf" | "metalc")) {
+        if kind.is_some_and(|value| {
+            let kind = value.trim();
+            !kind.starts_with("covale") && !matches!(kind, "disulf" | "metalc" | "modres")
+        }) {
             continue;
         }
+        let image = match images::relative(&source, &connections, row, structure) {
+            Ok(image) => image,
+            Err(reason) => {
+                reasons.push(format!("Connection row {row}: {reason}"));
+                continue;
+            }
+        };
         let find = |side| {
             let fields = endpoint_fields(&connections, row, side);
             if !fields.iter().any(|(name, _)| name.ends_with("atom_id")) {
@@ -54,10 +65,17 @@ pub(super) fn uncovered(
             reasons.push(format!(
                 "Connection row {row} has missing or ambiguous atom identities"
             ));
-        } else if !graph
-            .bonds
-            .iter()
-            .any(|bond| bond.indices == [first[0].min(second[0]), first[0].max(second[0])])
+        } else if !(graph.symmetry_bonds.iter().any(|bond| {
+            bond.indices == [first[0], second[0]] && images::same(image, bond.image)
+                || bond.indices == [second[0], first[0]]
+                    && image
+                        .inverse()
+                        .is_some_and(|reverse| images::same(reverse, bond.image))
+        }) || image.is_identity()
+            && graph
+                .bonds
+                .iter()
+                .any(|bond| bond.indices == [first[0].min(second[0]), first[0].max(second[0])]))
         {
             reasons.push(format!(
                 "Connection row {row} lacks a weighted chemical link definition"

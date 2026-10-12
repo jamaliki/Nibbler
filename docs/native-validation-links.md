@@ -25,15 +25,33 @@ validation report follows mmtbx's origin-0 selection for bonds, angles and
 chiralities. `angle_origins` and `chirality_origins` expose that choice. The
 explicit `RestraintGraph` evaluator can evaluate every supplied restraint.
 
-## Limits
+## Native validation path
 
-This is not a complete production replacement yet. General symmetry-linked
-covalent and metal chemistry needs weighted image interpretation and reference
-tests beyond the disulfide control. Automatic metal partner selection also
-needs broader controls for alternate conformers, competing ligands, other
-coordination counts and boundary distances. The preparation path includes
-metal rules that CCTBX's validation path does not share; an unmatched weighted
-bond remains incomplete.
+The six agreed checks now use native interpretation, geometry and Probe
+contacts. CCTBX remains the independent test oracle; the runtime neither
+imports it nor starts a Probe2 process. The test suite blocks reference imports
+while checking a complete mixed Cys/His zinc control.
+
+Validation has its own nonbonded metal search. It applies covalent exclusions,
+1-4 scaling, conformer compatibility, charged energy radii and the reference's
+candidate order. Both MCL hooks read the same initial candidates. Preparation
+keeps its separate metal rules. The search uses a spatial index and bounds
+crystal shifts before enumerating images, including oblique cells.
+
+The forty frozen controls in `tests/native_validation_mcl` include electron and
+nuclear modes for mixed Cys/His counts, ND1/NE2 ordering, competing donors,
+alternate conformers, both sides of the 3 A cutoff, FES, F3S, SF4, translated
+zinc and annotated image bonds. They compare target weights, operator matrices,
+processed atoms, Probe typing, clash pairs and reported values. The effective
+zinc table includes an ordered mixed-nitrogen key that the live tests exposed;
+its generator records the reference source hash.
+
+Annotated connections now decode operator IDs and cell shifts and require a
+matching weighted image. Unknown operators, wrong images and missing targets
+remain incomplete. The default CCTBX automatic-link path skips general
+symmetry-related covalent candidates. Nibbler does not invent those targets.
+
+## Input limits and report differences
 
 Missing declared connections and undefined target uncertainties remain
 incomplete. A structure with a typed dictionary does not automatically have
@@ -44,9 +62,10 @@ The 1DWL comparison also exposed a reporting difference. mmtbx's plane wrapper
 takes the maximum signed deviation. Nibbler uses the maximum absolute
 standardized deviation, as the primitive plane tests specify. One captured
 plane reports 8.78267 sigma through mmtbx and 15.63550 through Nibbler. Some
-planes therefore produce additional native findings. The implementation must
-not claim whole-entry legacy report parity for this case or silently remove
-the absolute-deviation check.
+planes therefore produce additional native findings. A recorded direct-primitive
+test reproduces that discrepancy and verifies the absolute check. This case
+does not have whole-entry legacy report parity; the implementation does not
+remove the absolute-deviation check to match the wrapper.
 
 The cancelled archive scan remains stopped. These local controls do not
 measure archive rejection rates or establish a new archive ETA.
