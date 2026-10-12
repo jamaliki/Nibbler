@@ -40,6 +40,7 @@ pub(super) fn resolve_builtin(component_id: &str) -> Option<ComponentDefinition>
             atom_id: upper,
             element: element.to_owned(),
             formal_charge: record.charge,
+            leaving: None,
         }]
     });
     Some(ComponentDefinition {

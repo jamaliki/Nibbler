@@ -81,7 +81,13 @@ fn attach_component_atoms(
     for row in category_rows(
         categories,
         "chem_comp_atom",
-        ["comp_id", "atom_id", "type_symbol", "charge"],
+        [
+            "comp_id",
+            "atom_id",
+            "type_symbol",
+            "charge",
+            "pdbx_leaving_atom_flag",
+        ],
     ) {
         let component_id = required_text(&row, "chem_comp_atom", "comp_id", 0)?;
         let definition = components
@@ -91,6 +97,22 @@ fn attach_component_atoms(
             atom_id: required_text(&row, "chem_comp_atom", "atom_id", 1)?,
             element: required_text(&row, "chem_comp_atom", "type_symbol", 2)?,
             formal_charge: optional_charge(&row, "chem_comp_atom", "charge", 3)?,
+            leaving: match optional_text(&row, 4).as_deref() {
+                None => None,
+                Some("Y" | "y") => Some(true),
+                Some("N" | "n") => Some(false),
+                Some(value) => {
+                    return Err(SemanticError::new(
+                        "PDBX_ITEM_TYPE",
+                        format!("Invalid leaving-atom flag {value:?}"),
+                        vec![
+                            "category=chem_comp_atom".into(),
+                            "item=pdbx_leaving_atom_flag".into(),
+                            format!("row={}", row.row_index()),
+                        ],
+                    ));
+                }
+            },
         });
     }
     Ok(())

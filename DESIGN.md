@@ -249,6 +249,15 @@ describe the coordinates are kept; the crystal cell,
 symmetry, and assembly definitions are left out, so no consumer applies crystal symmetry
 to copies that are already present. The result is itself a valid PDBx model.
 
+Explicit preparation lives above semantic reading. `mmcif.prepare_chemistry` returns
+an immutable linked-product graph with missing template sites, charges, hydrogen
+counts, and edit records. `mmcif.select_conformer` selects a model and consistent
+residue alternatives without parent substitution. Assembly expansion also removes
+whole overlapping free-ligand copies, and `assembly_with_mapping` reports those
+aliases without another expansion. The array APIs serve callers that already own
+coordinates. [Structure preparation](docs/structure-preparation.md) defines the rules,
+limits, provenance, and downstream contract gaps.
+
 ## 9. ModelCIF semantics
 
 `profile="modelcif"` extends the same PDBx coordinate graph with immutable typed

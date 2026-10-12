@@ -201,6 +201,7 @@ part of the portable release matrix.
 - [Schema, PGO, and release workflow diagrams](tools/README.md)
 - [Python API reference](docs/python-api.md)
 - [Native chemistry and Probe validation](docs/native-validation.md)
+- [Explicit linked products, conformers, and assembly overlap](docs/structure-preparation.md)
 - [Engineering and review standard](ENGINEERING.md)
 - [Current performance architecture and qualification](docs/performance-report.md)
 - [Benchmark commands and measurement contract](benchmarks/README.md)

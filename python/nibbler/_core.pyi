@@ -67,6 +67,27 @@ class CifTable:
     ) -> CifTable: ...
     def __arrow_c_stream__(self, requested_schema: object = None) -> object: ...
 
+class PreparedChemistry:
+    @property
+    def schema_version(self) -> str: ...
+    @property
+    def atom_count(self) -> int: ...
+    @property
+    def bond_count(self) -> int: ...
+    def to_dict(self) -> dict[str, object]: ...
+
+class ConformerSelection:
+    @property
+    def atom_rows(self) -> list[int]: ...
+    @property
+    def search_nodes(self) -> int: ...
+    @property
+    def model_number(self) -> int | None: ...
+    @property
+    def schema_version(self) -> str: ...
+    @property
+    def document(self) -> CifDocument: ...
+
 class MmcifModel:
     @property
     def profile(self) -> Literal["pdbx", "modelcif"]: ...
@@ -151,12 +172,47 @@ def build_mmcif_model(
     profile: Literal["pdbx", "modelcif"],
     registry: Registry | None = None,
 ) -> MmcifModel: ...
+def prepare_mmcif_chemistry(
+    model: MmcifModel,
+    registry: Registry | None = None,
+    model_number: int = 1,
+    alternate_id: str | None = None,
+) -> PreparedChemistry: ...
+def select_mmcif_conformer(
+    model: MmcifModel, model_number: int | None = None, seed: int = 0
+) -> ConformerSelection: ...
+def select_document_conformer(
+    document: CifDocument, model_number: int | None = None, seed: int = 0
+) -> ConformerSelection: ...
+def select_conformer_arrays(
+    coordinates: list[list[float]],
+    occupancy: list[float],
+    residue_ids: list[int],
+    chain_ids: list[str],
+    sequence_ids: list[int | None],
+    atom_names: list[str],
+    alternate_ids: list[str | None],
+    bonds: list[list[int]],
+    clash_mask: list[bool],
+    seed: int = 0,
+) -> ConformerSelection: ...
+def deduplicate_assembly_arrays(
+    positions: list[list[float]],
+    source_atoms: list[int],
+    units: list[int],
+    copies: list[int],
+    eligible: list[bool],
+    occupied: list[bool],
+) -> tuple[list[int], list[list[int]]]: ...
 def _model_document(
     model: MmcifModel, mirror_local_qa_metric: int | None = None
 ) -> CifDocument: ...
 def build_assembly_document(
     model: MmcifModel, assembly_id: str | None = None
 ) -> CifDocument: ...
+def build_assembly_with_mapping(
+    model: MmcifModel, assembly_id: str | None = None
+) -> tuple[CifDocument, list[tuple[int, str, str]]]: ...
 def build_component_registry(document: CifDocument) -> Registry: ...
 def validate_mmcif_document(
     document: CifDocument, profile: Literal["pdbx", "modelcif"]
@@ -166,8 +222,12 @@ def reduce_document(
     document: CifDocument, options: Mapping[str, object]
 ) -> tuple[CifDocument, str]: ...
 def validate_geometry_document(
-    document: CifDocument, chem_data: str, nuclear: bool = False,
-    use_cdl: bool = True, sigma_cutoff: float = 5.0, include_graph: bool = False,
+    document: CifDocument,
+    chem_data: str,
+    nuclear: bool = False,
+    use_cdl: bool = True,
+    sigma_cutoff: float = 5.0,
+    include_graph: bool = False,
     restraint_dictionaries: list[CifDocument] | None = None,
     restraint_links: list[tuple[str, int, int]] | None = None,
 ) -> str: ...

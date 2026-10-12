@@ -6,6 +6,9 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
 
 ### Added
 
+- Explicit native linked-product chemistry, clash-aware conformer selection, and
+  whole-ligand assembly overlap checks, with source mappings and real-entry regressions.
+
 - Strict CIF 1.1 parsing with complete logical-document construction and preserving or
   canonical text output.
 - Direct typed Arrow projection with predicates, missing-state preservation, and

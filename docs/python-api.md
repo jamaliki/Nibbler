@@ -275,6 +275,36 @@ operator missing from `_pdbx_struct_oper_list`), `PDBX_ASSEMBLY_ASYM`,
 `PDBX_ASSEMBLY_TOO_LARGE` (over 50 million atom sites), or a `PDBX_ITEM_*` code for a
 missing or untyped operator or coordinate value.
 
+## Explicit structure preparation
+
+`mmcif.prepare_chemistry(source, registry=None, model_number=1, alternate_id=None)`
+returns an immutable `PreparedChemistry`. Its `schema_version`, `atom_count`, and
+`bond_count` do not export Python atom objects. `to_dict()` exports atom/bond records,
+edits, and diagnostics on request. Missing sites lack coordinates; inactive leaving
+atoms retain source identities. Hydrogen counts precede any pH assignment.
+
+`mmcif.select_conformer(source, model_number=None, seed=0)` returns an immutable
+`ConformerSelection` with `atom_rows`, `model_number`, `search_nodes`,
+`schema_version`, and a lazy `document` view. It selects the lowest model by default,
+uses occupancy preferences and clash constraints, and preserves chemical identity.
+It never substitutes a parent component. The array form accepts coordinates,
+occupancies, residue/chain/sequence IDs, atom names, alternates, and bond exclusions.
+The array form also requires `clash_mask`, which excludes H, D, and T from heavy-atom
+contact tests while retaining their occupancy scores.
+
+`mmcif.assembly_with_mapping(source, assembly_id=None, registry=None)` returns the
+expanded document and `(source_row, removed_label_chain, retained_label_chain)`
+triples for whole-unit overlap merges. The older partial same-atom coincidence
+rule has no mapping in this result. `mmcif.deduplicate_assembly_copies` accepts
+expanded positions, source atom IDs, unit/copy IDs, eligibility, and occupied masks;
+it returns retained rows and removed-to-retained same-source-atom pairs.
+
+All arguments after `source` in `prepare_chemistry` and `select_conformer` are
+keyword-only. `registry` is keyword-only for assembly operations. The
+[preparation contract](structure-preparation.md) gives limits, failure rules,
+provenance, and examples. These operations do not change ordinary parsing or run
+Reduce3 implicitly.
+
 ## Hydrogens with Reduce3
 
 Builds with the `reduce3` Cargo feature, which the Python package enables, can run

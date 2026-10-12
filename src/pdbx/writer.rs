@@ -229,6 +229,7 @@ fn component_atom_loop(atoms: &[(&ComponentDefinition, &ComponentAtom)]) -> CifE
         "_chem_comp_atom.atom_id",
         "_chem_comp_atom.type_symbol",
         "_chem_comp_atom.charge",
+        "_chem_comp_atom.pdbx_leaving_atom_flag",
     ];
     let values = atoms
         .iter()
@@ -281,6 +282,9 @@ fn component_atom_value(
         "atom_id" => CifValue::text(&atom.atom_id),
         "type_symbol" => CifValue::text(&atom.element),
         "charge" => optional_integer(atom.formal_charge.map(i64::from)),
+        "pdbx_leaving_atom_flag" => atom.leaving.map_or(CifValue::Unknown, |value| {
+            CifValue::text(if value { "y" } else { "n" })
+        }),
         _ => CifValue::Unknown,
     }
 }

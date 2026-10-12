@@ -275,7 +275,7 @@ fn asym_units(categories: CategoryView<'_>) -> Result<Vec<AsymUnit>, SemanticErr
         .collect()
 }
 
-fn atom_sites(categories: CategoryView<'_>) -> Result<Vec<AtomSite>, SemanticError> {
+pub(super) fn atom_sites(categories: CategoryView<'_>) -> Result<Vec<AtomSite>, SemanticError> {
     let category = "atom_site";
     category_rows(
         categories,
@@ -397,7 +397,7 @@ fn branch_scheme(categories: CategoryView<'_>) -> Result<Vec<BranchSchemeRow>, S
     .collect()
 }
 
-fn connections(categories: CategoryView<'_>) -> Result<Vec<Connection>, SemanticError> {
+pub(super) fn connections(categories: CategoryView<'_>) -> Result<Vec<Connection>, SemanticError> {
     let category = "struct_conn";
     category_rows(
         categories,
@@ -620,11 +620,13 @@ TST C1 N1 doub y
                     atom_id: "C1".to_owned(),
                     element: "C".to_owned(),
                     formal_charge: Some(1),
+                    leaving: None,
                 },
                 super::super::model::ComponentAtom {
                     atom_id: "N1".to_owned(),
                     element: "N".to_owned(),
                     formal_charge: Some(0),
+                    leaving: None,
                 },
             ]
         );

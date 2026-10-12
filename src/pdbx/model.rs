@@ -73,6 +73,7 @@ pub(super) struct ComponentAtom {
     pub atom_id: String,
     pub element: String,
     pub formal_charge: Option<i32>,
+    pub leaving: Option<bool>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

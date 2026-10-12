@@ -144,6 +144,227 @@ struct PyComponentRegistry {
     registry: Arc<ComponentRegistry>,
 }
 
+#[pyclass(name = "PreparedChemistry", module = "nibbler.mmcif", frozen)]
+struct PyPreparedChemistry {
+    graph: crate::pdbx::PreparedChemistry,
+}
+
+#[pyclass(name = "ConformerSelection", module = "nibbler.mmcif", frozen)]
+struct PyConformerSelection {
+    selected: crate::pdbx::ConformerSelection,
+    source: Option<Arc<CifDocument>>,
+}
+
+#[pymethods]
+impl PyConformerSelection {
+    #[getter]
+    fn atom_rows(&self) -> Vec<usize> {
+        self.selected.atom_rows.clone()
+    }
+    #[getter]
+    fn search_nodes(&self) -> usize {
+        self.selected.search_nodes
+    }
+    #[getter]
+    fn model_number(&self) -> Option<i64> {
+        self.selected.model_number
+    }
+    #[getter]
+    fn schema_version(&self) -> &'static str {
+        self.selected.schema_version
+    }
+    #[getter]
+    fn document(&self, py: Python<'_>) -> PyResult<PyCifDocument> {
+        let source = self
+            .source
+            .as_ref()
+            .ok_or_else(|| PyValueError::new_err("Array selection has no source document"))?;
+        let document = py
+            .detach(|| crate::pdbx::selected_atom_document(source, &self.selected.atom_rows))
+            .map_err(model_error_to_python)?;
+        Ok(PyCifDocument {
+            document: Arc::new(document),
+            schema: Some("pdbx".into()),
+        })
+    }
+}
+
+#[pyfunction]
+#[pyo3(signature = (model, model_number=None, seed=0))]
+fn select_mmcif_conformer(
+    py: Python<'_>,
+    model: &PyMmcifModel,
+    model_number: Option<i64>,
+    seed: u64,
+) -> PyResult<PyConformerSelection> {
+    let selected = py
+        .detach(|| crate::pdbx::select_conformer(model.model.coordinates(), model_number, seed))
+        .map_err(model_error_to_python)?;
+    Ok(PyConformerSelection {
+        selected,
+        source: Some(Arc::new(
+            model.model.coordinates().source_document().clone(),
+        )),
+    })
+}
+
+#[pyfunction]
+#[pyo3(signature = (document, model_number=None, seed=0))]
+fn select_document_conformer(
+    py: Python<'_>,
+    document: &PyCifDocument,
+    model_number: Option<i64>,
+    seed: u64,
+) -> PyResult<PyConformerSelection> {
+    let selected = py
+        .detach(|| crate::pdbx::select_conformer_document(&document.document, model_number, seed))
+        .map_err(model_error_to_python)?;
+    Ok(PyConformerSelection {
+        selected,
+        source: Some(Arc::clone(&document.document)),
+    })
+}
+
+#[pyfunction]
+#[pyo3(signature = (coordinates, occupancy, residue_ids, chain_ids, sequence_ids, atom_names, alternate_ids, bonds, clash_mask, seed=0))]
+#[allow(clippy::too_many_arguments)]
+fn select_conformer_arrays(
+    py: Python<'_>,
+    coordinates: Vec<[f64; 3]>,
+    occupancy: Vec<f64>,
+    residue_ids: Vec<usize>,
+    chain_ids: Vec<String>,
+    sequence_ids: Vec<Option<i64>>,
+    atom_names: Vec<String>,
+    alternate_ids: Vec<Option<String>>,
+    bonds: Vec<[usize; 2]>,
+    clash_mask: Vec<bool>,
+    seed: u64,
+) -> PyResult<PyConformerSelection> {
+    let count = coordinates.len();
+    if [
+        occupancy.len(),
+        residue_ids.len(),
+        chain_ids.len(),
+        sequence_ids.len(),
+        atom_names.len(),
+        alternate_ids.len(),
+        clash_mask.len(),
+    ]
+    .iter()
+    .any(|&n| n != count)
+    {
+        return Err(PyValueError::new_err(
+            "Conformer arrays must have equal lengths",
+        ));
+    }
+    let atoms: Vec<_> = coordinates
+        .into_iter()
+        .zip(occupancy)
+        .zip(residue_ids)
+        .zip(chain_ids)
+        .zip(sequence_ids)
+        .zip(atom_names)
+        .zip(alternate_ids)
+        .zip(clash_mask)
+        .map(
+            |(
+                ((((((coordinates, occupancy), residue), chain), sequence), atom_name), alternate),
+                clash_eligible,
+            )| {
+                crate::pdbx::ConformerAtom {
+                    coordinates,
+                    occupancy,
+                    residue,
+                    chain,
+                    sequence,
+                    atom_name,
+                    alternate,
+                    clash_eligible,
+                }
+            },
+        )
+        .collect();
+    let selected = py
+        .detach(|| crate::pdbx::select_atom_conformers(&atoms, &bonds, seed))
+        .map_err(model_error_to_python)?;
+    Ok(PyConformerSelection {
+        selected,
+        source: None,
+    })
+}
+
+#[pyfunction]
+fn deduplicate_assembly_arrays(
+    py: Python<'_>,
+    positions: Vec<[f64; 3]>,
+    source_atoms: Vec<usize>,
+    units: Vec<usize>,
+    copies: Vec<usize>,
+    eligible: Vec<bool>,
+    occupied: Vec<bool>,
+) -> PyResult<(Vec<usize>, Vec<[usize; 2]>)> {
+    let result = py
+        .detach(|| {
+            crate::pdbx::deduplicate_assembly_copies(
+                &positions,
+                &source_atoms,
+                &units,
+                &copies,
+                &eligible,
+                &occupied,
+            )
+        })
+        .map_err(model_error_to_python)?;
+    Ok((result.retained_rows, result.duplicate_pairs))
+}
+
+#[pymethods]
+impl PyPreparedChemistry {
+    #[getter]
+    fn schema_version(&self) -> &'static str {
+        self.graph.schema_version()
+    }
+
+    #[getter]
+    fn atom_count(&self) -> usize {
+        self.graph.atoms().len()
+    }
+
+    #[getter]
+    fn bond_count(&self) -> usize {
+        self.graph.bonds().len()
+    }
+
+    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyAny>> {
+        let text =
+            serde_json::to_string(&self.graph).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        py.import("json")?.call_method1("loads", (text,))
+    }
+}
+
+#[pyfunction]
+#[pyo3(signature = (model, registry=None, model_number=1, alternate_id=None))]
+fn prepare_mmcif_chemistry(
+    py: Python<'_>,
+    model: &PyMmcifModel,
+    registry: Option<&PyComponentRegistry>,
+    model_number: i64,
+    alternate_id: Option<String>,
+) -> PyResult<PyPreparedChemistry> {
+    let graph = py
+        .detach(|| {
+            crate::pdbx::prepare_chemistry(
+                model.model.coordinates(),
+                registry.map(|r| r.registry.as_ref()),
+                model_number,
+                alternate_id.as_deref(),
+            )
+        })
+        .map_err(model_error_to_python)?;
+    Ok(PyPreparedChemistry { graph })
+}
+
 #[pymethods]
 impl PyComponentRegistry {
     fn __len__(&self) -> usize {
@@ -349,6 +570,28 @@ fn build_assembly_document(
 }
 
 type DiagnosticFields = (String, String, String, Vec<String>);
+type AssemblyMappedDocument = (PyCifDocument, Vec<(usize, String, String)>);
+
+#[pyfunction]
+#[pyo3(signature = (model, assembly_id=None))]
+fn build_assembly_with_mapping(
+    py: Python<'_>,
+    model: &PyMmcifModel,
+    assembly_id: Option<String>,
+) -> PyResult<AssemblyMappedDocument> {
+    let source = model.model.coordinates();
+    let (document, merges) = py
+        .detach(|| crate::pdbx::assembly_document_with_mapping(source, assembly_id.as_deref()))
+        .map_err(model_error_to_python)?;
+    let mapping = crate::pdbx::assembly_mapping_names(source, merges);
+    Ok((
+        PyCifDocument {
+            document: Arc::new(document),
+            schema: Some("pdbx".to_owned()),
+        },
+        mapping,
+    ))
+}
 type ValidationFields = (String, String, Vec<String>, Vec<DiagnosticFields>);
 
 #[pyfunction]
@@ -836,12 +1079,20 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCifTable>()?;
     module.add_class::<PyMmcifModel>()?;
     module.add_class::<PyComponentRegistry>()?;
+    module.add_class::<PyPreparedChemistry>()?;
+    module.add_class::<PyConformerSelection>()?;
+    module.add_function(wrap_pyfunction!(select_mmcif_conformer, module)?)?;
+    module.add_function(wrap_pyfunction!(select_document_conformer, module)?)?;
+    module.add_function(wrap_pyfunction!(select_conformer_arrays, module)?)?;
+    module.add_function(wrap_pyfunction!(deduplicate_assembly_arrays, module)?)?;
+    module.add_function(wrap_pyfunction!(prepare_mmcif_chemistry, module)?)?;
     module.add_function(wrap_pyfunction!(read_file, module)?)?;
     module.add_function(wrap_pyfunction!(read_bytes, module)?)?;
     module.add_function(wrap_pyfunction!(validate_document, module)?)?;
     module.add_function(wrap_pyfunction!(build_mmcif_model, module)?)?;
     module.add_function(wrap_pyfunction!(_model_document, module)?)?;
     module.add_function(wrap_pyfunction!(build_assembly_document, module)?)?;
+    module.add_function(wrap_pyfunction!(build_assembly_with_mapping, module)?)?;
     module.add_function(wrap_pyfunction!(build_component_registry, module)?)?;
     module.add_function(wrap_pyfunction!(validate_mmcif_document, module)?)?;
     module.add_function(wrap_pyfunction!(validate_mmcif_model, module)?)?;
