@@ -81,3 +81,23 @@ parsing, chemistry, geometry, Probe contacts and normal reporting. They
 alternate backend order and retain wall time, process CPU time, laptop load
 and RSS for every trial. Detailed parity captures stay outside timed regions.
 Shared-process RSS does not measure each backend's isolated peak memory.
+
+The pinned build passed 131 Python tests without skips, all 108 Nibbler Rust
+tests and 55 owning Reduce3 tests. Nibbler library Clippy and the changed-file
+format/lint checks passed. Reduce3 still has inherited library Clippy warnings
+outside the new validation modules.
+
+Twenty paired warm trials per input measured:
+
+| Input | CCTBX/Probe2 median | Native median | Wall ratio | CPU ratio |
+| --- | ---: | ---: | ---: | ---: |
+| 1CRN, nuclear H, 642 atoms | 1.486 s | 6.349 ms | 234.1x | 161.9x |
+| Protein, electron H, 2160 atoms | 3.036 s | 18.949 ms | 160.2x | 136.1x |
+| RNA pair, electron H, 66 atoms | 0.771 s | 1.097 ms | 702.9x | 217.8x |
+
+No agent build or test ran during timing; other laptop work continued.
+One-minute load ranged from 7.65 to 8.48 on 16 logical CPUs. Native wall-time
+ranges were 5.998-7.135 ms, 18.322-19.955 ms and 0.967-1.292 ms, respectively.
+The protein input uses the earlier recorded CCTBX-processed sites. These
+measurements do not estimate the runtime of an archive scan with unknown
+fallback frequency and hydrogen-preparation costs.

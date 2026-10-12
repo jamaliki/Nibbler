@@ -1,0 +1,89 @@
+{
+  "schema": "nibbler.native-validation.extensions.v1",
+  "implementation_commit": "5343b7fe16e92348583fe8a86ddf822d4b19358d",
+  "reduce3_commit": "3312514c7724b7b853bef19e3a89ed76215dbc15",
+  "wheel_sha256": "deebcff062905d14a39e7aafd4a58bac2196f6c484b5ef281f757339a161755b",
+  "installed_binary_sha256": "19611ddacdf5ae819bc23074f4021f6249c733d9599d2c62552f152a39e63199",
+  "installed_python_source_matches_commit": true,
+  "local_dependency_override": false,
+  "tests": {
+    "python_passed": 131,
+    "python_skipped": 0,
+    "nibbler_rust_passed": 108,
+    "reduce3_rust_passed": 55,
+    "new_reference_cases": 30
+  },
+  "reference_manifest": "tests/native_validation_extensions/manifest.json",
+  "chemistry_sources": {
+    "monomers_commit": "1c97ea23a7df06373ed01cd7c3156a1f8e9b27e3",
+    "geostd_commit": "f4d21cc5f4dbf84f55cc972fb6b287354300ab2d",
+    "cctbx_version": "2026.9"
+  },
+  "timing": {
+    "trials_per_backend_per_input": 20,
+    "order": "Alternating AB/BA",
+    "scope": "Warm full validation, including reads and reporting; detailed graph capture excluded",
+    "fixtures": [
+      {
+        "name": "1crn-nuclear-extensions",
+        "records": "benchmarks/native-validation-results/1crn-nuclear-extensions.json",
+        "records_sha256": "3673e67fb148a9b4358e93eef759dc921332b3d6a1b6785b2baf9d790926946a",
+        "reference_median_seconds": 1.486186729511246,
+        "native_median_seconds": 0.0063489379826933146,
+        "wall_speedup": 234.08430410920212,
+        "cpu_speedup": 161.9178426867867,
+        "native_wall_range": [
+          0.005998458014801145,
+          0.007135499967262149
+        ],
+        "one_minute_load_range": [
+          7.65185546875,
+          7.9326171875
+        ]
+      },
+      {
+        "name": "protein-2160-electron-extensions",
+        "records": "benchmarks/native-validation-results/protein-2160-electron-extensions.json",
+        "records_sha256": "4ee1ad37d7f5d20eefb595809b4d0a5070d94456eda7f09f181c8264888ca987",
+        "reference_median_seconds": 3.036085416912101,
+        "native_median_seconds": 0.0189486671006307,
+        "wall_speedup": 160.22685927133344,
+        "cpu_speedup": 136.13154287000324,
+        "native_wall_range": [
+          0.01832183380611241,
+          0.019955207826569676
+        ],
+        "one_minute_load_range": [
+          7.919921875,
+          8.10791015625
+        ]
+      },
+      {
+        "name": "rna-pair-electron-extensions",
+        "records": "benchmarks/native-validation-results/rna-pair-electron-extensions.json",
+        "records_sha256": "723d82e4a73b473234cc363f70c244b6ced4070a22fba3acfbccf67fd7276735",
+        "reference_median_seconds": 0.7710528755560517,
+        "native_median_seconds": 0.0010969165014103055,
+        "wall_speedup": 702.9275925421024,
+        "cpu_speedup": 217.75095460331457,
+        "native_wall_range": [
+          0.0009669160936027765,
+          0.0012916249688714743
+        ],
+        "one_minute_load_range": [
+          8.244140625,
+          8.478515625
+        ]
+      }
+    ]
+  },
+  "limits": [
+    "Automatic metal/glycosidic linking and ASU symmetry remain guarded reference paths",
+    "Modified nucleotide pucker rules and chemistry without full typed restraints remain unsupported",
+    "Reference Probe fallback atom typing does not establish complete parity",
+    "Controls and protein fixtures do not establish whole-archive coverage or throughput",
+    "Shared-process RSS cannot isolate backend peak memory",
+    "Nibbler library Clippy passed; owning Reduce3 has inherited library lints outside these new modules",
+    "No scan, training or screening-policy change occurred"
+  ]
+}
