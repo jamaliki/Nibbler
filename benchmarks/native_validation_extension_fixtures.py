@@ -213,6 +213,26 @@ def nucleotide_pair(source, output):
     )
 
 
+def conflicting_enol_dictionary(source, output):
+    model = iotbx.cif.reader(file_path=str(source)).model()
+    block = model["comp_ALA"]
+    for row, (a, b) in enumerate(
+        zip(
+            block["_chem_comp_bond.atom_id_1"],
+            block["_chem_comp_bond.atom_id_2"],
+            strict=True,
+        )
+    ):
+        if {a, b} in ({"C", "O"}, {"HNO", "O"}):
+            for column in ("value_dist", "value_dist_neutron"):
+                block[f"_chem_comp_bond.{column}"][row] = "1.2"
+    for row, atom in enumerate(block["_chem_comp_angle.atom_id_1"]):
+        if atom == "HNO":
+            block["_chem_comp_angle.value_angle"][row] = "90"
+    with output.open("x") as stream:
+        stream.write(str(model))
+
+
 def fixtures(args):
     args.output.mkdir(parents=True, exist_ok=True)
     records = []
@@ -224,6 +244,9 @@ def fixtures(args):
         )
         enol_dictionary(args.chem_data / "geostd", "ALA", args.output / "enol-ALA.cif")
         enol_dictionary(args.chem_data / "geostd", "THR", args.output / "enol-THR.cif")
+        conflicting_enol_dictionary(
+            args.output / "enol-ALA.cif", args.output / "enol-target-override.cif"
+        )
     for component in ("A", "C", "G", "U", "DA", "DC", "DG", "DT"):
         file = args.chem_data / "mon_lib" / component[0].lower() / f"{component}.cif"
         if not file.exists():

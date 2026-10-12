@@ -36,11 +36,13 @@ incomplete. The API does not rewrite deposited structures.
 
 ## Independent comparisons
 
-Thirty electron/nuclear comparisons pass graph targets and weights, Probe
+Thirty-two electron/nuclear comparisons pass graph targets and weights, Probe
 atom typing, clash pairs/scores and strict sigma5 findings. They cover eight
 standard nucleotide bases, an RNA pair with both pucker choices, a deliberately
 swapped whole protein, a supplied custom component, typed isolated/linked
 enols, a cross-component chirality link and a link with a residue modification.
+Two of the controls change the supplied enol bond and angle targets; CCTBX and
+the native code preserve those targets when HNO already has a declared type.
 The fixtures are controls, rather than a representative archive sample.
 
 The enol tests also found a CCTBX/Probe limitation. CCTBX added HNO geometry
@@ -82,7 +84,7 @@ alternate backend order and retain wall time, process CPU time, laptop load
 and RSS for every trial. Detailed parity captures stay outside timed regions.
 Shared-process RSS does not measure each backend's isolated peak memory.
 
-The pinned build passed 131 Python tests without skips, all 108 Nibbler Rust
+The pinned build passed 133 Python tests without skips, all 108 Nibbler Rust
 tests and 55 owning Reduce3 tests. Nibbler library Clippy and the changed-file
 format/lint checks passed. Reduce3 still has inherited library Clippy warnings
 outside the new validation modules.
