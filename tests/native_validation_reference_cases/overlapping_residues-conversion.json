@@ -1,0 +1,9 @@
+{
+  "source": "tests/native_validation_reference_cases/overlapping_residues.pdb",
+  "source_sha256": "0c663e08a5041a7cc41e832909c44d07f15752653d6e6374736b0389ebcc2509",
+  "output": "tests/native_validation_reference_cases/overlapping_residues.cif",
+  "output_sha256": "44a724e4579d182e36661742b7387c18583b8bb8137d443fa1f185f1f8b5d841",
+  "atoms": 20,
+  "coordinates_and_ids_unchanged": true,
+  "scope": "Serialization only; no hydrogen addition, restraint processing or repair."
+}

@@ -1,0 +1,10 @@
+{
+  "source": "tests/native_validation_reference_cases/charged_too_close.pdb",
+  "source_sha256": "6e2ea9227d3396064003625932c015ec458dae10c0f9bb03f31abbc55a713515",
+  "output": "tests/native_validation_reference_cases/charged_too_close.cif",
+  "output_sha256": "78662770997a5c72bb1ad9f5b6c08329dfc4db788ea4b25dea37d530ebe27f68",
+  "atoms": 9,
+  "coordinates_and_ids_unchanged": true,
+  "identity_scope": "Model/chain/residue/component/altloc/name/element after stripping fixed-width label padding; coordinates must match exactly.",
+  "scope": "Serialization only; no hydrogen addition, restraint processing or repair."
+}

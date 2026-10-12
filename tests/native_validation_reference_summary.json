@@ -1,0 +1,31 @@
+{
+  "schema": "nibbler.native-validation.reference-summary.v1",
+  "reduce3_commit": "4ebfea46adb4707f10441f2dd9f5c3d3cd260aff",
+  "wheel_sha256": "31c88bafcddc9a1f77e3e67ef4cda5bc6937c38bca2ec558042596f7858e78ac",
+  "native_extension_sha256": "4acc118d76e8ca81fff860dac7a699181fe730bfdfc62d4eaf469d7e7fa1def8",
+  "tests": {"passed": 31, "skipped": 0},
+  "lint": "Scoped Ruff passed; staged diff check warns about preserved CIF blank EOF lines",
+  "whole_proteins": [
+    {"name": "1crn-prepared", "atoms": 642, "nuclear": true, "use_cdl": true,
+     "graph_parity": true, "initial_probe_typing_parity": true,
+     "clash_pair_parity": true, "reference_clashes": 0, "native_clashes": 0,
+     "reference_sigma5_outliers": 4, "native_sigma5_outliers": 4,
+     "outlier_categories": {"bonds": 1, "angles": 3},
+     "maximum_coordinate_error": 1.0658141036401503e-14,
+     "maximum_score_error": 1.092459456231154e-13,
+     "maximum_residual_error": 1.2505552149377763e-12},
+    {"name": "protein-2160", "atoms": 2160, "nuclear": false, "use_cdl": true,
+     "sites": "Explicit captured CCTBX processed sites; original input retained",
+     "graph_parity": true, "initial_probe_typing_parity": true,
+     "clash_pair_parity": true, "reference_sigma5_outliers": 134,
+     "native_sigma5_outliers": 134, "outlier_categories": {"bonds": 134},
+     "maximum_coordinate_error": 0}
+  ],
+  "limits": [
+    "These declared local chemistry assets differ from the cancelled archive scan",
+    "Raw protein-2160 coordinates differ from CCTBX-rounded processed sites by up to 0.0005 A",
+    "Microheterogeneity fixture has missing H and records incomplete native coverage",
+    "No whole-PDB completeness or performance claim follows from these cases",
+    "No timing run occurred during reference validation"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "source": "tests/native_validation_reference_cases/displaced_hydrogen.pdb",
+  "source_sha256": "1d26d82fc4c49f0ebc4154dece638b02e687760bdd04a069f2325834fbffb07b",
+  "output": "tests/native_validation_reference_cases/displaced_hydrogen.cif",
+  "output_sha256": "4731cdb0df031f2b0903ef213629a3a948e2f4b4bd26b3267eb83e08023ed929",
+  "atoms": 10,
+  "coordinates_and_ids_unchanged": true,
+  "scope": "Serialization only; no hydrogen addition, restraint processing or repair."
+}

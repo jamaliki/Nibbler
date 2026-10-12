@@ -1,0 +1,10 @@
+{
+  "source": "tests/native_validation_reference_cases/hydrogen_bond_contact.pdb",
+  "source_sha256": "122f19bf7bd84538654937a90409a129d7d547cce611248dc749ee6e01ee64b7",
+  "output": "tests/native_validation_reference_cases/hydrogen_bond_contact.cif",
+  "output_sha256": "291615c818e3db04779b3538b27678d1b757513086ee7b3d4d19ba9b067c8f05",
+  "atoms": 11,
+  "coordinates_and_ids_unchanged": true,
+  "identity_scope": "Model/chain/residue/component/altloc/name/element after stripping fixed-width label padding; coordinates must match exactly.",
+  "scope": "Serialization only; no hydrogen addition, restraint processing or repair."
+}

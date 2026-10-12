@@ -1,0 +1,10 @@
+{
+  "source": "tests/native_validation_reference_cases/wrong_handedness.pdb",
+  "source_sha256": "00b63db5f228c87d07bd6d0f48e74f135a687a5bb0e92f88b7f0aa2cb5ff2c21",
+  "output": "tests/native_validation_reference_cases/wrong_handedness.cif",
+  "output_sha256": "aa6f10f0d62b4733e053679e3a8ba0cffe11c792690e506a69ba59c87f809f53",
+  "atoms": 10,
+  "coordinates_and_ids_unchanged": true,
+  "identity_scope": "Model/chain/residue/component/altloc/name/element after stripping fixed-width label padding; coordinates must match exactly.",
+  "scope": "Serialization only; no hydrogen addition, restraint processing or repair."
+}

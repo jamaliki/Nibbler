@@ -1,0 +1,9 @@
+{
+  "source": "tests/native_validation_reference_cases/metal_oxygen_contact.pdb",
+  "source_sha256": "99ad10d3a8370d1c0a20cf262ca08c47e24a86adf58d6799dcc00e18741ba43a",
+  "output": "tests/native_validation_reference_cases/metal_oxygen_contact.cif",
+  "output_sha256": "0a6f816946d286f4bc0a3b6d3def466e0b3a6d310b556b07ae6a0e8133d8b3d9",
+  "atoms": 11,
+  "coordinates_and_ids_unchanged": true,
+  "scope": "Serialization only; no hydrogen addition, restraint processing or repair."
+}
