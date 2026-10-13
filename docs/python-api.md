@@ -97,6 +97,8 @@ loop. Missing values match only a missing-state predicate.
 
 - `block_count`: number of data and global blocks;
 - `schema`: attached dictionary selector, or `None`;
+- `project(category, *, columns=None, schema=None)`: a columnar table read from the
+  document without serialization or parsing;
 - `to_canonical()`: deterministic CIF 1.1 text;
 - `to_preserving()`: deterministic text using source order and valid original value
   lexemes; and
@@ -105,6 +107,12 @@ loop. Missing values match only a missing-state predicate.
 `CifTable` exposes `category`, `columns`, `len(table)`, `with_missing(policy)`, and the
 Arrow C Stream protocol. PyArrow and Polars consume the object directly; neither is a
 Nibbler runtime dependency.
+
+`nibbler.cif.project(document, category, *, columns=None, schema=None)` offers the
+same projection with schema-name normalization and structured Python errors.
+Both forms retain source row order and CIF missing kinds. Explicit `schema` selects
+typed columns; omitting it returns text columns even when the document has an
+attached schema. Projection releases the GIL and leaves the document unchanged.
 
 ```python
 import pyarrow

@@ -4,10 +4,12 @@ use std::fmt::{self, Display, Formatter};
 use std::sync::Arc;
 
 use super::SchemaName;
+use super::document::{CifDocument, CifEntry};
 use super::error::ParseError;
 use super::parser::{ParseOptions, parse_source_into};
 use super::projection_sink::TableSink;
 use super::schema::loaded_schema;
+use super::sink::ParseSink;
 use super::source::SourceBuffer;
 use super::table::{CifCell, CifTable, ColumnType, MissingKind};
 
@@ -499,6 +501,60 @@ pub fn project_source_with_options(
     let mut sink = TableSink::new(source.name(), plan);
     parse_source_into(source, options, &mut sink)?;
     sink.finish()
+}
+
+/// Project an already parsed document without serialization or parsing.
+///
+/// Output and missing-state rules match [`project`]. Provenance uses the source
+/// name `<document>` and retains block and save-frame identifiers.
+///
+/// # Errors
+///
+/// Returns the same plan, column-layout, and typed-value failures as [`project`].
+pub fn project_document(
+    document: &CifDocument,
+    plan: ProjectionPlan,
+) -> Result<CifTable, ProjectionError> {
+    let mut sink = TableSink::new("<document>", plan);
+    for block in document.blocks() {
+        sink.start_block(block.kind(), block.code());
+        project_entries(block.entries(), &mut sink)?;
+        sink.end_block();
+    }
+    sink.finish()
+}
+
+fn project_entries(entries: &[CifEntry], sink: &mut TableSink) -> Result<(), ProjectionError> {
+    for entry in entries {
+        match entry {
+            CifEntry::Item(item) => sink.item_value(item.tag(), item.value().as_ref()),
+            CifEntry::Frame(frame) => {
+                sink.start_frame(frame.code());
+                project_entries(frame.entries(), sink)?;
+                sink.end_frame();
+            }
+            CifEntry::Loop(cif_loop) => {
+                sink.start_loop(cif_loop.tags());
+                let selected: Vec<_> = (0..cif_loop.column_count())
+                    .filter(|&column| sink.wants_loop_value(column))
+                    .collect();
+                for row in 0..cif_loop.row_count() {
+                    for &column in &selected {
+                        let value = cif_loop.value(row, column).ok_or_else(|| {
+                            ProjectionError::new(
+                                ProjectionErrorCode::IncompatibleColumns,
+                                "document loop row lacks its declared column",
+                            )
+                        })?;
+                        sink.loop_document_value(column, value);
+                    }
+                    sink.end_loop_row();
+                }
+                sink.end_loop();
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(feature = "robustness")]

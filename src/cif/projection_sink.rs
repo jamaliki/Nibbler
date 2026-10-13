@@ -1,6 +1,6 @@
 use std::thread;
 
-use super::document::BlockKind;
+use super::document::{BlockKind, CifValueRef};
 use super::error::ParseErrorCode;
 use super::lexer::Lexer;
 use super::parallel::{LoopKernel, ParallelLoop, ProjectedChunk, scan_projected_loop};
@@ -82,6 +82,33 @@ impl TableSink {
             })?;
         }
         Ok(table)
+    }
+
+    pub(super) fn item_value(&mut self, tag: &str, value: CifValueRef<'_>) {
+        let Some((_, item)) = split_tag(tag)
+            .filter(|(category, _)| category.eq_ignore_ascii_case(&self.plan.category))
+        else {
+            return;
+        };
+        if let Some(spec) = self.column_spec(item) {
+            self.scalar_values.push((spec, cell_from_document(value)));
+        }
+    }
+
+    pub(super) fn loop_document_value(&mut self, column_index: usize, value: CifValueRef<'_>) {
+        let Some(cif_loop) = &mut self.current_loop else {
+            return;
+        };
+        let Some(target_index) = cif_loop.target_by_tag[column_index] else {
+            return;
+        };
+        if cif_loop.columns.predicate_columns.is_empty() {
+            if let Err(message) = self.table.columns[target_index].append_value(value) {
+                self.set_error(ProjectionErrorCode::SchemaType, message);
+            }
+        } else {
+            cif_loop.values[target_index] = Some(cell_from_document(value));
+        }
     }
 
     fn take_table(&mut self) -> CifTable {
@@ -216,6 +243,16 @@ impl TableSink {
             return None;
         };
         Some(ColumnSpec::new(item, column_type))
+    }
+}
+
+fn cell_from_document(value: CifValueRef<'_>) -> CifCell {
+    match value {
+        CifValueRef::Text(text) => CifCell::Text(text.as_str().to_owned()),
+        CifValueRef::Integer(number, _) => CifCell::Text(number.to_string()),
+        CifValueRef::Float(number, _, _) => CifCell::Text(number.to_string()),
+        CifValueRef::Unknown => CifCell::Unknown,
+        CifValueRef::NotApplicable => CifCell::NotApplicable,
     }
 }
 

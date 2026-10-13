@@ -4,6 +4,7 @@ use arrow_array::builder::{Float64Builder, Int64Builder, StringBuilder, UInt8Bui
 use arrow_array::{Array, ArrayRef, Float64Array, Int64Array, StringArray, UInt8Array};
 use arrow_schema::DataType;
 
+use super::document::CifValueRef;
 use super::numeric::{parse_float, parse_integer};
 use super::sink::ParsedValue;
 
@@ -342,6 +343,17 @@ impl ColumnBuilder {
                 self.append_text(value.as_str())?;
                 self.missing.append_value(0);
             }
+        }
+        Ok(())
+    }
+
+    pub(super) fn append_value(&mut self, value: CifValueRef<'_>) -> Result<(), String> {
+        match value {
+            CifValueRef::Text(text) => self.append_text_value(text.as_str())?,
+            CifValueRef::Integer(number, _) => self.append_integer_value(number),
+            CifValueRef::Float(number, _, _) => self.append_float_value(number)?,
+            CifValueRef::Unknown => self.append_missing(MissingKind::Unknown),
+            CifValueRef::NotApplicable => self.append_missing(MissingKind::NotApplicable),
         }
         Ok(())
     }

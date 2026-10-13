@@ -8,8 +8,8 @@ use crate::cif::{
     ArrowMissingPolicy, BinaryCifError, CifDocument, CifTable, InputError, InputLimits,
     LoadedBytes, MissingKind, ParseError, Predicate, ProjectionError, ProjectionPlan, SchemaName,
     SourceBuffer, decode_binary, decode_input, encode_binary, export_arrow_stream,
-    is_binary_container, parse_source, project_binary_named, project_source, read_input_file,
-    validate_document as validate_cif_document, write_canonical, write_preserving,
+    is_binary_container, parse_source, project_binary_named, project_document, project_source,
+    read_input_file, validate_document as validate_cif_document, write_canonical, write_preserving,
 };
 use crate::modelcif::{
     ModelCifModel, build_model_with_registry as build_modelcif_with_registry,
@@ -84,6 +84,29 @@ impl PyCifDocument {
     /// Return the dictionary selector requested at read time, if any.
     fn schema(&self) -> Option<&str> {
         self.schema.as_deref()
+    }
+
+    /// Project a category from this document without serialization or parsing.
+    #[pyo3(signature = (category, *, columns=None, schema=None))]
+    fn project(
+        &self,
+        py: Python<'_>,
+        category: String,
+        columns: Option<Vec<String>>,
+        schema: Option<String>,
+    ) -> PyResult<PyCifTable> {
+        let plan = build_optional_plan(Some(category), columns, Vec::new(), schema)
+            .map_err(error_to_python)?
+            .ok_or_else(|| PyValueError::new_err("Projection requires a category"))?;
+        let document = Arc::clone(&self.document);
+        let table = py
+            .detach(move || project_document(&document, plan))
+            .map_err(|error| error_to_python(ReadFailure::Projection(error)))?;
+        Ok(PyCifTable {
+            table: Arc::new(table),
+            missing: ArrowMissingPolicy::Collapse,
+            include_provenance: false,
+        })
     }
 
     /// Serialize the document using Nibbler's canonical CIF policy.

@@ -98,6 +98,23 @@ def read(
     return native
 
 
+def project(
+    document: CifDocument,
+    category: str,
+    *,
+    columns: Sequence[str] | None = None,
+    schema: str | None = None,
+) -> CifTable:
+    """Project one category from a parsed document without parsing it again."""
+    if not isinstance(document, CifDocument):
+        raise TypeError("nibbler.cif.project() requires CifDocument")
+    normalized_schema = None if schema is None else _normalize_schema(schema)
+    try:
+        return document.project(category, columns=columns, schema=normalized_schema)
+    except ValueError as error:
+        raise_read_error(error)
+
+
 def scan(
     sources: Iterable[Source],
     *,

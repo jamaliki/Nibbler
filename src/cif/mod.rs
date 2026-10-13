@@ -63,8 +63,8 @@ pub use parser::{
     Limits, ParseOptions, parse, parse_source, parse_source_with_options, parse_with_options,
 };
 pub use projection::{
-    Predicate, ProjectionError, ProjectionErrorCode, ProjectionPlan, project, project_source,
-    project_source_with_options, project_with_options,
+    Predicate, ProjectionError, ProjectionErrorCode, ProjectionPlan, project, project_document,
+    project_source, project_source_with_options, project_with_options,
 };
 pub use schema::{SchemaError, SchemaName};
 pub use schema_artifact::encode_dictionary;
