@@ -57,7 +57,6 @@ pub(crate) struct PyCifDocument {
     schema: Option<String>,
 }
 
-#[cfg(feature = "reduce3")]
 impl PyCifDocument {
     pub(crate) const fn new(document: Arc<CifDocument>, schema: Option<String>) -> Self {
         Self { document, schema }

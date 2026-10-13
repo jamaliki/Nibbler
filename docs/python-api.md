@@ -395,3 +395,26 @@ All public failures derive from `NibblerError`:
 Parse-derived errors expose a stable `code`, message, source name, byte span, and
 one-based line and display column when available. Code and structured fields are the
 machine contract; human-readable messages may add detail.
+# Native coordinate observations
+
+`nibbler.observations.ObservationPacker(schema_json, elements, excluded)` keeps
+the caller's Atom32 slot/state schema and ligand feature tables in Rust.
+`add_component(name, features)` accepts atom-name keys and four values per atom:
+formal charge, hybridization, total hydrogen count, and charge-known flag.
+The packer does not infer or change these CCD values.
+
+`pack(document, ...)` reads selected atoms directly from the document and
+returns `(arrays, keys)`. Each array is `(dtype, shape, buffer)`; its writable
+buffer owns the storage. NumPy can view it with `frombuffer(...).reshape(...)`.
+Packing releases the GIL. It preserves source token identities, geometric
+hydrogen parents, known/unknown labels, and covalent attachment indices.
+`complete_tokens=True` removes incomplete canonical protein tokens, and
+`expected_keys` aligns tokens to the index's JSON identities. `validate=True`
+checks observed atoms and presence labels against allowed chemical states;
+an incompatible residue raises an error with its row and identity. Raw
+alternate choices must be selected before packing.
+
+`protein_document(positions, masks, identities, identifier)` builds a parsed
+document directly from float32 Atom14 coordinates, boolean masks and int64
+residue identities. It splits peptide breaks using the existing distance
+policy. No Python atom objects, CIF text construction or reparse are needed.

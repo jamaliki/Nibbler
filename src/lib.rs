@@ -13,6 +13,8 @@ pub mod cif;
 pub mod geometry;
 pub mod modelcif;
 pub mod pdbx;
+#[cfg(feature = "python")]
+mod observations;
 #[cfg(feature = "reduce3")]
 pub mod reduce;
 #[cfg(feature = "reduce3")]
@@ -22,6 +24,8 @@ pub mod validation;
 mod python;
 #[cfg(feature = "python")]
 mod python_geometry;
+#[cfg(feature = "python")]
+mod python_observations;
 #[cfg(all(feature = "python", feature = "reduce3"))]
 mod python_reduce;
 #[cfg(feature = "python")]
@@ -69,6 +73,7 @@ fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(build_profile, module)?)?;
     python::register(module)?;
     python_geometry::register(module)?;
+    python_observations::register(module)?;
     #[cfg(feature = "reduce3")]
     python_validation::register(module)?;
     Ok(())
