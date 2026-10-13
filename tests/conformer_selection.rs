@@ -135,3 +135,87 @@ fn symmetry_image_bond_does_not_exempt_an_asu_clash() {
     let result = _core::pdbx::select_conformer_document(&same_image, None, 0).expect("selection");
     assert_eq!(result.atom_rows, [0, 2]);
 }
+
+#[test]
+fn scalar_links_and_anisotrop_follow_the_selected_source_rows() {
+    let tags = [
+        "group_PDB",
+        "id",
+        "type_symbol",
+        "label_atom_id",
+        "label_alt_id",
+        "label_comp_id",
+        "label_asym_id",
+        "label_entity_id",
+        "label_seq_id",
+        "Cartn_x",
+        "Cartn_y",
+        "Cartn_z",
+        "occupancy",
+        "auth_seq_id",
+        "auth_comp_id",
+        "auth_asym_id",
+        "auth_atom_id",
+        "pdbx_PDB_model_num",
+    ]
+    .map(|name| format!("_atom_site.{name}"))
+    .join("\n");
+    let source = format!(
+        "data_scalar\n_entry.id scalar\nloop_\n{tags}\n\
+        ATOM 1 C C1 A LIG A 1 . 0 0 0 .8 1 LIG A C1 1\n\
+        ATOM 2 C C1 B LIG A 1 . 10 0 0 .2 1 LIG A C1 1\n\
+        ATOM 3 C C1 . LIG B 2 . .5 0 0 1 1 LIG B C1 1\n\
+        _atom_site_anisotrop.id 1\n_atom_site_anisotrop.U[1][1] .01\n\
+        _struct_conn.id link\n_struct_conn.conn_type_id covale\n\
+        _struct_conn.ptnr1_label_asym_id A\n_struct_conn.ptnr1_label_atom_id C1\n\
+        _struct_conn.pdbx_ptnr1_label_alt_id A\n\
+        _struct_conn.ptnr2_label_asym_id B\n_struct_conn.ptnr2_label_atom_id C1\n"
+    );
+    let doc = _core::cif::parse(source.as_bytes()).expect("source");
+    let selected = _core::pdbx::selected_atom_document(&doc, &[1, 2]).expect("scalar view");
+    let text = _core::cif::write_canonical(&selected).expect("selected text");
+    assert!(!text.contains("_struct_conn.id"));
+    assert!(!text.contains("_atom_site_anisotrop.id"));
+    assert!(text.contains("_entry.id scalar"));
+    let retained = source
+        .replace("_atom_site_anisotrop.id 1", "_atom_site_anisotrop.id 2")
+        .replace(
+            "_struct_conn.pdbx_ptnr1_label_alt_id A",
+            "_struct_conn.pdbx_ptnr1_label_alt_id B",
+        );
+    let doc = _core::cif::parse(retained.as_bytes()).expect("retained source");
+    let selected =
+        _core::pdbx::selected_atom_document(&doc, &[1, 2]).expect("retained scalar view");
+    let text = _core::cif::write_canonical(&selected).expect("retained text");
+    assert!(text.contains("_struct_conn.id link"));
+    assert!(text.contains("_atom_site_anisotrop.id 2"));
+    let selected = _core::pdbx::select_conformer_document(&doc, None, 0).expect("scalar conformer");
+    assert_eq!(selected.atom_rows, [1, 2]);
+}
+
+#[test]
+fn a_scalar_atom_site_is_a_single_row_table() {
+    let source = b"data_scalar\n_atom_site.group_PDB HETATM\n_atom_site.id 7\n\
+        _atom_site.type_symbol C\n_atom_site.label_atom_id C1\n_atom_site.label_alt_id .\n\
+        _atom_site.label_comp_id LIG\n_atom_site.label_asym_id A\n_atom_site.label_entity_id 1\n\
+        _atom_site.label_seq_id .\n_atom_site.Cartn_x 0\n_atom_site.Cartn_y 0\n_atom_site.Cartn_z 0\n\
+        _atom_site.occupancy 1\n_atom_site.auth_seq_id 1\n_atom_site.auth_comp_id LIG\n\
+        _atom_site.auth_asym_id A\n_atom_site.auth_atom_id C1\n_atom_site.pdbx_PDB_model_num 1\n";
+    let doc = _core::cif::parse(source).expect("scalar atom");
+    assert_eq!(
+        _core::pdbx::select_conformer_document(&doc, None, 0)
+            .expect("scalar selection")
+            .atom_rows,
+        [0]
+    );
+    assert_eq!(
+        _core::pdbx::selected_atom_document(&doc, &[0]).expect("all rows"),
+        doc
+    );
+    let empty = _core::pdbx::selected_atom_document(&doc, &[]).expect("empty selection");
+    assert!(
+        !_core::cif::write_canonical(&empty)
+            .expect("empty text")
+            .contains("_atom_site.id")
+    );
+}

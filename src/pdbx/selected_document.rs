@@ -18,8 +18,8 @@ type SiteIndex<'a> = HashMap<(&'a str, &'a str), Vec<(usize, &'a AtomSite)>>;
 ///
 /// # Errors
 ///
-/// Rejects invalid row indices, multiple atom loops, scalar coordinate categories,
-/// and mixed-category coordinate loops, which cannot represent this row view.
+/// Rejects invalid row indices, repeated atom tables, and mixed-category
+/// coordinate loops, which cannot represent this row view.
 pub fn selected_atom_document(
     source: &CifDocument,
     selected: &[usize],
@@ -39,10 +39,7 @@ pub fn selected_atom_document(
     let rows: HashSet<_> = selected.iter().copied().collect();
     let connection_rows = selected_connections(CategoryView::new(block.entries()), &rows)?;
     let mut ids = HashSet::new();
-    let has_anisotrop = block.entries().iter().any(|entry| {
-        matches!(entry, CifEntry::Loop(values)
-        if values.tags().iter().all(|tag| in_category(tag, "atom_site_anisotrop")))
-    });
+    let has_anisotrop = BlockCategory::find(block.entries(), "atom_site_anisotrop").is_some();
     if has_anisotrop && let Some(col) = table.column("id") {
         for &r in selected {
             if let Some(id) = table.text(r, col) {
@@ -52,7 +49,25 @@ pub fn selected_atom_document(
     }
     let mut entries = Vec::with_capacity(block.entries().len());
     let mut connection_offset = 0;
+    let anisotrop_keep = BlockCategory::find(block.entries(), "atom_site_anisotrop")
+        .and_then(|table| table.column("id").and_then(|col| table.text(0, col)))
+        .is_some_and(|id| ids.contains(id.as_ref()));
     for entry in block.entries() {
+        if let CifEntry::Item(item) = entry {
+            let keep = if in_category(item.tag(), "atom_site") {
+                rows.contains(&0)
+            } else if in_category(item.tag(), "atom_site_anisotrop") {
+                anisotrop_keep
+            } else if in_category(item.tag(), "struct_conn") {
+                connection_rows.contains(&0)
+            } else {
+                true
+            };
+            if keep {
+                entries.push(entry.clone());
+            }
+            continue;
+        }
         if let CifEntry::Loop(values) = entry {
             let atom = values
                 .tags()
@@ -111,11 +126,16 @@ pub fn selected_atom_document(
 
 pub(super) fn check_tables(entries: &[CifEntry]) -> Result<(), SemanticError> {
     let mut atom_loops = 0;
+    let mut scalar = [false; 3];
+    let mut loops = [0; 3];
     for entry in entries {
-        for category in ["atom_site", "atom_site_anisotrop", "struct_conn"] {
+        for (index, category) in ["atom_site", "atom_site_anisotrop", "struct_conn"]
+            .into_iter()
+            .enumerate()
+        {
             match entry {
                 CifEntry::Item(item) if in_category(item.tag(), category) => {
-                    return Err(error("Selection requires looped coordinate categories"));
+                    scalar[index] = true;
                 }
                 CifEntry::Loop(values)
                     if values.tags().iter().any(|tag| in_category(tag, category)) =>
@@ -128,13 +148,23 @@ pub(super) fn check_tables(entries: &[CifEntry]) -> Result<(), SemanticError> {
                     if category == "atom_site" {
                         atom_loops += 1;
                     }
+                    loops[index] += 1;
                 }
                 _ => {}
             }
         }
     }
-    if atom_loops != 1 {
-        return Err(error("Selection requires one atom_site loop"));
+    if scalar
+        .iter()
+        .zip(loops)
+        .any(|(&items, count)| items && count > 0)
+    {
+        return Err(error(
+            "Selection cannot mix scalar and loop rows in one coordinate category",
+        ));
+    }
+    if atom_loops + usize::from(scalar[0]) != 1 {
+        return Err(error("Selection requires one atom_site table"));
     }
     Ok(())
 }
