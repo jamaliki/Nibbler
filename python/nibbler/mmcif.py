@@ -6,6 +6,8 @@ from typing import Literal
 
 from . import _core, cif
 from ._core import CifDocument, MmcifModel
+from ._core import ConformerSelection as ConformerSelection
+from ._core import PreparedChemistry as PreparedChemistry
 from ._input import Source
 from ._native import (
     raise_chemistry_error,
@@ -37,6 +39,128 @@ def read(
         raise_chemistry_error(error)
 
 
+def prepare_chemistry(
+    source: Source | CifDocument | MmcifModel,
+    *,
+    registry: Registry | None = None,
+    model_number: int = 1,
+    alternate_id: str | None = None,
+) -> PreparedChemistry:
+    """Resolve authored covalent products without changing the source model.
+
+    This separate operation returns an immutable native graph. ``to_dict()``
+    exports its atoms, bond orders, hydrogen counts and repair records on demand.
+    Missing template sites have no coordinates; inactive leaving atoms retain
+    their source row. Metal coordination does not count toward covalent valence.
+    ``model_number`` is the deposited number. Without ``alternate_id``, selection
+    uses the highest summed occupancy per residue; selection is not clash-aware.
+    A supplied alternate takes precedence where present. Unknown linked chemistry
+    raises :class:`nibbler.ChemistryError`. This does not assign a pH or place atoms.
+    """
+    if isinstance(model_number, bool) or not isinstance(model_number, int):
+        raise TypeError("model_number must be an integer")
+    if alternate_id is not None and not isinstance(alternate_id, str):
+        raise TypeError("alternate_id must be a string")
+    model = source if isinstance(source, MmcifModel) else read(source)
+    try:
+        return _core.prepare_mmcif_chemistry(
+            model, registry, model_number, alternate_id
+        )
+    except ValueError as error:
+        raise_chemistry_error(error)
+
+
+def select_conformer(
+    source: Source | CifDocument | MmcifModel,
+    *,
+    model_number: int | None = None,
+    seed: int = 0,
+) -> ConformerSelection:
+    """Select clash-free residue alternatives without changing chemical identity.
+
+    Selection prefers higher occupancy and uses the seed to order ties. Nearby
+    residues on different chains prefer matching letters on equal occupancy.
+    The native search uses sparse spatial contacts and a 100,000-choice limit;
+    an unresolved conflict raises ``ChemistryError`` rather than returning clashes.
+    ``atom_rows`` indexes the source table. ``document`` creates the selected view
+    only when requested. This never substitutes a modified residue's parent.
+    """
+    if model_number is not None and (
+        isinstance(model_number, bool) or not isinstance(model_number, int)
+    ):
+        raise TypeError("model_number must be an integer")
+    if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+        raise TypeError("seed must be a nonnegative integer")
+    try:
+        if isinstance(source, MmcifModel):
+            return _core.select_mmcif_conformer(source, model_number, seed)
+        document = source if isinstance(source, CifDocument) else cif.read(source)
+        return _core.select_document_conformer(document, model_number, seed)
+    except ValueError as error:
+        raise_chemistry_error(error)
+
+
+def select_atom_conformers(
+    coordinates: list[list[float]],
+    occupancy: list[float],
+    residue_ids: list[int],
+    chain_ids: list[str],
+    sequence_ids: list[int | None],
+    atom_names: list[str],
+    alternate_ids: list[str | None],
+    *,
+    bonds: list[list[int]],
+    clash_mask: list[bool],
+    seed: int = 0,
+) -> ConformerSelection:
+    """Select already parsed atom arrays without a second CIF read.
+
+    Residue IDs name occurrences; bond indices refer to input rows. ``clash_mask``
+    must exclude H, D, and T from contact tests; their occupancies still count.
+    Both selection APIs apply the same rules. The array result has no source document.
+    """
+    if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+        raise TypeError("seed must be a nonnegative integer")
+    try:
+        return _core.select_conformer_arrays(
+            coordinates,
+            occupancy,
+            residue_ids,
+            chain_ids,
+            sequence_ids,
+            atom_names,
+            alternate_ids,
+            bonds,
+            clash_mask,
+            seed,
+        )
+    except ValueError as error:
+        raise_chemistry_error(error)
+
+
+def deduplicate_assembly_copies(
+    positions: list[list[float]],
+    source_atoms: list[int],
+    units: list[int],
+    copies: list[int],
+    eligible: list[bool],
+    occupied: list[bool],
+) -> tuple[list[int], list[list[int]]]:
+    """Remove whole same-source copies with at least 50% overlap within 1 A.
+
+    Lower copy IDs take precedence; rank identity operators first. Mark attached
+    multi-atom units ineligible unless their mapping is exact. The result gives
+    retained input rows and removed-to-retained source atom pairs. These arrays
+    let a caller remap its edges and keep preparation provenance.
+    """
+    try:
+        return _core.deduplicate_assembly_arrays(
+            positions, source_atoms, units, copies, eligible, occupied
+        )
+    except ValueError as error:
+        raise_chemistry_error(error)
+
+
 def validate(
     value: object,
     *,
@@ -45,6 +169,29 @@ def validate(
     """Validate a document or semantic model against an explicit profile."""
     selected = Profile(profile)
     return _validate_value(value, selected)
+
+
+def assembly_with_mapping(
+    source: Source | CifDocument | MmcifModel,
+    assembly_id: str | None = None,
+    *,
+    registry: Registry | None = None,
+) -> tuple[CifDocument, list[tuple[int, str, str]]]:
+    """Expand once and return removed-to-retained whole-unit overlap mappings.
+
+    Each triple gives a row in the input atom_site table, the removed label chain,
+    and the retained label chain. This does not report the older partial same-atom
+    coincidence rule. No second expansion or CIF parse runs to obtain the mapping.
+    """
+    if assembly_id is not None and not isinstance(assembly_id, str):
+        raise TypeError("assembly_id must be a string")
+    model = (
+        source if isinstance(source, MmcifModel) else read(source, registry=registry)
+    )
+    try:
+        return _core.build_assembly_with_mapping(model, assembly_id)
+    except ValueError as error:
+        raise_chemistry_error(error)
 
 
 def _validate_value(value: object, profile: Profile) -> ValidationReport:

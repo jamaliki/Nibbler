@@ -14,7 +14,7 @@ crate-type = ["cdylib", "rlib"]
 [features]
 default = []
 robustness = []
-python = ["dep:pyo3"]
+python = ["dep:pyo3", "dep:serde_json"]
 reduce3 = ["dep:reduce3", "dep:serde_json"]
 extension-module = ["python", "pyo3/extension-module", "dep:mimalloc"]
 

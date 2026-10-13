@@ -170,6 +170,22 @@ pub fn assembly_document(
     model: &PdbxModel,
     assembly_id: Option<&str>,
 ) -> Result<CifDocument, SemanticError> {
+    Ok(assembly_document_with_mapping(model, assembly_id)?.0)
+}
+
+/// Expand an assembly and return whole-unit overlap merges.
+///
+/// Each triple gives a source atom_site row, removed copy number, and retained
+/// copy number. Copy numbers follow [`assembly_document`]. This excludes the
+/// older partial, same-atom coincidence rule.
+///
+/// # Errors
+///
+/// Returns the same errors as [`assembly_document`].
+pub fn assembly_document_with_mapping(
+    model: &PdbxModel,
+    assembly_id: Option<&str>,
+) -> Result<(CifDocument, Vec<[usize; 3]>), SemanticError> {
     let block = model
         .source_document()
         .blocks()
@@ -178,11 +194,37 @@ pub fn assembly_document(
         .ok_or_else(|| assembly_error("PDBX_ASSEMBLY_ABSENT", "the model has no data block"))?;
     let view = CategoryView::new(block.entries());
     let copies = copies(model, view, assembly_id)?;
-    let entries = Expansion::new(block, &copies)?.entries()?;
-    Ok(CifDocument::new(vec![CifBlock::data(
-        block.code().unwrap_or_default().to_owned(),
-        entries,
-    )]))
+    let mut expansion = Expansion::new(block, &copies)?;
+    let mapping = expansion.merge_overlapping_nonpolymers(model)?;
+    let entries = expansion.entries()?;
+    Ok((
+        CifDocument::new(vec![CifBlock::data(
+            block.code().unwrap_or_default().to_owned(),
+            entries,
+        )]),
+        mapping,
+    ))
+}
+
+#[cfg(feature = "python")]
+pub(crate) fn assembly_mapping_names(
+    model: &PdbxModel,
+    merges: Vec<[usize; 3]>,
+) -> Vec<(usize, String, String)> {
+    let name = |asym: &str, copy: usize| {
+        if copy == 1 {
+            asym.to_owned()
+        } else {
+            format!("{asym}-{copy}")
+        }
+    };
+    merges
+        .into_iter()
+        .map(|[row, removed, retained]| {
+            let asym = &model.atom_sites[row].label_asym_id;
+            (row, name(asym, removed), name(asym, retained))
+        })
+        .collect()
 }
 
 fn copies(
@@ -433,6 +475,109 @@ struct Expansion<'a> {
 }
 
 impl<'a> Expansion<'a> {
+    fn merge_overlapping_nonpolymers(
+        &mut self,
+        model: &PdbxModel,
+    ) -> Result<Vec<[usize; 3]>, SemanticError> {
+        if self.copies.len() < 2 {
+            return Ok(Vec::new());
+        }
+        let nonpolymer_entities: HashSet<_> = model
+            .entities
+            .iter()
+            .filter(|e| e.kind == super::model::EntityKind::NonPolymer)
+            .map(|e| e.id.as_str())
+            .collect();
+        let candidates: HashSet<_> = model
+            .asym_units
+            .iter()
+            .filter(|asym| nonpolymer_entities.contains(asym.entity_id.as_str()))
+            .map(|asym| asym.id.as_str())
+            .collect();
+        if candidates.is_empty() {
+            return Ok(Vec::new());
+        }
+        let connected: HashSet<_> = model
+            .connections
+            .iter()
+            .filter(|c| c.kind == "covale" || c.kind == "disulf")
+            .flat_map(|c| [c.first.asym_id.as_str(), c.second.asym_id.as_str()])
+            .collect();
+        let coordinated: HashSet<_> = model
+            .connections
+            .iter()
+            .filter(|c| c.kind == "metalc")
+            .flat_map(|c| [c.first.asym_id.as_str(), c.second.asym_id.as_str()])
+            .collect();
+        let mut source_units: HashMap<&str, usize> = HashMap::new();
+        let mut sizes: HashMap<&str, usize> = HashMap::new();
+        for a in &model.atom_sites {
+            *sizes.entry(&a.label_asym_id).or_default() += 1;
+        }
+        let sites: Vec<_> = model
+            .atom_sites
+            .iter()
+            .enumerate()
+            .filter_map(|(row, a)| {
+                let asym = a.label_asym_id.as_str();
+                if !candidates.contains(asym)
+                    || connected.contains(asym)
+                    || (coordinated.contains(asym) && sizes.get(asym).is_some_and(|&n| n > 1))
+                {
+                    return None;
+                }
+                let count = source_units.len();
+                let unit = *source_units.entry(asym).or_insert(count);
+                Some((row, a, unit))
+            })
+            .collect();
+        if sites.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut order: Vec<_> = self.copies.iter().enumerate().collect();
+        order.sort_by_key(|(index, copy)| (copy.transform != Transform::IDENTITY, *index));
+        let mut positions = Vec::new();
+        let mut sources = Vec::new();
+        let mut units = Vec::new();
+        let mut copies = Vec::new();
+        let mut rows = Vec::new();
+        let mut occupied = Vec::new();
+        for (priority, (copy_index, copy)) in order.into_iter().enumerate() {
+            for &(row, a, unit) in &sites {
+                let asym = a.label_asym_id.as_str();
+                if !copy.has(asym) {
+                    continue;
+                }
+                positions.push(copy.transform.apply(self.positions[row]));
+                sources.push(row);
+                units.push(unit);
+                copies.push(priority);
+                rows.push((copy_index, row));
+                occupied.push(a.occupancy > 0.);
+            }
+        }
+        let eligible = vec![true; positions.len()];
+        let result = super::deduplicate_assembly_copies(
+            &positions, &sources, &units, &copies, &eligible, &occupied,
+        )?;
+        for retained in result.retained_rows {
+            let (copy, row) = rows[retained];
+            self.merged.remove(&(copy, row));
+            self.absorbed
+                .remove(&(copy, model.atom_sites[row].label_asym_id.clone()));
+        }
+        let mut mapping = Vec::with_capacity(result.duplicate_pairs.len());
+        for [removed, target] in result.duplicate_pairs {
+            let (copy, row) = rows[removed];
+            let (kept, _) = rows[target];
+            mapping.push([row, self.copies[copy].number, self.copies[kept].number]);
+            self.merged.insert((copy, row));
+            self.absorbed
+                .insert((copy, model.atom_sites[row].label_asym_id.clone()), kept);
+        }
+        Ok(mapping)
+    }
+
     fn new(block: &'a CifBlock, copies: &'a [AssemblyCopy]) -> Result<Self, SemanticError> {
         let atom_sites = BlockCategory::find(block.entries(), "atom_site").ok_or_else(|| {
             assembly_error(

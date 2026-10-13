@@ -6,6 +6,12 @@ of work; token counters are diagnostic tools, not release evidence.
 
 ## Cross-library projection
 
+Explicit preparation costs and the baseline comparison live in
+[the preparation qualification report](../docs/preparation-performance.md).
+`preparation_cost.py` separates read, selection, assembly, and native product
+costs; `linked_products.py` audits the migration cases against a chosen archive
+and CCD snapshot.
+
 The comparison runner projects `label_comp_id`, `Cartn_x`, `Cartn_y`, and `Cartn_z`
 from `_atom_site` with Nibbler, Gemmi, Biotite, and Bio.PDB. Each engine runs in a fresh
 process so imports and peak RSS are isolated. Row values are hashed with unambiguous
