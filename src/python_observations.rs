@@ -10,6 +10,9 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+mod prepared;
+use prepared::PreparedObservationSource;
+
 #[pyclass(module = "nibbler.observations")]
 struct ObservationPacker {
     schema: Schema,
@@ -189,6 +192,13 @@ impl ObservationPacker {
             .map_err(PyValueError::new_err)
     }
 
+    #[pyo3(signature = (document, *, model=1))]
+    fn prepare_source(&self, py: Python<'_>, document: &PyCifDocument, model: i64) -> PyResult<PreparedObservationSource> {
+        let source = py.detach(|| observations::PreparedSource::read(document.document(), model))
+            .map_err(PyValueError::new_err)?;
+        Ok(PreparedObservationSource { source })
+    }
+
     #[pyo3(signature = (document, *, model=1, complete=false, topology_policy="observed_connectivity", protein_only=false, complete_tokens=false, expected_keys=None, validate=false, with_keys=true, chem_data=None, target_uncertainties=None))]
     #[allow(clippy::too_many_arguments)]
     fn pack<'py>(
@@ -206,42 +216,25 @@ impl ObservationPacker {
         chem_data: Option<PathBuf>,
         target_uncertainties: Option<&str>,
     ) -> PyResult<(Bound<'py, PyDict>, Vec<[String; 5]>)> {
-        let result = py
-            .detach(|| {
-                let mut result = observations::pack(
-                    document.document(),
-                    &self.schema,
-                    &self.features,
-                    &self.hydrogen_parents,
-                    &self.elements,
-                    &self.excluded,
-                    &observations::PackOptions {
-                        model,
-                        complete,
-                        topology_policy,
-                        protein_only,
-                        chem_data: chem_data.as_deref(),
-                    },
-                )?;
-                if let Some(json) = target_uncertainties {
-                    let values: Vec<observations::uncertainty::TargetUncertainty> =
-                        serde_json::from_str(json).map_err(|error| error.to_string())?;
-                    observations::uncertainty::apply(&mut result, &self.schema, &values)?;
-                }
-                if complete_tokens {
-                    result.complete(&self.schema)?;
-                }
-                if let Some(keys) = expected_keys {
-                    result.align(keys)?;
-                }
-                if validate {
-                    result.validate(&self.schema)?;
-                }
-                Ok::<_, String>(result)
-            })
-            .map_err(PyValueError::new_err)?;
-        let arrays = buffers(py, &result, protein_only)?;
-        Ok((arrays, if with_keys { result.keys } else { Vec::new() }))
+        self.finish_pack(py, || observations::pack(document.document(), &self.schema, &self.features,
+            &self.hydrogen_parents, &self.elements, &self.excluded, &observations::PackOptions {
+                model, complete, topology_policy, protein_only, chem_data: chem_data.as_deref(),
+            }), protein_only, complete_tokens, expected_keys, validate, with_keys, target_uncertainties)
+    }
+
+    #[pyo3(signature = (source, *, complete=false, topology_policy="observed_connectivity", protein_only=false, complete_tokens=false, expected_keys=None, validate=false, with_keys=true, chem_data=None, target_uncertainties=None))]
+    #[allow(clippy::too_many_arguments)]
+    fn pack_prepared<'py>(
+        &self, py: Python<'py>, source: &PreparedObservationSource, complete: bool,
+        topology_policy: &str, protein_only: bool, complete_tokens: bool,
+        expected_keys: Option<&str>, validate: bool, with_keys: bool,
+        chem_data: Option<PathBuf>, target_uncertainties: Option<&str>,
+    ) -> PyResult<(Bound<'py, PyDict>, Vec<[String; 5]>)> {
+        self.finish_pack(py, || source.source.pack(&self.schema, &self.features,
+            &self.hydrogen_parents, &self.elements, &self.excluded, &observations::PackOptions {
+                model: source.source.model, complete, topology_policy, protein_only,
+                chem_data: chem_data.as_deref(),
+            }), protein_only, complete_tokens, expected_keys, validate, with_keys, target_uncertainties)
     }
 
     fn protein_document(
@@ -262,6 +255,28 @@ impl ObservationPacker {
             chains,
             sequence,
         ))
+    }
+}
+
+impl ObservationPacker {
+    #[allow(clippy::too_many_arguments)]
+    fn finish_pack<'py>(&self, py: Python<'py>, build: impl FnOnce() -> Result<Tokens, String> + Send,
+        protein_only: bool, complete_tokens: bool, expected_keys: Option<&str>, validate: bool,
+        with_keys: bool, target_uncertainties: Option<&str>) -> PyResult<(Bound<'py, PyDict>, Vec<[String; 5]>)> {
+        let result = py.detach(|| {
+            let mut result = build()?;
+            if let Some(json) = target_uncertainties {
+                let values: Vec<observations::uncertainty::TargetUncertainty> =
+                    serde_json::from_str(json).map_err(|error| error.to_string())?;
+                observations::uncertainty::apply(&mut result, &self.schema, &values)?;
+            }
+            if complete_tokens { result.complete(&self.schema)?; }
+            if let Some(keys) = expected_keys { result.align(keys)?; }
+            if validate { result.validate(&self.schema)?; }
+            Ok::<_, String>(result)
+        }).map_err(PyValueError::new_err)?;
+        let arrays = buffers(py, &result, protein_only)?;
+        Ok((arrays, if with_keys { result.keys } else { Vec::new() }))
     }
 }
 
@@ -347,5 +362,6 @@ fn buffers<'py>(
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_class::<PreparedObservationSource>()?;
     module.add_class::<ObservationPacker>()
 }

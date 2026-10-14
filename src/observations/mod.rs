@@ -8,6 +8,7 @@ pub(crate) mod bridges;
 #[cfg(feature = "reduce3")]
 pub(crate) mod parents;
 mod record;
+mod prepared;
 mod residue;
 mod schema;
 mod source;
@@ -17,8 +18,11 @@ pub(crate) mod uncertainty;
 
 use crate::cif::CifDocument;
 pub(crate) use record::Tokens;
+pub(crate) use prepared::PreparedSource;
 pub(crate) use schema::Schema;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
+#[cfg(feature = "reduce3")]
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -36,21 +40,11 @@ pub(crate) struct PackOptions<'a> {
 
 #[cfg(feature = "reduce3")]
 pub(crate) fn missing_hydrogen_dictionaries(document: &CifDocument, model: i64, chem_data: &Path) -> Result<Vec<String>, String> {
-    let source = source::read(document, model)?;
-    let library = crate::reduce::load_monomer_library(Some(chem_data)).map_err(|error| error.to_string())?;
-    Ok(parents::missing(&library, &source))
+    PreparedSource::read(document, model)?.missing_hydrogen_dictionaries(chem_data)
 }
 
 pub(crate) fn components(document: &CifDocument, model: i64) -> Result<Vec<String>, String> {
-    let source = source::read(document, model)?;
-    Ok(source
-        .atoms
-        .iter()
-        .filter(|atom| !atom.protein)
-        .map(|atom| atom.component.clone())
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect())
+    Ok(PreparedSource::read(document, model)?.components())
 }
 
 #[cfg(feature = "reduce3")]
@@ -196,19 +190,27 @@ pub(crate) fn pack(
     options: &PackOptions<'_>,
 ) -> Result<Tokens, String> {
     let source = source::read(document, options.model)?;
+    pack_source(&source, schema, features, hydrogen_parents, elements, excluded, options)
+}
+
+fn pack_source(
+    source: &source::Source, schema: &Schema, features: &LigandFeatures,
+    hydrogen_parents: &HydrogenParents, elements: &[String], excluded: &[String],
+    options: &PackOptions<'_>,
+) -> Result<Tokens, String> {
     #[cfg(feature = "reduce3")]
     let mut bridge_sites = Vec::new();
     #[cfg(feature = "reduce3")]
     let residue_parents = if options.chem_data.is_some()
-        || (!options.protein_only && bridges::possible_source(&source)) {
+        || (!options.protein_only && bridges::possible_source(source)) {
             let library = crate::reduce::load_monomer_library(options.chem_data).map_err(|error| error.to_string())?;
             if !options.protein_only {
-                bridge_sites = bridges::for_source(&library, &source)?;
+                bridge_sites = bridges::for_source(&library, source)?;
                 if !bridge_sites.is_empty() && !elements.iter().any(|element| element == "H") {
                     return Err("Metal hydride packing requires a ligand contract with H token 65".into());
                 }
             }
-            parents::for_source(&library, &source)?
+            parents::for_source(&library, source)?
     } else {
         HashMap::new()
     };
@@ -220,7 +222,7 @@ pub(crate) fn pack(
         HashMap::new()
     };
     tokens::pack(
-        &source,
+        source,
         schema,
         features,
         hydrogen_parents,

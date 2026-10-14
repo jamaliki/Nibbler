@@ -14,8 +14,12 @@ float32 peptide-chain rule as protein_document.
 Its pack method returns (arrays, keys). Each array is a (dtype, shape, buffer)
 tuple. The buffers own their storage and support writable NumPy views. Native
 packing releases the GIL and never serializes or reparses the source document.
+prepare_source returns an immutable selected-model snapshot. Its dictionary and
+component queries share that source with pack_prepared, which reads the packer's
+current feature tables and does not accept a second model argument. Later edits
+to the document do not alter the snapshot. kaveh-data creates one per pack call.
 """
 
-from ._core import ObservationPacker
+from ._core import ObservationPacker, PreparedObservationSource
 
-__all__ = ["ObservationPacker"]
+__all__ = ["ObservationPacker", "PreparedObservationSource"]
