@@ -6,6 +6,10 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
 
 ### Added
 
+- Reduce3 indexes deposited bond endpoints within each unchanged atom hierarchy,
+  avoiding repeated full-structure scans while keeping exact match rules and
+  candidate order.
+
 - Explicit native linked-product chemistry, clash-aware conformer selection, and
   whole-ligand assembly overlap checks, with source mappings and real-entry regressions.
 
