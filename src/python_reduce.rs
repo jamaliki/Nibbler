@@ -10,7 +10,7 @@ use pyo3::types::PyModule;
 
 use crate::python::PyCifDocument;
 use crate::reduce::{
-    Approach, NTermCharge, OptParams, Params, ProbeParams, ReduceError, load_monomer_library, run,
+    Approach, NTermCharge, OptParams, Params, ProbeParams, ReduceError, load_monomer_library, run, source_model_number,
 };
 
 /// Options already validated by `nibbler.reduce.run`.
@@ -38,6 +38,8 @@ struct Options {
     ignore_missing_restraints: bool,
     allow_missing_restraints_for: Vec<String>,
     required_hydrogen_target_keys: Option<String>,
+    allow_undefined_ligand_targets: bool,
+    allow_unresolved_bond_targets: bool,
     verbosity: i32,
     probe: HashMap<String, f64>,
     probe_flags: HashMap<String, bool>,
@@ -107,6 +109,9 @@ fn params(options: &Options) -> PyResult<Params> {
         stop_on_any_missing_hydrogen: options.stop_on_any_missing_hydrogen,
         allow_missing_restraints_for: options.allow_missing_restraints_for.clone(),
         required_hydrogen_parent_sources: None,
+        allowed_unplaced_hydrogen_parent_sources: Vec::new(),
+        allowed_unplaced_bridge_hydrogens: Vec::new(),
+        allow_unresolved_bond_targets: options.allow_unresolved_bond_targets,
         opt: OptParams {
             probe,
             add_flip_movers: options.add_flip_movers,
@@ -140,11 +145,15 @@ fn reduce_document(
     py: Python<'_>,
     document: &PyCifDocument,
     options: Options,
-) -> PyResult<(PyCifDocument, String)> {
+) -> PyResult<(PyCifDocument, String, String)> {
     let mut params = params(&options)?;
     let source = Arc::clone(document.document());
     let chem_data = options.chem_data;
     let target_keys = options.required_hydrogen_target_keys;
+    let allow_undefined = options.allow_undefined_ligand_targets;
+    if (allow_undefined || params.allow_unresolved_bond_targets) && target_keys.is_none() {
+        return Err(invalid("Target masking requires retained hydrogen target keys".into()));
+    }
     if target_keys.is_some() && (params.compat || params.approach != Approach::Add
         || !params.stop_on_any_missing_hydrogen || params.model_id.is_none()) {
         return Err(PyValueError::new_err(("REDUCE_INVALID_MODEL",
@@ -153,18 +162,28 @@ fn reduce_document(
     let reduction = py
         .detach(move || {
             if let Some(keys) = target_keys {
-                let model = params.model_id.and_then(|model| i64::try_from(model).ok())
-                    .ok_or_else(|| invalid("model_id is out of range".into()))?;
-                params.required_hydrogen_parent_sources = Some(crate::observations::required_parent_sources(&source, &keys, model)
-                    .map_err(|message| PyValueError::new_err(("REDUCE_INVALID_MODEL", message, Vec::<String>::new())))?);
+                let model = params.model_id.map(source_model_number).transpose()
+                    .map_err(reduce_error_to_python)?
+                    .ok_or_else(|| invalid("model_id is missing".into()))?;
+                let required = crate::observations::required_parent_sources(&source, &keys, model, chem_data.as_deref())
+                    .map_err(|message| PyValueError::new_err(("REDUCE_INVALID_MODEL", message, Vec::<String>::new())))?;
+                if allow_undefined {
+                    params.allowed_unplaced_hydrogen_parent_sources = crate::observations::retained_ligand_sources(&source, model, &required)
+                        .map_err(invalid)?;
+                    params.allowed_unplaced_bridge_hydrogens = crate::observations::bridge_parent_sources(&source, model, chem_data.as_deref())
+                        .map_err(invalid)?;
+                }
+                params.required_hydrogen_parent_sources = Some(required);
             }
             let monomers = load_monomer_library(chem_data.as_deref()).map_err(reduce_error_to_python)?;
             run(&source, &monomers, &params).map_err(reduce_error_to_python)
         })?;
+    let statuses = reduction.target_uncertainties_json.clone();
     let (output, report) = reduction.into_parts();
     Ok((
         PyCifDocument::new(Arc::new(output), document.schema_name().map(str::to_owned)),
         report,
+        statuses,
     ))
 }
 

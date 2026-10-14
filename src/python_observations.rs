@@ -7,6 +7,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyByteArray, PyDict, PyMemoryView, PyModule};
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 #[pyclass(module = "nibbler.observations")]
@@ -103,7 +104,7 @@ impl ObservationPacker {
     }
 
     #[staticmethod]
-    #[pyo3(signature = (positions, chains, ligand, usable, *, crop_size=384))]
+    #[pyo3(signature = (positions, chains, ligand, usable, *, crop_size=384, centre_eligible=None))]
     fn crop_plans<'py>(
         py: Python<'py>,
         positions: &[u8],
@@ -111,9 +112,10 @@ impl ObservationPacker {
         ligand: &[u8],
         usable: &[u8],
         crop_size: usize,
+        centre_eligible: Option<&[u8]>,
     ) -> PyResult<(Bound<'py, PyDict>, f64)> {
         let value = py
-            .detach(|| observations::crops::plan(positions, chains, ligand, usable, crop_size))
+            .detach(|| observations::crops::plan(positions, chains, ligand, usable, crop_size, centre_eligible))
             .map_err(PyValueError::new_err)?;
         let result = PyDict::new(py);
         let count = value.centers.len();
@@ -180,7 +182,14 @@ impl ObservationPacker {
             .map_err(PyValueError::new_err)
     }
 
-    #[pyo3(signature = (document, *, model=1, complete=false, topology_policy="observed_connectivity", protein_only=false, complete_tokens=false, expected_keys=None, validate=false, with_keys=true))]
+    #[cfg(feature = "reduce3")]
+    #[pyo3(signature = (document, *, chem_data, model=1))]
+    fn missing_hydrogen_dictionaries(&self, py: Python<'_>, document: &PyCifDocument, chem_data: PathBuf, model: i64) -> PyResult<Vec<String>> {
+        py.detach(|| observations::missing_hydrogen_dictionaries(document.document(), model, &chem_data))
+            .map_err(PyValueError::new_err)
+    }
+
+    #[pyo3(signature = (document, *, model=1, complete=false, topology_policy="observed_connectivity", protein_only=false, complete_tokens=false, expected_keys=None, validate=false, with_keys=true, chem_data=None, target_uncertainties=None))]
     #[allow(clippy::too_many_arguments)]
     fn pack<'py>(
         &self,
@@ -194,6 +203,8 @@ impl ObservationPacker {
         expected_keys: Option<&str>,
         validate: bool,
         with_keys: bool,
+        chem_data: Option<PathBuf>,
+        target_uncertainties: Option<&str>,
     ) -> PyResult<(Bound<'py, PyDict>, Vec<[String; 5]>)> {
         let result = py
             .detach(|| {
@@ -209,10 +220,16 @@ impl ObservationPacker {
                         complete,
                         topology_policy,
                         protein_only,
+                        chem_data: chem_data.as_deref(),
                     },
                 )?;
+                if let Some(json) = target_uncertainties {
+                    let values: Vec<observations::uncertainty::TargetUncertainty> =
+                        serde_json::from_str(json).map_err(|error| error.to_string())?;
+                    observations::uncertainty::apply(&mut result, &self.schema, &values)?;
+                }
                 if complete_tokens {
-                    result.complete(&self.schema);
+                    result.complete(&self.schema)?;
                 }
                 if let Some(keys) = expected_keys {
                     result.align(keys)?;
@@ -316,6 +333,15 @@ fn buffers<'py>(
             vec![2, value.attachments.len()],
             integer(&edges),
         )?;
+        if !value.bridge_edges.is_empty() {
+            let edges: Vec<i64> = value.bridge_edges.iter().map(|&(a, _, _)| a as i64)
+                .chain(value.bridge_edges.iter().map(|&(_, b, _)| b as i64)).collect();
+            put("ligand_bridge_index", "=i8", vec![2, value.bridge_edges.len()], integer(&edges))?;
+            put("ligand_bridge_type", "u1", vec![value.bridge_edges.len()],
+                value.bridge_edges.iter().map(|&(_, _, kind)| kind).collect())?;
+            put("crop_positions", "=f4", vec![count, 3], float(&value.crop_positions))?;
+            put("crop_center_eligible", "?", vec![count], value.crop_center_eligible.clone())?;
+        }
     }
     Ok(result)
 }

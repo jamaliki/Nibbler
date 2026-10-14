@@ -122,6 +122,8 @@ impl Error for ReduceError {}
 pub struct Reduction {
     document: CifDocument,
     report: String,
+    #[cfg(feature = "python")]
+    pub(crate) target_uncertainties_json: String,
 }
 
 impl Reduction {
@@ -146,6 +148,8 @@ impl Reduction {
 }
 
 /// Run Reduce3 on the first data block of `document` that has an `_atom_site` loop.
+/// In fixed mode, `model_id` names the source `_atom_site.pdbx_PDB_model_num`.
+/// Compatibility mode keeps Reduce2's ordinal selection.
 ///
 /// # Errors
 ///
@@ -180,7 +184,8 @@ pub fn run_block(
     monomers: &MonLib,
     params: &Params,
 ) -> Result<Reduction, ReduceError> {
-    let structure = reduce3::mmcif::structure_from_cif(&BlockSource::new(block))
+    let source = BlockSource::new(block);
+    let mut structure = reduce3::mmcif::structure_from_cif(&source)
         .map_err(|message| ReduceError::new(ReduceErrorCode::InvalidModel, message))?;
     if structure.atoms_size() == 0 {
         return Err(ReduceError::new(
@@ -188,8 +193,26 @@ pub fn run_block(
             "the _atom_site loop has no atoms",
         ));
     }
-    let output = reduce3::pipeline::run(structure, monomers, params)
+    if !params.compat {
+        restore_single_model_id(&mut structure, &source);
+    }
+    let mut pipeline_params = params.clone();
+    if !params.compat && let Some(model_id) = params.model_id {
+        pipeline_params.model_id = Some(source_model_index(&structure, model_id)? + 1);
+    }
+    let output = reduce3::pipeline::run(structure, monomers, &pipeline_params)
         .map_err(|message| ReduceError::new(ReduceErrorCode::Failed, message))?;
+    #[cfg(feature = "python")]
+    let target_uncertainties_json = if !params.allowed_unplaced_hydrogen_parent_sources.is_empty()
+        || !params.allowed_unplaced_bridge_hydrogens.is_empty() || params.allow_unresolved_bond_targets {
+        let model = params.model_id.map(source_model_number).transpose()?
+            .ok_or_else(|| ReduceError::new(ReduceErrorCode::InvalidModel, "Target masking requires an explicit source model ID"))?;
+        let source_document = CifDocument::new(vec![block.clone()]);
+        let statuses = crate::observations::uncertainty::from_output(&source_document, model, &output,
+            params.required_hydrogen_parent_sources.as_deref(), params.allow_unresolved_bond_targets)
+            .map_err(|message| ReduceError::new(ReduceErrorCode::InvalidModel, message))?;
+        serde_json::to_string(&statuses).map_err(|error| ReduceError::new(ReduceErrorCode::ResultTooLarge, error.to_string()))?
+    } else { "[]".to_owned() };
     let document = if params.compat {
         structure_document(&output.structure, block.code().unwrap_or("default"))?
     } else {
@@ -198,7 +221,91 @@ pub fn run_block(
     Ok(Reduction {
         document,
         report: output.description,
+        #[cfg(feature = "python")]
+        target_uncertainties_json,
     })
+}
+
+pub(crate) fn source_model_number(model_id: usize) -> Result<i64, ReduceError> {
+    i64::try_from(model_id).ok().filter(|number| *number > 0).ok_or_else(|| {
+        ReduceError::new(ReduceErrorCode::InvalidModel, "Source model ID must be a positive signed 64-bit integer")
+    })
+}
+
+fn restore_single_model_id(structure: &mut Structure, source: &BlockSource<'_>) {
+    if structure.models.len() == 1 && structure.models[0].id.is_empty()
+        && let Some(table) = source.table("atom_site") {
+        structure.models[0].id = table.column("pdbx_PDB_model_num")
+            .map_or_else(|| "1".to_owned(), |column| table.cell(0, column).into_owned());
+    }
+}
+
+fn source_model_index(structure: &Structure, model_id: usize) -> Result<usize, ReduceError> {
+    let number = source_model_number(model_id)?;
+    let mut matches = structure.models.iter().enumerate()
+        .filter(|(_, model)| model.id.trim().parse::<i64>() == Ok(number));
+    let index = matches.next().map(|(index, _)| index).ok_or_else(|| {
+        ReduceError::new(ReduceErrorCode::InvalidModel, format!("Source model ID {number} is not present"))
+    })?;
+    if matches.next().is_some() {
+        return Err(ReduceError::new(ReduceErrorCode::InvalidModel,
+            format!("Source model ID {number} is ambiguous")));
+    }
+    Ok(index)
+}
+
+#[cfg(test)]
+mod source_model_tests {
+    use super::{ReduceErrorCode, source_model_index, source_model_number};
+    use reduce3::model::{Model, Structure};
+
+    fn structure(ids: &[&str]) -> Structure {
+        Structure { models: ids.iter().map(|id| Model { id: (*id).into(), chains: Vec::new() }).collect(),
+                    ..Structure::default() }
+    }
+
+    #[test]
+    fn source_model_ids_map_without_renumbering() {
+        let input = structure(&["35", "18"]);
+        assert_eq!(source_model_index(&input, 18).ok(), Some(1));
+        assert_eq!(source_model_index(&input, 35).ok(), Some(0));
+        assert_eq!(input.models[0].id, "35");
+        assert_eq!(input.models[1].id, "18");
+    }
+
+    #[test]
+    fn missing_source_ids_do_not_fall_back_to_ordinals() {
+        assert_eq!(source_model_index(&structure(&["18"]), 1).err().map(|error| error.code()),
+                   Some(ReduceErrorCode::InvalidModel));
+    }
+
+    #[test]
+    fn repeated_and_numeric_alias_ids_are_ambiguous() {
+        for ids in [["18", "35", "18"], ["18", "018", "35"]] {
+            assert!(source_model_index(&structure(&ids), 18).err()
+                    .is_some_and(|error| error.message().contains("ambiguous")));
+        }
+    }
+
+    #[test]
+    fn source_model_numbers_reject_zero_and_overflow() {
+        assert!(source_model_number(0).is_err());
+        assert!(source_model_number(usize::MAX).is_err());
+    }
+
+    #[test]
+    fn parsed_single_model_ids_match_source_values() {
+        use super::{BlockSource, restore_single_model_id};
+        for text in [include_bytes!("../tests/reduce3/linked_8zje.cif").as_slice(),
+                     include_bytes!("../tests/reduce3/linked_9hj3.cif").as_slice()] {
+            let document = crate::cif::parse(text).unwrap();
+            let source = BlockSource::new(&document.blocks()[0]);
+            let mut structure = reduce3::mmcif::structure_from_cif(&source).unwrap();
+            restore_single_model_id(&mut structure, &source);
+            assert_eq!(structure.models.iter().map(|model| &model.id).collect::<Vec<_>>(), vec!["1"]);
+            assert_eq!(source_model_index(&structure, 1).ok(), Some(0));
+        }
+    }
 }
 
 /// Build a one-block document holding `structure` in the block it was read from:

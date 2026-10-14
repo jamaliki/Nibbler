@@ -73,17 +73,22 @@ fn protein_parent(schema: &Residue, atom: &Atom, heavy: &[(usize, [f32; 3])]) ->
             .zip(&schema.parents)
             .find_map(|(slot, &parent)| (slot == name && parent >= 0).then_some(parent as usize))
     };
-    let parent = named_parent(&atom.name).or_else(|| {
-        if atom.element.eq_ignore_ascii_case("D") || atom.element.eq_ignore_ascii_case("T") {
-            named_parent(
-                &atom
-                    .name
-                    .replacen(&atom.element.to_ascii_uppercase(), "H", 1),
-            )
-        } else {
-            None
-        }
-    });
+    let parent = named_parent(&atom.name)
+        .or_else(|| match atom.name.as_str() {
+            "H1" | "D1" | "T1" => named_parent("H"),
+            _ => None,
+        })
+        .or_else(|| {
+            if atom.element.eq_ignore_ascii_case("D") || atom.element.eq_ignore_ascii_case("T") {
+                named_parent(
+                    &atom
+                        .name
+                        .replacen(&atom.element.to_ascii_uppercase(), "H", 1),
+                )
+            } else {
+                None
+            }
+        });
     if let Some(parent) = parent {
         return heavy.iter().find_map(|&(slot, xyz)| {
             let value = distance(atom.position, xyz);

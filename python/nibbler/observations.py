@@ -5,6 +5,9 @@ add_hydrogen_parents stores dictionary hydrogen-to-heavy-atom names per componen
 Ligand packing uses observed covalent bonds first, then dictionary parents, and
 uses distance only when neither source names a parent. Protein packing uses the
 slot schema's named parent before distance-based assignment.
+When pack receives chem_data, Rust selects each ligand residue's Reduce3
+dictionary. missing_hydrogen_dictionaries lists components that need CCD parents;
+it does not send dictionary maps through Python.
 afdb_eligibility scans a read-only A14P buffer without decoding a coordinate
 array or retaining the source. It counts complete residues within the same
 float32 peptide-chain rule as protein_document.

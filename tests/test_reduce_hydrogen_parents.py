@@ -63,6 +63,77 @@ def test_same_component_with_conflicting_selected_dictionaries_fails(library):
         nibbler.reduce.hydrogen_parents(doc, chem_data=library)
 
 
+def test_native_packing_selects_each_residue_dictionary(library):
+    import numpy as np
+    from test_observation_protein_parents import packer
+
+    native, _ = packer()
+    native.add_component("KHP", {"C1": [0, 4, 1, 1], "C2": [0, 4, 1, 1]})
+    native.add_hydrogen_parents("KHP", {"H1": "C2"})
+    source = document([row("C1", "C"), row("H1", "H", x=.97),
+                       row("C2", "C", chain="B", x=3), row("H1", "H", chain="B", x=3.97)])
+    before = source.to_canonical()
+    assert native.missing_hydrogen_dictionaries(source, chem_data=library) == []
+    buffers, keys = native.pack(source, chem_data=library, complete=True, validate=True)
+    arrays = {name: np.frombuffer(data, dtype=dtype).reshape(shape)
+              for name, (dtype, shape, data) in buffers.items()}
+    assert [key[-1] for key in keys] == ["C1", "C2"]
+    np.testing.assert_array_equal(arrays["mask"][:, 15:].sum(axis=1), [1, 1])
+    np.testing.assert_array_equal(arrays["pos"][:, 15, 0], np.array([.97, 3.97], np.float32))
+    assert arrays["ligand_hydrogen_known"].all() and arrays["ligand_charge_known"].all()
+    assert source.to_canonical() == before
+
+
+def test_native_dictionary_keeps_geometry_strict(library):
+    from test_observation_protein_parents import packer
+
+    native, _ = packer()
+    native.add_hydrogen_parents("KHP", {"H1": "C2"})
+    source = document([row("C1", "C"), row("H1", "H", x=3)])
+    with pytest.raises(ValueError, match="invalid geometry"):
+        native.pack(source, chem_data=library, complete=True, validate=True)
+
+
+@pytest.mark.parametrize("invalid", [False, True])
+def test_generated_terminal_names_use_the_producer_parent(library, invalid):
+    import numpy as np
+    from test_observation_protein_parents import packer
+
+    (library / "geostd/k/data_KHP.cif").write_text("data_comp_KHP\nloop_\n"
+        "_chem_comp_atom.atom_id\n_chem_comp_atom.type_symbol\n_chem_comp_atom.type_energy\n"
+        "N N NH1\nCA C CH2\nC C C\nO O O\nC3 C CH1\nH H HNH1\nH3 H HCH1\n"
+        "loop_\n_chem_comp_bond.atom_id_1\n_chem_comp_bond.atom_id_2\n"
+        "_chem_comp_bond.type\n_chem_comp_bond.value_dist\nN H single .97\nC3 H3 single .97\n"
+        "N CA single 1.46\nCA C single 1.53\nC O double 1.23\n")
+    native, _ = packer()
+    native.add_component("KHP", {"N": [1, 4, 3, 1], "C3": [0, 4, 1, 1]})
+    source = document([row("N", "N"), row("C3", "C", x=.8),
+        row("HNT1", "H", x=3 if invalid else .97), row("HNT2", "H", x=-.97),
+        row("HNT3", "H", x=1.05), row("H3", "H", x=1.77)])
+    if invalid:
+        with pytest.raises(ValueError, match="invalid geometry"):
+            native.pack(source, chem_data=library, complete=True, validate=True)
+    else:
+        buffers, keys = native.pack(source, chem_data=library, complete=True, validate=True)
+        masks = np.frombuffer(buffers["mask"][2], dtype=bool).reshape(buffers["mask"][1])
+        assert [key[-1] for key in keys] == ["N", "C3"]
+        np.testing.assert_array_equal(masks[:, 15:].sum(axis=1), [3, 1])
+
+
+def test_missing_native_dictionary_uses_checked_ccd_parent(library):
+    import numpy as np
+    from test_observation_protein_parents import packer
+
+    native, _ = packer()
+    native.add_hydrogen_parents("UNL", {"H1": "C1"})
+    source = document([row("C1", "C", component="UNL"), row("C2", "C", component="UNL", x=.8),
+                       row("H1", "H", component="UNL", x=.97)])
+    assert native.missing_hydrogen_dictionaries(source, chem_data=library) == ["UNL"]
+    buffers, _ = native.pack(source, chem_data=library, complete=True, validate=True)
+    masks = np.frombuffer(buffers["mask"][2], dtype=bool).reshape(buffers["mask"][1])
+    assert masks[0, 15] and not masks[1, 15]
+
+
 def test_unavailable_source_dictionary_stays_distinct_from_no_hydrogens(library):
     doc = document([row("C1", "C", component="UNL")])
     assert nibbler.reduce.hydrogen_parents(doc, chem_data=library) == {}

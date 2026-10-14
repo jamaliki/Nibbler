@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+import json
 from os import PathLike, fspath
 from typing import Literal
 
@@ -46,6 +47,7 @@ class Reduction:
 
     document: CifDocument
     report: str
+    target_uncertainties: tuple[dict, ...] = ()
 
 
 def _require_number(name: str, value: object) -> float:
@@ -76,6 +78,7 @@ def hydrogen_parents(
 
 def required_parent_sources(
     document: CifDocument, expected_keys_json: str, *, model_id: int = 1,
+    chem_data: str | PathLike[str] | None = None,
 ) -> list[int]:
     """Map checked target keys to original heavy-atom source rows."""
     if not isinstance(document, CifDocument):
@@ -86,7 +89,8 @@ def required_parent_sources(
         raise ValueError("model_id must be a one-based model number")
     if not hasattr(_core, "reduce_required_parent_sources"):
         raise RuntimeError("This Nibbler build has no required-parent source helper")
-    return _core.reduce_required_parent_sources(document, expected_keys_json, model=model_id)
+    return _core.reduce_required_parent_sources(document, expected_keys_json, model=model_id,
+        chem_data=None if chem_data is None else fspath(chem_data))
 
 
 def run(
@@ -113,6 +117,8 @@ def run(
     ignore_missing_restraints: bool = False,
     allow_missing_restraints_for: Sequence[str] = (),
     required_hydrogen_target_keys: str | None = None,
+    allow_undefined_ligand_targets: bool = False,
+    allow_unresolved_bond_targets: bool = False,
     verbosity: int = 2,
     probe: Mapping[str, float | bool] | None = None,
 ) -> Reduction:
@@ -143,6 +149,15 @@ def run(
     fixed-mode addition may remove and report an unplaced H only when its
     unique parent lies outside those targets. Valid context hydrogens and all
     heavy atoms remain unchanged. This option requires explicit ``model_id``.
+
+    ``allow_undefined_ligand_targets`` retains incomplete ligand fragments and
+    reports only undefined H targets. It also retains validated bridging
+    hydrides as observed atoms or reports their missing coordinates.
+    ``allow_unresolved_bond_targets`` reports target uncertainty for deposited
+    bonds that the placement graph cannot support. Both options require strict
+    fixed-mode addition and retained keys. ``target_uncertainties`` names the
+    affected original heavy atoms; pass it to ObservationPacker when packing
+    training targets. Ordinary protein H placement remains strict.
     """
     if not available():
         raise RuntimeError(
@@ -176,6 +191,8 @@ def run(
         "skip_bond_fix_up": skip_bond_fix_up,
         "stop_on_any_missing_hydrogen": stop_on_any_missing_hydrogen,
         "ignore_missing_restraints": ignore_missing_restraints,
+        "allow_undefined_ligand_targets": allow_undefined_ligand_targets,
+        "allow_unresolved_bond_targets": allow_unresolved_bond_targets,
     }
     for name, flag in flags.items():
         if not isinstance(flag, bool):
@@ -230,7 +247,7 @@ def run(
         "required_hydrogen_target_keys": required_hydrogen_target_keys,
     }
     try:
-        output, report = _core.reduce_document(document, options)
+        output, report, statuses = _core.reduce_document(document, options)
     except ValueError as error:
         raise_chemistry_error(error)
-    return Reduction(document=output, report=report)
+    return Reduction(document=output, report=report, target_uncertainties=tuple(json.loads(statuses)))

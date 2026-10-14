@@ -4,8 +4,9 @@
 //! projection, schema, and Python APIs build on that one production path. With the
 //! `reduce3` feature, `reduce` adds hydrogens to parsed models in memory.
 
-// The Python extension's Rust allocations (parsing, Reduce3) use mimalloc.
-#[cfg(feature = "extension-module")]
+// Keep the system allocator on macOS; shared-thread page recovery can stall there.
+// Linux and Windows extension builds retain mimalloc for parsing and Reduce3.
+#[cfg(all(feature = "extension-module", not(target_os = "macos")))]
 #[global_allocator]
 static ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
 

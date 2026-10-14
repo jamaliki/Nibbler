@@ -18,6 +18,7 @@ struct View {
     chains: Vec<usize>,
     ligand: Vec<bool>,
     usable: Vec<bool>,
+    center_eligible: Vec<bool>,
     chain_sizes: Vec<usize>,
     chain_ligand: Vec<bool>,
     size: usize,
@@ -51,6 +52,7 @@ impl View {
         ligand: &[u8],
         usable: &[u8],
         size: usize,
+        center_eligible: Option<&[u8]>,
     ) -> Result<Self, String> {
         let count = ligand.len();
         if !(50..=512).contains(&size)
@@ -60,6 +62,7 @@ impl View {
             || !chains.len().is_multiple_of(8)
             || usable.len() != count
             || ligand.iter().chain(usable).any(|&value| value > 1)
+            || center_eligible.is_some_and(|values| values.len() != count || values.iter().any(|&value| value > 1))
         {
             return Err("Invalid spatial-crop input shapes, masks or size".into());
         }
@@ -87,6 +90,7 @@ impl View {
             chains,
             ligand,
             usable: usable.iter().map(|&value| value != 0).collect(),
+            center_eligible: center_eligible.map_or_else(|| vec![true; count], |values| values.iter().map(|&value| value != 0).collect()),
             chain_sizes,
             chain_ligand,
             size,
@@ -198,10 +202,11 @@ pub(crate) fn plan(
     ligand: &[u8],
     usable: &[u8],
     size: usize,
+    center_eligible: Option<&[u8]>,
 ) -> Result<CropPlans, String> {
-    let view = View::read(positions, chains, ligand, usable, size)?;
-    let total = view.positions.len();
-    let ligand_count = view.ligand.iter().filter(|&&value| value).count();
+    let view = View::read(positions, chains, ligand, usable, size, center_eligible)?;
+    let total = view.center_eligible.iter().filter(|&&value| value).count();
+    let ligand_count = view.ligand.iter().zip(&view.center_eligible).filter(|&(ligand, eligible)| *ligand && *eligible).count();
     let mut result = CropPlans {
         centers: Vec::new(),
         radii: Vec::new(),
@@ -212,10 +217,11 @@ pub(crate) fn plan(
         mass: 0.,
     };
     let mut retry = 0;
-    if view.ligand.iter().all(|&value| value) {
+    if total == 0 || view.ligand.iter().all(|&value| value) {
         return Ok(result);
     }
-    for center in 0..total {
+    for center in 0..view.positions.len() {
+        if !view.center_eligible[center] { continue; }
         let nearest = view.nearest(center);
         let (bits, over) = view.filter(&nearest);
         retry += usize::from(over && view.ligand[center]);
@@ -262,8 +268,8 @@ pub(crate) fn permutation(
     ligand: &[u8],
 ) -> Result<Vec<i64>, String> {
     let usable = vec![1; ligand.len()];
-    let left = View::read(before, chains, ligand, &usable, 50)?;
-    let right = View::read(after, chains, ligand, &usable, 50)?;
+    let left = View::read(before, chains, ligand, &usable, 50, None)?;
+    let right = View::read(after, chains, ligand, &usable, 50, None)?;
     let bits =
         |position: [f32; 3]| position.map(|value| if value == 0. { 0 } else { value.to_bits() });
     let mut positions: HashMap<_, VecDeque<i64>> = HashMap::new();

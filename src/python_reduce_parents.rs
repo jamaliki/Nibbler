@@ -1,71 +1,15 @@
 //! Hydrogen parents from the same fixed-mode dictionaries as Reduce3.
 
 use crate::observations;
+use crate::observations::parents::{Parents, dictionary as dictionary_parents};
 use crate::python::PyCifDocument;
 use crate::reduce::load_monomer_library;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
-use reduce3::monlib::{Comp, MonLib};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, OnceLock, PoisonError};
-
-type Parents = HashMap<String, String>;
-type CacheKey = (PathBuf, PathBuf, String);
-static PARENTS: OnceLock<Mutex<HashMap<CacheKey, Arc<Parents>>>> = OnceLock::new();
-
-fn hydrogen(element: &str) -> bool {
-    element.eq_ignore_ascii_case("H")
-        || element.eq_ignore_ascii_case("D")
-        || element.eq_ignore_ascii_case("T")
-}
-
-fn dictionary_parents(library: &MonLib, dictionary: &Comp) -> Result<Arc<Parents>, String> {
-    let key = (
-        library.root.clone(),
-        dictionary.source.clone(),
-        dictionary.id.clone(),
-    );
-    let cache = PARENTS.get_or_init(Mutex::default);
-    if let Some(parents) = cache
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .get(&key)
-    {
-        return Ok(Arc::clone(parents));
-    }
-    let mut parents = HashMap::new();
-    for bond in &dictionary.bonds {
-        let (Some(first), Some(second)) = (dictionary.atom(&bond.a1), dictionary.atom(&bond.a2))
-        else {
-            return Err(format!(
-                "Reduce3 dictionary {} has a bond with an absent atom",
-                dictionary.id
-            ));
-        };
-        let pair = match (hydrogen(&first.type_symbol), hydrogen(&second.type_symbol)) {
-            (true, false) => Some((&bond.a1, &bond.a2)),
-            (false, true) => Some((&bond.a2, &bond.a1)),
-            _ => None,
-        };
-        if let Some((child, parent)) = pair
-            && let Some(previous) = parents.insert(child.clone(), parent.clone())
-            && previous != *parent
-        {
-            return Err(format!(
-                "Reduce3 dictionary {} hydrogen {child} has conflicting parents",
-                dictionary.id
-            ));
-        }
-    }
-    let parents = Arc::new(parents);
-    cache
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .insert(key, Arc::clone(&parents));
-    Ok(parents)
-}
+use std::sync::Arc;
 
 #[pyfunction]
 #[pyo3(signature = (document, *, chem_data=None, model=1))]
@@ -103,14 +47,15 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 #[pyfunction]
-#[pyo3(signature = (document, expected_keys, *, model=1))]
+#[pyo3(signature = (document, expected_keys, *, model=1, chem_data=None))]
 fn reduce_required_parent_sources(
     py: Python<'_>,
     document: &PyCifDocument,
     expected_keys: &str,
     model: i64,
+    chem_data: Option<PathBuf>,
 ) -> PyResult<Vec<u32>> {
     let source = Arc::clone(document.document());
-    py.detach(|| observations::required_parent_sources(&source, expected_keys, model))
+    py.detach(|| observations::required_parent_sources(&source, expected_keys, model, chem_data.as_deref()))
         .map_err(PyValueError::new_err)
 }

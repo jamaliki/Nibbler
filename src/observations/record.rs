@@ -39,6 +39,9 @@ pub(crate) struct Tokens {
     pub state_known: Vec<u8>,
     pub topology: Vec<i64>,
     pub attachments: Vec<(usize, usize)>,
+    pub bridge_edges: Vec<(usize, usize, u8)>,
+    pub crop_positions: Vec<f32>,
+    pub crop_center_eligible: Vec<u8>,
     pub keys: Vec<[String; 5]>,
 }
 
@@ -61,6 +64,9 @@ impl Tokens {
             state_known: Vec::new(),
             topology: Vec::new(),
             attachments: Vec::new(),
+            bridge_edges: Vec::new(),
+            crop_positions: Vec::new(),
+            crop_center_eligible: Vec::new(),
             keys: Vec::new(),
         }
     }
@@ -89,9 +95,11 @@ impl Tokens {
         self.state_known.push(u8::from(packed.state_known));
         self.topology.extend(packed.topology);
         self.keys.push(token_key(atom, ligand));
+        self.crop_positions.extend(packed.position[0]);
+        self.crop_center_eligible.push(u8::from(identity != 65));
     }
 
-    pub fn select(&mut self, indices: &[usize]) {
+    pub fn select(&mut self, indices: &[usize]) -> Result<(), String> {
         fn selected<T: Clone>(values: &[T], rows: &[usize], width: usize) -> Vec<T> {
             rows.iter()
                 .flat_map(|&row| values[row * width..(row + 1) * width].iter().cloned())
@@ -99,8 +107,19 @@ impl Tokens {
         }
         let mut inverse = vec![usize::MAX; self.identity.len()];
         for (index, &row) in indices.iter().enumerate() {
+            if row >= inverse.len() || inverse[row] != usize::MAX {
+                return Err("Token selection indices are absent or repeated".into());
+            }
             inverse[row] = index;
         }
+        for &(hydrogen, metal, _) in &self.bridge_edges {
+            if inverse[hydrogen] != usize::MAX && inverse[metal] == usize::MAX {
+                return Err("Token selection retains a bridge hydrogen without both metals".into());
+            }
+        }
+        self.bridge_edges = self.bridge_edges.iter().filter_map(|&(hydrogen, metal, kind)| {
+            (inverse[hydrogen] != usize::MAX).then_some((inverse[hydrogen], inverse[metal], kind))
+        }).collect();
         self.attachments = self
             .attachments
             .iter()
@@ -126,13 +145,16 @@ impl Tokens {
         self.state = selected(&self.state, indices, 1);
         self.state_known = selected(&self.state_known, indices, 1);
         self.keys = selected(&self.keys, indices, 1);
+        self.crop_positions = selected(&self.crop_positions, indices, 3);
+        self.crop_center_eligible = selected(&self.crop_center_eligible, indices, 1);
         self.covalent = vec![0; indices.len()];
         for &(a, _) in &self.attachments {
             self.covalent[a] = 1;
         }
+        Ok(())
     }
 
-    pub fn complete(&mut self, schema: &Schema) {
+    pub fn complete(&mut self, schema: &Schema) -> Result<(), String> {
         let indices: Vec<_> = (0..self.identity.len())
             .filter(|&row| {
                 if self.ligand[row] != 0 {
@@ -151,7 +173,7 @@ impl Tokens {
                     })
             })
             .collect();
-        self.select(&indices);
+        self.select(&indices)
     }
 
     pub fn align(&mut self, expected: &str) -> Result<(), String> {
@@ -172,12 +194,29 @@ impl Tokens {
             return Err("PDB token identities differ from the heavy index".into());
         }
         let indices: Vec<_> = wanted.iter().map(|key| lookup[key]).collect();
-        self.select(&indices);
+        self.select(&indices)?;
         renumber_ligands(self);
         Ok(())
     }
 
     pub fn validate(&self, schema: &Schema) -> Result<(), String> {
+        let mut bridges: HashMap<usize, BTreeSet<usize>> = HashMap::new();
+        for &(hydrogen, metal, kind) in &self.bridge_edges {
+            if hydrogen >= self.identity.len() || metal >= self.identity.len()
+                || self.identity[hydrogen] != 65 || self.ligand[hydrogen] == 0
+                || self.ligand[metal] == 0 || hydrogen == metal || kind != 1 {
+                return Err("Ligand bridge edges have invalid endpoints or type".into());
+            }
+            if !bridges.entry(hydrogen).or_default().insert(metal) {
+                return Err("Ligand bridge edges contain a repeated metal endpoint".into());
+            }
+        }
+        for (row, &identity) in self.identity.iter().enumerate() {
+            if identity == 65 && self.ligand[row] != 0
+                && bridges.get(&row).is_none_or(|metals| metals.len() != 2) {
+                return Err("Ligand bridge hydrogen requires exactly two metal edges".into());
+            }
+        }
         for row in 0..self.identity.len() {
             let aa = self.identity[row] as usize;
             let mask = &self.masks[row * 32..(row + 1) * 32];

@@ -3,26 +3,42 @@
 pub(crate) mod afdb;
 pub(crate) mod afdb_eligibility;
 pub(crate) mod crops;
+#[cfg(feature = "reduce3")]
+pub(crate) mod bridges;
+#[cfg(feature = "reduce3")]
+pub(crate) mod parents;
 mod record;
 mod residue;
 mod schema;
 mod source;
 mod tokens;
 mod topology;
+pub(crate) mod uncertainty;
 
 use crate::cif::CifDocument;
 pub(crate) use record::Tokens;
 pub(crate) use schema::Schema;
 use std::collections::{BTreeSet, HashMap};
+use std::path::Path;
+use std::sync::Arc;
 
 pub(crate) type LigandFeatures = HashMap<String, HashMap<String, [i16; 4]>>;
 pub(crate) type HydrogenParents = HashMap<String, HashMap<String, String>>;
+pub(crate) type ResidueParents = HashMap<usize, Arc<HashMap<String, String>>>;
 
 pub(crate) struct PackOptions<'a> {
     pub model: i64,
     pub complete: bool,
     pub topology_policy: &'a str,
     pub protein_only: bool,
+    pub chem_data: Option<&'a Path>,
+}
+
+#[cfg(feature = "reduce3")]
+pub(crate) fn missing_hydrogen_dictionaries(document: &CifDocument, model: i64, chem_data: &Path) -> Result<Vec<String>, String> {
+    let source = source::read(document, model)?;
+    let library = crate::reduce::load_monomer_library(Some(chem_data)).map_err(|error| error.to_string())?;
+    Ok(parents::missing(&library, &source))
 }
 
 pub(crate) fn components(document: &CifDocument, model: i64) -> Result<Vec<String>, String> {
@@ -64,10 +80,25 @@ pub(crate) fn ligand_groups(
 }
 
 #[cfg(feature = "reduce3")]
+pub(crate) fn bridge_parent_sources(
+    document: &CifDocument,
+    model: i64,
+    chem_data: Option<&Path>,
+) -> Result<Vec<(String, [u32; 2])>, String> {
+    let source = source::read(document, model)?;
+    if !bridges::possible_source(&source) { return Ok(Vec::new()); }
+    let library = crate::reduce::load_monomer_library(chem_data).map_err(|error| error.to_string())?;
+    Ok(bridges::for_source(&library, &source)?.into_iter().map(|site| {
+        (site.hydrogen_name, site.metal_rows.map(|row| source.atoms[row].source_row))
+    }).collect())
+}
+
+#[cfg(feature = "reduce3")]
 pub(crate) fn required_parent_sources(
     document: &CifDocument,
     expected_keys: &str,
     model: i64,
+    chem_data: Option<&Path>,
 ) -> Result<Vec<u32>, String> {
     let expected: Vec<[String; 5]> =
         serde_json::from_str(expected_keys).map_err(|error| error.to_string())?;
@@ -95,6 +126,21 @@ pub(crate) fn required_parent_sources(
         }
         selected.push(atom.source_row);
     }
+    if bridges::possible_source(&source)
+        && wanted.iter().any(|key| key[4] != "protein" && !found.contains_key(key)) {
+        let library = crate::reduce::load_monomer_library(chem_data).map_err(|error| error.to_string())?;
+        for site in bridges::for_source(&library, &source)? {
+            let atom = &source.atoms[site.metal_rows[0]];
+            let mut key = record::token_key(atom, true);
+            key[4] = site.hydrogen_name;
+            if wanted.contains(&key) {
+                if found.insert(key.clone(), site.group).is_some() {
+                    return Err(format!("Retained bridge key matches several residues: {key:?}"));
+                }
+                selected.extend(site.metal_rows.map(|row| source.atoms[row].source_row));
+            }
+        }
+    }
     if found.len() != wanted.len() {
         let missing: Vec<_> = wanted
             .iter()
@@ -106,7 +152,16 @@ pub(crate) fn required_parent_sources(
         ));
     }
     selected.sort_unstable();
+    selected.dedup();
     Ok(selected)
+}
+
+#[cfg(feature = "reduce3")]
+pub(crate) fn retained_ligand_sources(document: &CifDocument, model: i64, required: &[u32]) -> Result<Vec<u32>, String> {
+    let required = required.iter().copied().collect::<BTreeSet<_>>();
+    Ok(source::read(document, model)?.atoms.iter().filter(|atom|
+        !atom.protein && !residue::hydrogen(&atom.element) && required.contains(&atom.source_row))
+        .map(|atom| atom.source_row).collect())
 }
 
 pub(crate) fn pack(
@@ -119,11 +174,37 @@ pub(crate) fn pack(
     options: &PackOptions<'_>,
 ) -> Result<Tokens, String> {
     let source = source::read(document, options.model)?;
+    #[cfg(feature = "reduce3")]
+    let mut bridge_sites = Vec::new();
+    #[cfg(feature = "reduce3")]
+    let residue_parents = if options.chem_data.is_some()
+        || (!options.protein_only && bridges::possible_source(&source)) {
+            let library = crate::reduce::load_monomer_library(options.chem_data).map_err(|error| error.to_string())?;
+            if !options.protein_only {
+                bridge_sites = bridges::for_source(&library, &source)?;
+                if !bridge_sites.is_empty() && !elements.iter().any(|element| element == "H") {
+                    return Err("Metal hydride packing requires a ligand contract with H token 65".into());
+                }
+            }
+            parents::for_source(&library, &source)?
+    } else {
+        HashMap::new()
+    };
+    #[cfg(not(feature = "reduce3"))]
+    let residue_parents = {
+        if options.chem_data.is_some() {
+            return Err("Hydrogen dictionary packing requires the Reduce3 feature".into());
+        }
+        HashMap::new()
+    };
     tokens::pack(
         &source,
         schema,
         features,
         hydrogen_parents,
+        &residue_parents,
+        #[cfg(feature = "reduce3")]
+        &bridge_sites,
         elements,
         excluded,
         options,

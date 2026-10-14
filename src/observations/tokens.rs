@@ -2,7 +2,7 @@
 
 use super::record::{Tokens, renumber_ligands};
 use super::source::{Atom, Source};
-use super::{HydrogenParents, LigandFeatures, Schema, residue, topology};
+use super::{HydrogenParents, ResidueParents, LigandFeatures, Schema, residue, topology};
 use std::collections::{BTreeSet, HashMap};
 
 fn ligand_features(features: &LigandFeatures, atom: &Atom) -> [i16; 4] {
@@ -64,9 +64,10 @@ fn parent_error(atom: &Atom, parent: &str, reason: &str) -> String {
     format!("Invalid ligand hydrogen parent: {detail}")
 }
 
-fn declared_parents(source: &Source) -> Result<HashMap<usize, Option<usize>>, String> {
+fn declared_parents(source: &Source, bridges: &BTreeSet<usize>) -> Result<HashMap<usize, Option<usize>>, String> {
     let mut result = HashMap::new();
     for &(child, parent) in &source.hydrogen_bonds {
+        if bridges.contains(&child) { continue; }
         if let Some(previous) = result.insert(child, parent)
             && previous != parent
         {
@@ -78,6 +79,38 @@ fn declared_parents(source: &Source) -> Result<HashMap<usize, Option<usize>>, St
         }
     }
     Ok(result)
+}
+
+#[cfg(feature = "reduce3")]
+fn add_bridges(source: &Source, sites: &[super::bridges::Site], excluded: &[String],
+    tokens: &mut Tokens, mapping: &mut [usize]) -> Result<HashMap<usize, usize>, String> {
+    let mut counts = HashMap::new();
+    for site in sites {
+        let first = &source.atoms[site.metal_rows[0]];
+        if excluded.contains(&first.component) { continue; }
+        let token = tokens.identity.len();
+        let mut packed = residue::Packed::empty([-1; 3]);
+        if let Some(row) = site.hydrogen_row {
+            packed.position[0] = source.atoms[row].position;
+            packed.mask[0] = true;
+            mapping[row] = token;
+        }
+        tokens.push(first, 65, &packed, true, [site.formal_charge, 0, 0, 1]);
+        tokens.keys[token][4] = site.hydrogen_name.clone();
+        tokens.charge_known[token] = 1;
+        tokens.hydrogen_known[token] = 1;
+        if site.hydrogen_row.is_none() {
+            let [first, second] = site.metal_rows.map(|row| source.atoms[row].position);
+            for axis in 0..3 {
+                tokens.crop_positions[token * 3 + axis] = first[axis] * 0.5 + second[axis] * 0.5;
+            }
+        }
+        for edge in site.edges(token, mapping)? {
+            tokens.bridge_edges.push((edge.hydrogen, edge.metal, edge.kind as u8));
+        }
+        for row in site.metal_rows { *counts.entry(row).or_insert(0) += 1; }
+    }
+    Ok(counts)
 }
 
 fn nucleotide_reference(component: &str, name: &str) -> Option<String> {
@@ -167,6 +200,7 @@ fn dictionary_parent(
 fn ligand_parent(
     source: &Source,
     parents: &HydrogenParents,
+    residue_parents: &ResidueParents,
     declared: &HashMap<usize, Option<usize>>,
     row: usize,
     rows: &[usize],
@@ -175,8 +209,8 @@ fn ligand_parent(
     let atom = &source.atoms[row];
     let parent = if let Some(&parent) = declared.get(&row) {
         parent.ok_or_else(|| parent_error(atom, "struct_conn", "bonded parent is absent"))?
-    } else if let Some(name) = parents
-        .get(&atom.component)
+    } else if let Some(name) = residue_parents.get(&atom.group).map(AsRef::as_ref)
+        .or_else(|| parents.get(&atom.component))
         .map(|map| ccd_parent(map, atom))
         .transpose()?
         .flatten()
@@ -300,13 +334,19 @@ fn add_ligands(
     source: &Source,
     features: &LigandFeatures,
     parents: &HydrogenParents,
+    residue_parents: &ResidueParents,
+    #[cfg(feature = "reduce3")] bridge_sites: &[super::bridges::Site],
     elements: &[String],
     excluded: &[String],
     tokens: &mut Tokens,
     mapping: &mut [usize],
     complete: bool,
 ) -> Result<(), String> {
-    let declared = declared_parents(source)?;
+    #[cfg(feature = "reduce3")]
+    let bridge_rows = bridge_sites.iter().filter_map(|site| site.hydrogen_row).collect();
+    #[cfg(not(feature = "reduce3"))]
+    let bridge_rows = BTreeSet::new();
+    let declared = declared_parents(source, &bridge_rows)?;
     let mut assigned: HashMap<usize, Vec<usize>> = HashMap::new();
     for (row, atom) in source.atoms.iter().enumerate() {
         if atom.protein
@@ -319,6 +359,7 @@ fn add_ligands(
         mapping[row] = tokens.identity.len();
         let identity = elements
             .iter()
+            .filter(|element| element.as_str() != "H")
             .position(|element| element == &atom.element)
             .map_or(64, |index| 21 + index);
         let mut packed = residue::Packed::empty([-1; 3]);
@@ -338,6 +379,10 @@ fn add_ligands(
                 .ok_or("Missing ligand token")? = 1;
         }
     }
+    #[cfg(feature = "reduce3")]
+    let bridge_counts = add_bridges(source, bridge_sites, excluded, tokens, mapping)?;
+    #[cfg(not(feature = "reduce3"))]
+    let bridge_counts: HashMap<usize, usize> = HashMap::new();
     for rows in &source.groups {
         let heavy: Vec<_> = rows
             .iter()
@@ -348,14 +393,15 @@ fn add_ligands(
         for &row in rows.iter().filter(|&&row| {
             !source.atoms[row].protein
                 && residue::hydrogen(&source.atoms[row].element)
+                && !bridge_rows.contains(&row)
                 && !excluded.contains(&source.atoms[row].component)
         }) {
-            let parent = ligand_parent(source, parents, &declared, row, rows, &heavy)?;
+            let parent = ligand_parent(source, parents, residue_parents, &declared, row, rows, &heavy)?;
             if let Some(parent) = parent
                 && mapping[parent] == usize::MAX
                 && (declared.contains_key(&row)
-                    || parents
-                        .get(&source.atoms[row].component)
+                    || residue_parents.get(&source.atoms[row].group).map(AsRef::as_ref)
+                        .or_else(|| parents.get(&source.atoms[row].component))
                         .map(|map| ccd_parent(map, &source.atoms[row]))
                         .transpose()?
                         .flatten()
@@ -370,7 +416,7 @@ fn add_ligands(
             let parent = parent.filter(|&parent| mapping[parent] != usize::MAX);
             let Some(parent) = parent else {
                 for &other in rows {
-                    if mapping[other] != usize::MAX {
+                    if mapping[other] != usize::MAX && !residue::hydrogen(&source.atoms[other].element) {
                         tokens.hydrogen_known[mapping[other]] = 0;
                     }
                 }
@@ -394,14 +440,14 @@ fn add_ligands(
     }
     for (row, atom) in source.atoms.iter().enumerate() {
         let token = mapping[row];
-        if token == usize::MAX || tokens.ligand[token] == 0 {
+        if token == usize::MAX || tokens.ligand[token] == 0 || residue::hydrogen(&atom.element) {
             continue;
         }
         let feature = ligand_features(features, atom);
         let count = tokens.masks[token * 32 + 15..(token + 1) * 32]
             .iter()
             .filter(|&&value| value != 0)
-            .count();
+            .count() + bridge_counts.get(&row).copied().unwrap_or(0);
         tokens.charge_known[token] = u8::from(
             tokens.hydrogen_known[token] != 0 && feature[3] != 0 && count == feature[2] as usize,
         );
@@ -414,6 +460,8 @@ pub(super) fn pack(
     schema: &Schema,
     features: &LigandFeatures,
     parents: &HydrogenParents,
+    residue_parents: &ResidueParents,
+    #[cfg(feature = "reduce3")] bridge_sites: &[super::bridges::Site],
     elements: &[String],
     excluded: &[String],
     options: &super::PackOptions<'_>,
@@ -443,6 +491,9 @@ pub(super) fn pack(
             source,
             features,
             parents,
+            residue_parents,
+            #[cfg(feature = "reduce3")]
+            bridge_sites,
             elements,
             excluded,
             &mut result,

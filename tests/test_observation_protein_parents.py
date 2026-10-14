@@ -25,6 +25,24 @@ CYS_7F52 = [
 ]
 
 
+ASP_1R24 = [
+    ("N", "N", (75.097, -21.262, 8.356)),
+    ("CA", "C", (76.052, -20.122, 8.423)),
+    ("C", "C", (76.202, -21.086, 9.488)),
+    ("O", "O", (75.551, -22.048, 9.016)),
+    ("CB", "C", (75.224, -18.914, 8.769)),
+    ("CG", "C", (74.850, -18.615, 7.355)),
+    ("OD1", "O", (75.372, -19.394, 6.549)),
+    ("OD2", "O", (74.117, -17.664, 7.060)),
+    ("H1", "H", (75.534, -22.024, 8.501)),
+    ("H2", "H", (74.467, -21.158, 8.976)),
+    ("H3", "H", (74.719, -21.286, 7.550)),
+    ("HA", "H", (76.728, -19.722, 7.854)),
+    ("HB2", "H", (74.454, -19.123, 9.321)),
+    ("HB3", "H", (75.740, -18.201, 9.176)),
+]
+
+
 def packer():
     file = os.environ.get("KAVEH_ATOM32_SCHEMA")
     if file:
@@ -75,3 +93,60 @@ def test_named_parent_does_not_relax_disulfide_validation():
     native, _ = packer()
     with pytest.raises(ValueError, match="Atom-presence labels contradict every allowed chemical state"):
         native.pack(document(linked=True), complete=True, validate=True)
+
+
+def terminal_document(child="H1", element="H", distant_n=False):
+    header = ("data_terminal_parent\nloop_\n_entity_poly.entity_id\n_entity_poly.type\n"
+              "1 'polypeptide(L)'\nloop_\n_entity_poly_seq.entity_id\n_entity_poly_seq.num\n"
+              "1 1\n1 2\nloop_\n_atom_site.group_PDB\n_atom_site.label_entity_id\n"
+              "_atom_site.label_asym_id\n_atom_site.label_seq_id\n_atom_site.auth_seq_id\n"
+              "_atom_site.label_comp_id\n_atom_site.label_atom_id\n_atom_site.type_symbol\n"
+              "_atom_site.Cartn_x\n_atom_site.Cartn_y\n_atom_site.Cartn_z\n"
+              "_atom_site.pdbx_PDB_model_num\n")
+    rows = "".join(f"ATOM 1 C 1 1 ASP {child if name == 'H1' else name} "
+                   f"{element if name == 'H1' else kind} "
+                   f"{x + 5 if distant_n and name == 'N' else x} {y} {z} 1\n"
+                   for name, kind, (x, y, z) in ASP_1R24)
+    return nibbler.cif.read((header + rows).encode())
+
+
+@pytest.mark.parametrize("name,element", [("H1", "H"), ("D1", "D"), ("T1", "T")])
+def test_1r24_terminal_hydrogen_stays_on_nitrogen(name, element):
+    native, schema = packer()
+    source = {atom: np.asarray(xyz) for atom, _, xyz in ASP_1R24}
+    assert np.linalg.norm(source["H1"] - source["O"]) < np.linalg.norm(source["H1"] - source["N"])
+    buffers, _ = native.pack(terminal_document(name, element), complete=True, protein_only=True,
+                            topology_policy="entity_sequence", validate=True)
+    result = {key: np.frombuffer(data, dtype=dtype).reshape(shape)
+              for key, (dtype, shape, data) in buffers.items()}
+    asp = schema["residues"][3]
+    assert result["mask"][0, 15:18].all() and not result["mask"][0, 23]
+    assert result["state_known"][0] and result["atom_presence_known"][0].all()
+    state = asp["states"][result["chemical_state"][0]]
+    assert state["n_terminal"] and not state["c_terminal"]
+    np.testing.assert_array_equal(result["mask"][0], state["present"])
+    terminal = sorted((name if atom == "H1" else atom, xyz)
+                      for atom, _, xyz in ASP_1R24 if atom in {"H1", "H2", "H3"})
+    np.testing.assert_array_equal(result["pos"][0, 15:18],
+                                  np.asarray([xyz for _, xyz in terminal], dtype=np.float32))
+    for atom, _, xyz in ASP_1R24:
+        if atom not in {"H1", "H2", "H3"}:
+            slot = asp["names"].index(atom)
+            np.testing.assert_array_equal(result["pos"][0, slot], np.asarray(xyz, dtype=np.float32))
+
+
+@pytest.mark.parametrize("name,element", [("H1", "H"), ("D1", "D"), ("T1", "T")])
+def test_terminal_hydrogen_rejects_distant_nitrogen_without_oxygen_fallback(name, element):
+    native, _ = packer()
+    doc = terminal_document(name, element, distant_n=True)
+    buffers, _ = native.pack(doc, complete=False, protein_only=True,
+                            topology_policy="entity_sequence", validate=False)
+    dtype, shape, data = buffers["mask"]
+    mask = np.frombuffer(data, dtype=dtype).reshape(shape)
+    assert not mask[0, 15:18].any() and not mask[0, 23]
+    buffers, _ = native.pack(doc, complete=True, protein_only=True,
+                             topology_policy="entity_sequence", validate=True)
+    arrays = {key: np.frombuffer(data, dtype=dtype).reshape(shape)
+              for key, (dtype, shape, data) in buffers.items()}
+    assert not arrays["mask"][0, 15:18].any() and not arrays["mask"][0, 23]
+    assert not arrays["state_known"][0] and not arrays["atom_presence_known"][0, 15:18].any()
