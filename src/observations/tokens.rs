@@ -109,7 +109,7 @@ fn ligand_parent(
         rows.iter()
             .copied()
             .find(|&i| source.atoms[i].name == name && !residue::hydrogen(&source.atoms[i].element))
-            .ok_or_else(|| parent_error(atom, name, "CCD parent is absent"))?
+            .ok_or_else(|| parent_error(atom, name, "Dictionary parent is absent"))?
     } else {
         return Ok(residue::nearest(atom.position, heavy));
     };

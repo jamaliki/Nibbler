@@ -65,6 +65,34 @@ pub(super) fn nearest(position: [f32; 3], heavy: &[(usize, [f32; 3])]) -> Option
     (first.1 > 0.5 && first.1 < 1.6 && second - first.1 >= 0.2).then_some(first.0)
 }
 
+fn protein_parent(schema: &Residue, atom: &Atom, heavy: &[(usize, [f32; 3])]) -> Option<usize> {
+    let named_parent = |name: &str| {
+        schema
+            .names
+            .iter()
+            .zip(&schema.parents)
+            .find_map(|(slot, &parent)| (slot == name && parent >= 0).then_some(parent as usize))
+    };
+    let parent = named_parent(&atom.name).or_else(|| {
+        if atom.element.eq_ignore_ascii_case("D") || atom.element.eq_ignore_ascii_case("T") {
+            named_parent(
+                &atom
+                    .name
+                    .replacen(&atom.element.to_ascii_uppercase(), "H", 1),
+            )
+        } else {
+            None
+        }
+    });
+    if let Some(parent) = parent {
+        return heavy.iter().find_map(|&(slot, xyz)| {
+            let value = distance(atom.position, xyz);
+            (slot == parent && value > 0.5 && value < 1.6).then_some(slot)
+        });
+    }
+    nearest(atom.position, heavy)
+}
+
 pub(super) fn pack(
     schema: &Residue,
     atoms: &[&Atom],
@@ -96,7 +124,7 @@ pub(super) fn pack(
         .collect();
     let mut groups: [Vec<&Atom>; 15] = std::array::from_fn(|_| Vec::new());
     for atom in atoms.iter().filter(|atom| protein_hydrogen(&atom.element)) {
-        let Some(parent) = nearest(atom.position, &heavy) else {
+        let Some(parent) = protein_parent(schema, atom, &heavy) else {
             invalid = true;
             continue;
         };

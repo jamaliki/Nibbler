@@ -37,6 +37,7 @@ struct Options {
     stop_on_any_missing_hydrogen: bool,
     ignore_missing_restraints: bool,
     allow_missing_restraints_for: Vec<String>,
+    required_hydrogen_target_keys: Option<String>,
     verbosity: i32,
     probe: HashMap<String, f64>,
     probe_flags: HashMap<String, bool>,
@@ -105,6 +106,7 @@ fn params(options: &Options) -> PyResult<Params> {
         ignore_missing_restraints: options.ignore_missing_restraints,
         stop_on_any_missing_hydrogen: options.stop_on_any_missing_hydrogen,
         allow_missing_restraints_for: options.allow_missing_restraints_for.clone(),
+        required_hydrogen_parent_sources: None,
         opt: OptParams {
             probe,
             add_flip_movers: options.add_flip_movers,
@@ -139,15 +141,26 @@ fn reduce_document(
     document: &PyCifDocument,
     options: Options,
 ) -> PyResult<(PyCifDocument, String)> {
-    let params = params(&options)?;
+    let mut params = params(&options)?;
     let source = Arc::clone(document.document());
     let chem_data = options.chem_data;
+    let target_keys = options.required_hydrogen_target_keys;
+    if target_keys.is_some() && (params.compat || params.approach != Approach::Add
+        || !params.stop_on_any_missing_hydrogen || params.model_id.is_none()) {
+        return Err(PyValueError::new_err(("REDUCE_INVALID_MODEL",
+            "Required hydrogen target keys need an explicit model_id and strict fixed-mode addition", Vec::<String>::new())));
+    }
     let reduction = py
         .detach(move || {
-            let monomers = load_monomer_library(chem_data.as_deref())?;
-            run(&source, &monomers, &params)
-        })
-        .map_err(reduce_error_to_python)?;
+            if let Some(keys) = target_keys {
+                let model = params.model_id.and_then(|model| i64::try_from(model).ok())
+                    .ok_or_else(|| invalid("model_id is out of range".into()))?;
+                params.required_hydrogen_parent_sources = Some(crate::observations::required_parent_sources(&source, &keys, model)
+                    .map_err(|message| PyValueError::new_err(("REDUCE_INVALID_MODEL", message, Vec::<String>::new())))?);
+            }
+            let monomers = load_monomer_library(chem_data.as_deref()).map_err(reduce_error_to_python)?;
+            run(&source, &monomers, &params).map_err(reduce_error_to_python)
+        })?;
     let (output, report) = reduction.into_parts();
     Ok((
         PyCifDocument::new(Arc::new(output), document.schema_name().map(str::to_owned)),

@@ -59,6 +59,36 @@ def available() -> bool:
     return hasattr(_core, "reduce_document")
 
 
+def hydrogen_parents(
+    document: CifDocument, *, chem_data: str | PathLike[str] | None = None,
+    model_id: int = 1,
+) -> dict[str, dict[str, str]]:
+    """Return hydrogen parents from the dictionaries Reduce3 selects."""
+    if not isinstance(document, CifDocument):
+        raise TypeError("hydrogen_parents requires a parsed CIF document")
+    if isinstance(model_id, bool) or not isinstance(model_id, int) or model_id < 1:
+        raise ValueError("model_id must be a one-based model number")
+    if not hasattr(_core, "reduce_hydrogen_parents"):
+        raise RuntimeError("This Nibbler build has no Reduce3 hydrogen-parent helper")
+    return _core.reduce_hydrogen_parents(document,
+        chem_data=None if chem_data is None else fspath(chem_data), model=model_id)
+
+
+def required_parent_sources(
+    document: CifDocument, expected_keys_json: str, *, model_id: int = 1,
+) -> list[int]:
+    """Map checked target keys to original heavy-atom source rows."""
+    if not isinstance(document, CifDocument):
+        raise TypeError("required_parent_sources requires a parsed CIF document")
+    if not isinstance(expected_keys_json, str):
+        raise TypeError("expected_keys_json must be a JSON string")
+    if isinstance(model_id, bool) or not isinstance(model_id, int) or model_id < 1:
+        raise ValueError("model_id must be a one-based model number")
+    if not hasattr(_core, "reduce_required_parent_sources"):
+        raise RuntimeError("This Nibbler build has no required-parent source helper")
+    return _core.reduce_required_parent_sources(document, expected_keys_json, model=model_id)
+
+
 def run(
     source: Source | CifDocument | MmcifModel,
     *,
@@ -82,6 +112,7 @@ def run(
     stop_on_any_missing_hydrogen: bool = False,
     ignore_missing_restraints: bool = False,
     allow_missing_restraints_for: Sequence[str] = (),
+    required_hydrogen_target_keys: str | None = None,
     verbosity: int = 2,
     probe: Mapping[str, float | bool] | None = None,
 ) -> Reduction:
@@ -106,6 +137,12 @@ def run(
     records them in the report. Known dictionaries and strict checks for all
     other components and unparameterized hydrogens stay unchanged. This option
     requires ``compat=False``.
+
+    ``required_hydrogen_target_keys`` contains the retained target-key JSON.
+    Native code resolves its heavy parent rows in the selected model. Strict
+    fixed-mode addition may remove and report an unplaced H only when its
+    unique parent lies outside those targets. Valid context hydrogens and all
+    heavy atoms remain unchanged. This option requires explicit ``model_id``.
     """
     if not available():
         raise RuntimeError(
@@ -128,6 +165,8 @@ def run(
             or not isinstance(allow_missing_restraints_for, Sequence)
             or any(not isinstance(name, str) for name in allow_missing_restraints_for)):
         raise TypeError("allow_missing_restraints_for must be a sequence of component identifiers")
+    if required_hydrogen_target_keys is not None and not isinstance(required_hydrogen_target_keys, str):
+        raise TypeError("required_hydrogen_target_keys must be a JSON string")
     flags = {
         "add_flip_movers": add_flip_movers,
         "compat": compat,
@@ -188,6 +227,7 @@ def run(
         "probe": probe_numbers,
         "probe_flags": probe_flags,
         "allow_missing_restraints_for": list(allow_missing_restraints_for),
+        "required_hydrogen_target_keys": required_hydrogen_target_keys,
     }
     try:
         output, report = _core.reduce_document(document, options)

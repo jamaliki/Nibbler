@@ -5,6 +5,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use crate::cif::{BlockCategory, CifDocument, CifValueRef, numeric};
 
 pub(super) struct Atom {
+    pub source_row: u32,
     pub name: String,
     pub element: String,
     pub chain: String,
@@ -297,6 +298,8 @@ pub(super) fn read(document: &CifDocument, model: i64) -> Result<Source, String>
         }
         groups[group].push(atoms.len());
         atoms.push(Atom {
+            source_row: u32::try_from(row)
+                .map_err(|_| "atom_site row exceeds the source index limit")?,
             name: fields[0].clone(),
             element: fields[1].clone(),
             chain: fields[2].clone(),

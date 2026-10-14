@@ -28,6 +28,8 @@ mod python_geometry;
 mod python_observations;
 #[cfg(all(feature = "python", feature = "reduce3"))]
 mod python_reduce;
+#[cfg(all(feature = "python", feature = "reduce3"))]
+mod python_reduce_parents;
 #[cfg(feature = "python")]
 mod python_scan;
 #[cfg(all(feature = "python", feature = "reduce3"))]

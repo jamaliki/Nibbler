@@ -1121,5 +1121,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::python_scan::register(module)?;
     #[cfg(feature = "reduce3")]
     crate::python_reduce::register(module)?;
+    #[cfg(feature = "reduce3")]
+    crate::python_reduce_parents::register(module)?;
     Ok(())
 }

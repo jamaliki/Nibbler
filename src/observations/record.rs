@@ -4,6 +4,24 @@ use super::source::Atom;
 use super::{Schema, residue};
 use std::collections::{BTreeSet, HashMap};
 
+pub(super) fn token_key(atom: &Atom, ligand: bool) -> [String; 5] {
+    [
+        atom.chain.clone(),
+        if ligand {
+            atom.auth_sequence.clone()
+        } else {
+            atom.sequence.to_string()
+        },
+        atom.insertion.clone(),
+        atom.component.clone(),
+        if ligand {
+            atom.name.clone()
+        } else {
+            "protein".into()
+        },
+    ]
+}
+
 pub(crate) struct Tokens {
     pub positions: Vec<f32>,
     pub masks: Vec<u8>,
@@ -70,21 +88,7 @@ impl Tokens {
         self.state.push(packed.state);
         self.state_known.push(u8::from(packed.state_known));
         self.topology.extend(packed.topology);
-        self.keys.push([
-            atom.chain.clone(),
-            if ligand {
-                atom.auth_sequence.clone()
-            } else {
-                atom.sequence.to_string()
-            },
-            atom.insertion.clone(),
-            atom.component.clone(),
-            if ligand {
-                atom.name.clone()
-            } else {
-                "protein".into()
-            },
-        ]);
+        self.keys.push(token_key(atom, ligand));
     }
 
     pub fn select(&mut self, indices: &[usize]) {
