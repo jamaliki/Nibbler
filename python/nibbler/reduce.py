@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from os import PathLike, fspath
 from typing import Literal
@@ -81,6 +81,7 @@ def run(
     bonded_neighbor_depth: int = 4,
     stop_on_any_missing_hydrogen: bool = False,
     ignore_missing_restraints: bool = False,
+    allow_missing_restraints_for: Sequence[str] = (),
     verbosity: int = 2,
     probe: Mapping[str, float | bool] | None = None,
 ) -> Reduction:
@@ -99,6 +100,12 @@ def run(
     the cctbx monomer library directory; by default it is found through
     ``REDUCE3_CHEM_DATA``, ``CHEM_DATA``, or the active conda environment. The run
     releases the GIL.
+
+    ``allow_missing_restraints_for`` keeps named components as contact context
+    when they lack a dictionary. It adds no hydrogens to those components and
+    records them in the report. Known dictionaries and strict checks for all
+    other components and unparameterized hydrogens stay unchanged. This option
+    requires ``compat=False``.
     """
     if not available():
         raise RuntimeError(
@@ -117,6 +124,10 @@ def run(
         raise ValueError(
             "n_terminal_charge must be 'residue_one', 'first_in_chain', or 'no_charge'"
         )
+    if (isinstance(allow_missing_restraints_for, (str, bytes))
+            or not isinstance(allow_missing_restraints_for, Sequence)
+            or any(not isinstance(name, str) for name in allow_missing_restraints_for)):
+        raise TypeError("allow_missing_restraints_for must be a sequence of component identifiers")
     flags = {
         "add_flip_movers": add_flip_movers,
         "compat": compat,
@@ -176,6 +187,7 @@ def run(
         "verbosity": verbosity,
         "probe": probe_numbers,
         "probe_flags": probe_flags,
+        "allow_missing_restraints_for": list(allow_missing_restraints_for),
     }
     try:
         output, report = _core.reduce_document(document, options)

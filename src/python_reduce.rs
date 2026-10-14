@@ -36,6 +36,7 @@ struct Options {
     bonded_neighbor_depth: usize,
     stop_on_any_missing_hydrogen: bool,
     ignore_missing_restraints: bool,
+    allow_missing_restraints_for: Vec<String>,
     verbosity: i32,
     probe: HashMap<String, f64>,
     probe_flags: HashMap<String, bool>,
@@ -103,6 +104,7 @@ fn params(options: &Options) -> PyResult<Params> {
         model_id: options.model_id,
         ignore_missing_restraints: options.ignore_missing_restraints,
         stop_on_any_missing_hydrogen: options.stop_on_any_missing_hydrogen,
+        allow_missing_restraints_for: options.allow_missing_restraints_for.clone(),
         opt: OptParams {
             probe,
             add_flip_movers: options.add_flip_movers,
