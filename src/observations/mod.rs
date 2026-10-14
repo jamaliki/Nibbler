@@ -80,33 +80,55 @@ pub(crate) fn ligand_groups(
 }
 
 #[cfg(feature = "reduce3")]
-pub(crate) fn bridge_parent_sources(
-    document: &CifDocument,
-    model: i64,
-    chem_data: Option<&Path>,
-) -> Result<Vec<(String, [u32; 2])>, String> {
-    let source = source::read(document, model)?;
-    if !bridges::possible_source(&source) { return Ok(Vec::new()); }
-    let library = crate::reduce::load_monomer_library(chem_data).map_err(|error| error.to_string())?;
-    Ok(bridges::for_source(&library, &source)?.into_iter().map(|site| {
-        (site.hydrogen_name, site.metal_rows.map(|row| source.atoms[row].source_row))
-    }).collect())
-}
-
-#[cfg(feature = "reduce3")]
 pub(crate) fn required_parent_sources(
     document: &CifDocument,
     expected_keys: &str,
     model: i64,
     chem_data: Option<&Path>,
 ) -> Result<Vec<u32>, String> {
-    let expected: Vec<[String; 5]> =
-        serde_json::from_str(expected_keys).map_err(|error| error.to_string())?;
-    let wanted: BTreeSet<_> = expected.iter().cloned().collect();
-    if wanted.len() != expected.len() {
-        return Err("Retained hydrogen-parent keys contain duplicates".into());
+    Ok(RetainedParents::read(document, expected_keys, model, chem_data)?.required)
+}
+
+#[cfg(feature = "reduce3")]
+pub(crate) struct RetainedParents {
+    source: source::Source,
+    pub required: Vec<u32>,
+}
+
+#[cfg(feature = "reduce3")]
+impl RetainedParents {
+    pub fn read(document: &CifDocument, expected_keys: &str, model: i64,
+        chem_data: Option<&Path>) -> Result<Self, String> {
+        let expected: Vec<[String; 5]> =
+            serde_json::from_str(expected_keys).map_err(|error| error.to_string())?;
+        let wanted: BTreeSet<_> = expected.iter().cloned().collect();
+        if wanted.len() != expected.len() {
+            return Err("Retained hydrogen-parent keys contain duplicates".into());
+        }
+        let source = source::read(document, model)?;
+        let required = required_sources(&source, &wanted, chem_data)?;
+        Ok(Self { source, required })
     }
-    let source = source::read(document, model)?;
+
+    pub fn ligand_sources(&self) -> Vec<u32> {
+        let required = self.required.iter().copied().collect::<BTreeSet<_>>();
+        self.source.atoms.iter().filter(|atom|
+            !atom.protein && !residue::hydrogen(&atom.element) && required.contains(&atom.source_row))
+            .map(|atom| atom.source_row).collect()
+    }
+
+    pub fn bridge_sources(&self, chem_data: Option<&Path>) -> Result<Vec<(String, [u32; 2])>, String> {
+        if !bridges::possible_source(&self.source) { return Ok(Vec::new()); }
+        let library = crate::reduce::load_monomer_library(chem_data).map_err(|error| error.to_string())?;
+        Ok(bridges::for_source(&library, &self.source)?.into_iter().map(|site| {
+            (site.hydrogen_name, site.metal_rows.map(|row| self.source.atoms[row].source_row))
+        }).collect())
+    }
+}
+
+#[cfg(feature = "reduce3")]
+fn required_sources(source: &source::Source, wanted: &BTreeSet<[String; 5]>,
+    chem_data: Option<&Path>) -> Result<Vec<u32>, String> {
     let mut found = HashMap::new();
     let mut selected = Vec::new();
     for atom in &source.atoms {
@@ -126,20 +148,9 @@ pub(crate) fn required_parent_sources(
         }
         selected.push(atom.source_row);
     }
-    if bridges::possible_source(&source)
+    if bridges::possible_source(source)
         && wanted.iter().any(|key| key[4] != "protein" && !found.contains_key(key)) {
-        let library = crate::reduce::load_monomer_library(chem_data).map_err(|error| error.to_string())?;
-        for site in bridges::for_source(&library, &source)? {
-            let atom = &source.atoms[site.metal_rows[0]];
-            let mut key = record::token_key(atom, true);
-            key[4] = site.hydrogen_name;
-            if wanted.contains(&key) {
-                if found.insert(key.clone(), site.group).is_some() {
-                    return Err(format!("Retained bridge key matches several residues: {key:?}"));
-                }
-                selected.extend(site.metal_rows.map(|row| source.atoms[row].source_row));
-            }
-        }
+        required_bridge_sources(source, wanted, chem_data, &mut found, &mut selected)?;
     }
     if found.len() != wanted.len() {
         let missing: Vec<_> = wanted
@@ -157,11 +168,22 @@ pub(crate) fn required_parent_sources(
 }
 
 #[cfg(feature = "reduce3")]
-pub(crate) fn retained_ligand_sources(document: &CifDocument, model: i64, required: &[u32]) -> Result<Vec<u32>, String> {
-    let required = required.iter().copied().collect::<BTreeSet<_>>();
-    Ok(source::read(document, model)?.atoms.iter().filter(|atom|
-        !atom.protein && !residue::hydrogen(&atom.element) && required.contains(&atom.source_row))
-        .map(|atom| atom.source_row).collect())
+fn required_bridge_sources(source: &source::Source, wanted: &BTreeSet<[String; 5]>,
+    chem_data: Option<&Path>, found: &mut HashMap<[String; 5], usize>,
+    selected: &mut Vec<u32>) -> Result<(), String> {
+    let library = crate::reduce::load_monomer_library(chem_data).map_err(|error| error.to_string())?;
+    for site in bridges::for_source(&library, source)? {
+        let atom = &source.atoms[site.metal_rows[0]];
+        let mut key = record::token_key(atom, true);
+        key[4] = site.hydrogen_name;
+        if wanted.contains(&key) {
+            if found.insert(key.clone(), site.group).is_some() {
+                return Err(format!("Retained bridge key matches several residues: {key:?}"));
+            }
+            selected.extend(site.metal_rows.map(|row| source.atoms[row].source_row));
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn pack(

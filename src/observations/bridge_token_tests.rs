@@ -147,7 +147,10 @@ fn virtual_h_key_needs_both_original_metal_rows_and_old_contract_fails() {
     let keys = r#"[["L","601",".","EJ2","H"]]"#;
     let library = library();
     assert_eq!(observations::required_parent_sources(&document, keys, 1, Some(&library.root)).expect("Both parents must resolve"), [0, 1]);
-    assert_eq!(observations::bridge_parent_sources(&document, 1, Some(&library.root)).expect("Bridge declaration must resolve"), [("H".into(), [0, 1])]);
+    let retained = observations::RetainedParents::read(&document, keys, 1, Some(&library.root))
+        .expect("Bridge parents must resolve");
+    assert_eq!(retained.ligand_sources(), [0, 1]);
+    assert_eq!(retained.bridge_sources(Some(&library.root)).expect("Bridge declaration must resolve"), [("H".into(), [0, 1])]);
     for chem_data in [Some(library.root.as_path()), None] {
         let options = PackOptions { model: 1, complete: false, topology_policy: "observed_connectivity", protein_only: false, chem_data };
         let error = observations::pack(&document, &schema(), &HashMap::new(), &HashMap::new(), &elements(false), &[], &options)

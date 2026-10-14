@@ -165,15 +165,14 @@ fn reduce_document(
                 let model = params.model_id.map(source_model_number).transpose()
                     .map_err(reduce_error_to_python)?
                     .ok_or_else(|| invalid("model_id is missing".into()))?;
-                let required = crate::observations::required_parent_sources(&source, &keys, model, chem_data.as_deref())
+                let retained = crate::observations::RetainedParents::read(&source, &keys, model, chem_data.as_deref())
                     .map_err(|message| PyValueError::new_err(("REDUCE_INVALID_MODEL", message, Vec::<String>::new())))?;
                 if allow_undefined {
-                    params.allowed_unplaced_hydrogen_parent_sources = crate::observations::retained_ligand_sources(&source, model, &required)
-                        .map_err(invalid)?;
-                    params.allowed_unplaced_bridge_hydrogens = crate::observations::bridge_parent_sources(&source, model, chem_data.as_deref())
+                    params.allowed_unplaced_hydrogen_parent_sources = retained.ligand_sources();
+                    params.allowed_unplaced_bridge_hydrogens = retained.bridge_sources(chem_data.as_deref())
                         .map_err(invalid)?;
                 }
-                params.required_hydrogen_parent_sources = Some(required);
+                params.required_hydrogen_parent_sources = Some(retained.required);
             }
             let monomers = load_monomer_library(chem_data.as_deref()).map_err(reduce_error_to_python)?;
             run(&source, &monomers, &params).map_err(reduce_error_to_python)
