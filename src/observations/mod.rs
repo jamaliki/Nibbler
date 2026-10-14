@@ -1,6 +1,7 @@
 //! Dense observations under a schema supplied by the caller.
 
 pub(crate) mod afdb;
+pub(crate) mod afdb_eligibility;
 pub(crate) mod crops;
 mod record;
 mod residue;

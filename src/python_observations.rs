@@ -2,9 +2,10 @@
 
 use crate::observations::{self, HydrogenParents, LigandFeatures, Schema, Tokens};
 use crate::python::PyCifDocument;
+use pyo3::buffer::{PyBuffer, PyUntypedBuffer};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyByteArray, PyDict, PyModule};
+use pyo3::types::{PyByteArray, PyDict, PyMemoryView, PyModule};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -38,9 +39,64 @@ impl ObservationPacker {
         self.hydrogen_parents.insert(component, parents);
     }
 
+    #[pyo3(signature = (payload, *, min_chain_residues=50, crop_size=384))]
+    fn afdb_eligibility<'py>(
+        &self,
+        py: Python<'py>,
+        payload: &Bound<'py, PyAny>,
+        min_chain_residues: usize,
+        crop_size: usize,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let input = PyUntypedBuffer::get(payload)?;
+        if !input.readonly()
+            || input.dimensions() != 1
+            || !input.is_c_contiguous()
+            || input.item_size() != 1
+        {
+            return Err(PyValueError::new_err(
+                "AFDB eligibility requires a read-only contiguous byte buffer",
+            ));
+        }
+        let view = PyMemoryView::from(payload)?.call_method1("cast", ("B",))?;
+        let buffer = PyBuffer::<u8>::get(&view)?;
+        let bytes = buffer
+            .as_slice(py)
+            .ok_or_else(|| PyValueError::new_err("Invalid AFDB byte buffer"))?;
+        let value = observations::afdb_eligibility::scan(
+            &self.schema,
+            bytes.len(),
+            |i| bytes[i].get(),
+            min_chain_residues,
+            crop_size,
+        )
+        .map_err(PyValueError::new_err)?;
+        let count = value.eligible.len();
+        let result = PyDict::new(py);
+        result.set_item(
+            "eligible",
+            ("?", vec![count], PyByteArray::new(py, &value.eligible)),
+        )?;
+        for (name, values) in [
+            ("complete_residues", value.complete_residues),
+            ("max_chain_residues", value.max_chain_residues),
+            ("reconstructed_chains", value.reconstructed_chains),
+        ] {
+            let bytes: Vec<_> = values
+                .iter()
+                .flat_map(|value| value.to_ne_bytes())
+                .collect();
+            result.set_item(name, ("=i8", vec![count], PyByteArray::new(py, &bytes)))?;
+        }
+        Ok(result)
+    }
+
     #[staticmethod]
     fn crop_permutation(
-        py: Python<'_>, before: &[u8], after: &[u8], chains: &[u8], ligand: &[u8],
+        py: Python<'_>,
+        before: &[u8],
+        after: &[u8],
+        chains: &[u8],
+        ligand: &[u8],
     ) -> PyResult<Vec<i64>> {
         py.detach(|| observations::crops::permutation(before, after, chains, ligand))
             .map_err(PyValueError::new_err)
@@ -49,22 +105,67 @@ impl ObservationPacker {
     #[staticmethod]
     #[pyo3(signature = (positions, chains, ligand, usable, *, crop_size=384))]
     fn crop_plans<'py>(
-        py: Python<'py>, positions: &[u8], chains: &[u8], ligand: &[u8], usable: &[u8], crop_size: usize,
+        py: Python<'py>,
+        positions: &[u8],
+        chains: &[u8],
+        ligand: &[u8],
+        usable: &[u8],
+        crop_size: usize,
     ) -> PyResult<(Bound<'py, PyDict>, f64)> {
-        let value = py.detach(|| observations::crops::plan(positions, chains, ligand, usable, crop_size))
+        let value = py
+            .detach(|| observations::crops::plan(positions, chains, ligand, usable, crop_size))
             .map_err(PyValueError::new_err)?;
         let result = PyDict::new(py);
         let count = value.centers.len();
         let put = |name, dtype, shape: Vec<usize>, bytes: Vec<u8>| -> PyResult<()> {
             result.set_item(name, (dtype, shape, PyByteArray::new(py, &bytes)))
         };
-        for (name, values) in [("crop_center", value.centers), ("crop_tie", value.ties),
-            ("crop_chain_words", vec![value.words as i64]), ("crop_offsets", vec![0, count as i64])] {
-            put(name, "=i8", vec![values.len()], values.iter().flat_map(|value| value.to_ne_bytes()).collect())?;
+        for (name, values) in [
+            ("crop_center", value.centers),
+            ("crop_tie", value.ties),
+            ("crop_chain_words", vec![value.words as i64]),
+            ("crop_offsets", vec![0, count as i64]),
+        ] {
+            put(
+                name,
+                "=i8",
+                vec![values.len()],
+                values
+                    .iter()
+                    .flat_map(|value| value.to_ne_bytes())
+                    .collect(),
+            )?;
         }
-        put("crop_radius", "=f4", vec![count], value.radii.iter().flat_map(|value| value.to_ne_bytes()).collect())?;
-        put("crop_chain_bits", "=u8", vec![value.bits.len()], value.bits.iter().flat_map(|value| value.to_ne_bytes()).collect())?;
-        put("crop_probability", "=f8", vec![count], value.probabilities.iter().flat_map(|value| value.to_ne_bytes()).collect())?;
+        put(
+            "crop_radius",
+            "=f4",
+            vec![count],
+            value
+                .radii
+                .iter()
+                .flat_map(|value| value.to_ne_bytes())
+                .collect(),
+        )?;
+        put(
+            "crop_chain_bits",
+            "=u8",
+            vec![value.bits.len()],
+            value
+                .bits
+                .iter()
+                .flat_map(|value| value.to_ne_bytes())
+                .collect(),
+        )?;
+        put(
+            "crop_probability",
+            "=f8",
+            vec![count],
+            value
+                .probabilities
+                .iter()
+                .flat_map(|value| value.to_ne_bytes())
+                .collect(),
+        )?;
         Ok((result, value.mass))
     }
 
