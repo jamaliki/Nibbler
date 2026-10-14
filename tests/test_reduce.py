@@ -16,6 +16,8 @@ from nibbler.reduce import Reduction
 CRAMBIN = Path(__file__).parent / "reduce3" / "crambin_1-5.cif"
 CRAMBIN_ENTRY = Path(__file__).parent / "reduce3" / "1crn.cif"
 MBO = Path(__file__).parent / "reduce3" / "mbo.cif"
+LINKED_PEPTIDE = Path(__file__).parent / "reduce3" / "linked_8zje.cif"
+LINKED_ADDUCT = Path(__file__).parent / "reduce3" / "linked_9hj3.cif"
 
 pytestmark = pytest.mark.skipif(
     not nibbler.reduce.available(), reason="built without the reduce3 feature"
@@ -48,6 +50,35 @@ def test_hydrogens_are_added_to_a_parsed_document() -> None:
     assert _atom_count(document) == 33
     assert _atom_count(result.document) == 66
     assert "MoverSingleHydrogenRotator" in result.report
+
+
+@pytest.mark.parametrize("fixture", [LINKED_PEPTIDE, LINKED_ADDUCT])
+def test_linked_states_keep_named_hydrogens_with_strict_checks(fixture: Path) -> None:
+    _chem_data_or_skip()
+    pyarrow = pytest.importorskip("pyarrow")
+    result = nibbler.reduce.run(
+        nibbler.chomp(fixture), model_id=1, stop_on_any_missing_hydrogen=True
+    )
+    rows = pyarrow.RecordBatchReader.from_stream(
+        result.document.project("atom_site")
+    ).read_all().to_pylist()
+    if fixture == LINKED_PEPTIDE:
+        hyp = [r for r in rows if r["label_comp_id"] == "HYP"]
+        assert not any(r["label_atom_id"] == "H" for r in hyp)
+        xza = [r for r in rows if r["label_comp_id"] == "XZA"]
+        assert sum(r["label_atom_id"] in {"HN1", "HN2"} for r in xza) == 1
+        assert any(
+            r["label_comp_id"] == "LEU" and r["label_atom_id"] == "H"
+            for r in rows
+        )
+    else:
+        ligand = {r["label_atom_id"]: r for r in rows if r["label_comp_id"] == "Z41"}
+        for name in ("H351", "H352"):
+            distance = math.sqrt(sum(
+                (float(ligand[name][key]) - float(ligand["C35"][key])) ** 2
+                for key in ("Cartn_x", "Cartn_y", "Cartn_z")
+            ))
+            assert abs(distance - 0.970) < 0.002
 
 
 def test_flips_are_considered_by_default() -> None:

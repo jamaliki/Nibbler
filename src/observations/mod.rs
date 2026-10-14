@@ -1,6 +1,7 @@
 //! Dense observations under a schema supplied by the caller.
 
 pub(crate) mod afdb;
+pub(crate) mod crops;
 mod record;
 mod residue;
 mod schema;
@@ -14,6 +15,7 @@ pub(crate) use schema::Schema;
 use std::collections::{BTreeSet, HashMap};
 
 pub(crate) type LigandFeatures = HashMap<String, HashMap<String, [i16; 4]>>;
+pub(crate) type HydrogenParents = HashMap<String, HashMap<String, String>>;
 
 pub(crate) struct PackOptions<'a> {
     pub model: i64,
@@ -38,10 +40,19 @@ pub(crate) fn pack(
     document: &CifDocument,
     schema: &Schema,
     features: &LigandFeatures,
+    hydrogen_parents: &HydrogenParents,
     elements: &[String],
     excluded: &[String],
     options: &PackOptions<'_>,
 ) -> Result<Tokens, String> {
     let source = source::read(document, options.model)?;
-    tokens::pack(&source, schema, features, elements, excluded, options)
+    tokens::pack(
+        &source,
+        schema,
+        features,
+        hydrogen_parents,
+        elements,
+        excluded,
+        options,
+    )
 }

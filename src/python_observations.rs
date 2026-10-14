@@ -1,6 +1,6 @@
 //! Python receives typed buffers after native observation packing.
 
-use crate::observations::{self, LigandFeatures, Schema, Tokens};
+use crate::observations::{self, HydrogenParents, LigandFeatures, Schema, Tokens};
 use crate::python::PyCifDocument;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -14,6 +14,7 @@ struct ObservationPacker {
     elements: Vec<String>,
     excluded: Vec<String>,
     features: LigandFeatures,
+    hydrogen_parents: HydrogenParents,
 }
 
 #[pymethods]
@@ -25,11 +26,46 @@ impl ObservationPacker {
             elements,
             excluded,
             features: HashMap::new(),
+            hydrogen_parents: HashMap::new(),
         })
     }
 
     fn add_component(&mut self, component: String, features: HashMap<String, [i16; 4]>) {
         self.features.insert(component, features);
+    }
+
+    fn add_hydrogen_parents(&mut self, component: String, parents: HashMap<String, String>) {
+        self.hydrogen_parents.insert(component, parents);
+    }
+
+    #[staticmethod]
+    fn crop_permutation(
+        py: Python<'_>, before: &[u8], after: &[u8], chains: &[u8], ligand: &[u8],
+    ) -> PyResult<Vec<i64>> {
+        py.detach(|| observations::crops::permutation(before, after, chains, ligand))
+            .map_err(PyValueError::new_err)
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (positions, chains, ligand, usable, *, crop_size=384))]
+    fn crop_plans<'py>(
+        py: Python<'py>, positions: &[u8], chains: &[u8], ligand: &[u8], usable: &[u8], crop_size: usize,
+    ) -> PyResult<(Bound<'py, PyDict>, f64)> {
+        let value = py.detach(|| observations::crops::plan(positions, chains, ligand, usable, crop_size))
+            .map_err(PyValueError::new_err)?;
+        let result = PyDict::new(py);
+        let count = value.centers.len();
+        let put = |name, dtype, shape: Vec<usize>, bytes: Vec<u8>| -> PyResult<()> {
+            result.set_item(name, (dtype, shape, PyByteArray::new(py, &bytes)))
+        };
+        for (name, values) in [("crop_center", value.centers), ("crop_tie", value.ties),
+            ("crop_chain_words", vec![value.words as i64]), ("crop_offsets", vec![0, count as i64])] {
+            put(name, "=i8", vec![values.len()], values.iter().flat_map(|value| value.to_ne_bytes()).collect())?;
+        }
+        put("crop_radius", "=f4", vec![count], value.radii.iter().flat_map(|value| value.to_ne_bytes()).collect())?;
+        put("crop_chain_bits", "=u8", vec![value.bits.len()], value.bits.iter().flat_map(|value| value.to_ne_bytes()).collect())?;
+        put("crop_probability", "=f8", vec![count], value.probabilities.iter().flat_map(|value| value.to_ne_bytes()).collect())?;
+        Ok((result, value.mass))
     }
 
     #[pyo3(signature = (document, *, model=1))]
@@ -64,6 +100,7 @@ impl ObservationPacker {
                     document.document(),
                     &self.schema,
                     &self.features,
+                    &self.hydrogen_parents,
                     &self.elements,
                     &self.excluded,
                     &observations::PackOptions {

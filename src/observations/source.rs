@@ -23,6 +23,7 @@ pub(super) struct Source {
     pub atoms: Vec<Atom>,
     pub groups: Vec<Vec<usize>>,
     pub bonds: Vec<(usize, usize)>,
+    pub hydrogen_bonds: Vec<(usize, Option<usize>)>,
     pub has_protein_annotations: bool,
     pub lengths: HashMap<String, i64>,
 }
@@ -30,6 +31,7 @@ pub(super) struct Source {
 type Occurrence = (String, i64, String, String, String, String);
 type Residue = (String, i64, String, String);
 type Endpoint = (String, i64, String, String);
+type Connections = (Vec<(usize, usize)>, Vec<(usize, Option<usize>)>);
 
 fn text(table: &BlockCategory<'_>, row: usize, column: Option<usize>) -> String {
     match column.and_then(|c| table.value(row, c)) {
@@ -157,10 +159,11 @@ fn endpoint(
         })
 }
 
-fn connections(entries: &[crate::cif::CifEntry], atoms: &[Atom]) -> Vec<(usize, usize)> {
+fn connections(entries: &[crate::cif::CifEntry], atoms: &[Atom]) -> Connections {
     let mut pairs = BTreeSet::new();
+    let mut hydrogen_pairs = BTreeSet::new();
     let Some(table) = BlockCategory::find(entries, "struct_conn") else {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     };
     let mut lookup: HashMap<Endpoint, Vec<usize>> = HashMap::new();
     for (index, atom) in atoms.iter().enumerate() {
@@ -190,15 +193,28 @@ fn connections(entries: &[crate::cif::CifEntry], atoms: &[Atom]) -> Vec<(usize, 
         }) {
             continue;
         }
-        if let (Some(a), Some(b)) = (
-            endpoint(&table, row, 1, atoms, &lookup),
-            endpoint(&table, row, 2, atoms, &lookup),
-        ) && atoms[a].group != atoms[b].group
-        {
-            pairs.insert((a.min(b), a.max(b)));
+        let first = endpoint(&table, row, 1, atoms, &lookup);
+        let second = endpoint(&table, row, 2, atoms, &lookup);
+        let hydrogen = |row: usize| matches!(atoms[row].element.as_str(), "H" | "D" | "T");
+        if let (Some(a), Some(b)) = (first, second) {
+            if hydrogen(a) != hydrogen(b) {
+                hydrogen_pairs.insert(if hydrogen(a) {
+                    (a, Some(b))
+                } else {
+                    (b, Some(a))
+                });
+            }
+            if atoms[a].group != atoms[b].group {
+                pairs.insert((a.min(b), a.max(b)));
+            }
+        } else if let Some(child) = first.or(second).filter(|&row| hydrogen(row)) {
+            hydrogen_pairs.insert((child, None));
         }
     }
-    pairs.into_iter().collect()
+    (
+        pairs.into_iter().collect(),
+        hydrogen_pairs.into_iter().collect(),
+    )
 }
 
 pub(super) fn read(document: &CifDocument, model: i64) -> Result<Source, String> {
@@ -342,11 +358,12 @@ pub(super) fn read(document: &CifDocument, model: i64) -> Result<Source, String>
     for (row, atom) in atoms.iter().enumerate() {
         groups[atom.group].push(row);
     }
-    let bonds = connections(block.entries(), &atoms);
+    let (bonds, hydrogen_bonds) = connections(block.entries(), &atoms);
     Ok(Source {
         atoms,
         groups,
         bonds,
+        hydrogen_bonds,
         has_protein_annotations: !types.is_empty(),
         lengths: entity_lengths(block.entries()),
     })

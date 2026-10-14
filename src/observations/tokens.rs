@@ -2,8 +2,8 @@
 
 use super::record::{Tokens, renumber_ligands};
 use super::source::{Atom, Source};
-use super::{LigandFeatures, Schema, residue, topology};
-use std::collections::BTreeSet;
+use super::{HydrogenParents, LigandFeatures, Schema, residue, topology};
+use std::collections::{BTreeSet, HashMap};
 
 fn ligand_features(features: &LigandFeatures, atom: &Atom) -> [i16; 4] {
     features
@@ -11,6 +11,123 @@ fn ligand_features(features: &LigandFeatures, atom: &Atom) -> [i16; 4] {
         .and_then(|component| component.get(&atom.name))
         .copied()
         .unwrap_or([0; 4])
+}
+
+fn hydrogen_overflow(
+    source: &Source,
+    features: &LigandFeatures,
+    parent: usize,
+    assigned: &[usize],
+) -> String {
+    let atom = &source.atoms[parent];
+    let children: Vec<_> = assigned
+        .iter()
+        .map(|&row| {
+            let child = &source.atoms[row];
+            serde_json::json!({"name":child.name,"element":child.element,
+            "position":child.position,"distance":residue::distance(atom.position,child.position)})
+        })
+        .collect();
+    let ccd = features
+        .get(&atom.component)
+        .and_then(|component| component.get(&atom.name));
+    let partners: Vec<_> = source
+        .bonds
+        .iter()
+        .filter_map(|&(a, b)| {
+            let other = if a == parent {
+                b
+            } else if b == parent {
+                a
+            } else {
+                return None;
+            };
+            let other = &source.atoms[other];
+            Some(
+                serde_json::json!({"chain":other.chain,"component":other.component,
+            "atom_name":other.name,"auth_sequence":other.auth_sequence,"position":other.position}),
+            )
+        })
+        .collect();
+    let detail = serde_json::json!({"parent_key":[atom.chain.clone(),atom.auth_sequence.clone(),
+        atom.insertion.clone(),atom.component.clone(),atom.name.clone()],"parent_element":atom.element,
+        "parent_position":atom.position,"capacity":3,"hydrogens":children,"covalent_partners":partners,
+        "ccd_features":ccd.map(|values| serde_json::json!({"formal_charge":values[0],
+            "hybridization":values[1],"total_hydrogen":values[2],"formal_charge_known":values[3] != 0}))});
+    format!("Ligand parent has more than three hydrogens; unsupported Atom32 ligand: {detail}")
+}
+
+fn parent_error(atom: &Atom, parent: &str, reason: &str) -> String {
+    let detail = serde_json::json!({"hydrogen_key":[atom.chain.clone(),atom.auth_sequence.clone(),
+        atom.insertion.clone(),atom.component.clone(),atom.name.clone()],
+        "position":atom.position,"parent":parent,"reason":reason});
+    format!("Invalid ligand hydrogen parent: {detail}")
+}
+
+fn declared_parents(source: &Source) -> Result<HashMap<usize, Option<usize>>, String> {
+    let mut result = HashMap::new();
+    for &(child, parent) in &source.hydrogen_bonds {
+        if let Some(previous) = result.insert(child, parent)
+            && previous != parent
+        {
+            return Err(parent_error(
+                &source.atoms[child],
+                "struct_conn",
+                "conflicting covalent parents",
+            ));
+        }
+    }
+    Ok(result)
+}
+
+fn ccd_parent<'a>(parents: &'a HashMap<String, String>, atom: &Atom) -> Option<&'a str> {
+    if let Some(parent) = parents.get(&atom.name) {
+        return Some(parent);
+    }
+    if matches!(atom.element.as_str(), "D" | "T") {
+        let alias = atom.name.replacen(&atom.element, "H", 1);
+        return parents.get(&alias).map(String::as_str);
+    }
+    None
+}
+
+fn ligand_parent(
+    source: &Source,
+    parents: &HydrogenParents,
+    declared: &HashMap<usize, Option<usize>>,
+    row: usize,
+    rows: &[usize],
+    heavy: &[(usize, [f32; 3])],
+) -> Result<Option<usize>, String> {
+    let atom = &source.atoms[row];
+    let parent = if let Some(&parent) = declared.get(&row) {
+        parent.ok_or_else(|| parent_error(atom, "struct_conn", "bonded parent is absent"))?
+    } else if let Some(name) = parents
+        .get(&atom.component)
+        .and_then(|map| ccd_parent(map, atom))
+    {
+        rows.iter()
+            .copied()
+            .find(|&i| source.atoms[i].name == name && !residue::hydrogen(&source.atoms[i].element))
+            .ok_or_else(|| parent_error(atom, name, "CCD parent is absent"))?
+    } else {
+        return Ok(residue::nearest(atom.position, heavy));
+    };
+    let target = &source.atoms[parent];
+    let distance = residue::distance(atom.position, target.position);
+    if !(residue::finite(atom.position)
+        && residue::finite(target.position)
+        && distance > 0.5
+        && distance < 1.6
+        && !target.protein)
+    {
+        return Err(parent_error(
+            atom,
+            &target.name,
+            "bonded parent has invalid geometry or is a protein atom",
+        ));
+    }
+    Ok(Some(parent))
 }
 
 fn add_proteins(
@@ -106,18 +223,22 @@ fn add_proteins(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn add_ligands(
     source: &Source,
     features: &LigandFeatures,
+    parents: &HydrogenParents,
     elements: &[String],
     excluded: &[String],
     tokens: &mut Tokens,
     mapping: &mut [usize],
     complete: bool,
 ) -> Result<(), String> {
+    let declared = declared_parents(source)?;
+    let mut assigned: HashMap<usize, Vec<usize>> = HashMap::new();
     for (row, atom) in source.atoms.iter().enumerate() {
         if atom.protein
-            || matches!(atom.element.as_str(), "H" | "D")
+            || residue::hydrogen(&atom.element)
             || !residue::finite(atom.position)
             || excluded.contains(&atom.component)
         {
@@ -153,10 +274,26 @@ fn add_ligands(
             .map(|row| (row, source.atoms[row].position))
             .collect();
         for &row in rows.iter().filter(|&&row| {
-            !source.atoms[row].protein && residue::hydrogen(&source.atoms[row].element)
+            !source.atoms[row].protein
+                && residue::hydrogen(&source.atoms[row].element)
+                && !excluded.contains(&source.atoms[row].component)
         }) {
-            let parent = residue::nearest(source.atoms[row].position, &heavy)
-                .filter(|&parent| mapping[parent] != usize::MAX);
+            let parent = ligand_parent(source, parents, &declared, row, rows, &heavy)?;
+            if let Some(parent) = parent
+                && mapping[parent] == usize::MAX
+                && (declared.contains_key(&row)
+                    || parents
+                        .get(&source.atoms[row].component)
+                        .and_then(|map| ccd_parent(map, &source.atoms[row]))
+                        .is_some())
+            {
+                return Err(parent_error(
+                    &source.atoms[row],
+                    &source.atoms[parent].name,
+                    "bonded parent has no ligand token",
+                ));
+            }
+            let parent = parent.filter(|&parent| mapping[parent] != usize::MAX);
             let Some(parent) = parent else {
                 for &other in rows {
                     if mapping[other] != usize::MAX {
@@ -166,14 +303,14 @@ fn add_ligands(
                 continue;
             };
             let token = mapping[parent];
+            let assigned = assigned.entry(parent).or_default();
+            assigned.push(row);
             let count = tokens.masks[token * 32 + 15..token * 32 + 18]
                 .iter()
                 .filter(|&&value| value != 0)
                 .count();
             if count >= 3 {
-                return Err(
-                    "Ligand parent has more than three hydrogens; unsupported Atom32 ligand".into(),
-                );
+                return Err(hydrogen_overflow(source, features, parent, assigned));
             }
             let slot = 15 + count;
             tokens.masks[token * 32 + slot] = 1;
@@ -202,6 +339,7 @@ pub(super) fn pack(
     source: &Source,
     schema: &Schema,
     features: &LigandFeatures,
+    parents: &HydrogenParents,
     elements: &[String],
     excluded: &[String],
     options: &super::PackOptions<'_>,
@@ -230,6 +368,7 @@ pub(super) fn pack(
         add_ligands(
             source,
             features,
+            parents,
             elements,
             excluded,
             &mut result,

@@ -15,6 +15,8 @@ use _core::reduce::{
 const CRAMBIN: &str = include_str!("reduce3/crambin_1-5.cif");
 /// PDB entry 1CRN as distributed by the RCSB.
 const CRAMBIN_ENTRY: &str = include_str!("reduce3/1crn.cif");
+const LINKED_PEPTIDE: &str = include_str!("reduce3/linked_8zje.cif");
+const LINKED_ADDUCT: &str = include_str!("reduce3/linked_9hj3.cif");
 
 const CHEMISTRY: &str = include_str!("fixtures/chemistry/ligand_ion_water.cif");
 const GLYCAN: &str = include_str!("fixtures/chemistry/branched_glycan.cif");
@@ -59,6 +61,23 @@ fn binary_cif_documents_build_the_same_model() {
         reduce3::mmcif::write_mmcif(&structure),
         file_round_trip(CRAMBIN)
     );
+}
+
+#[test]
+fn linked_states_agree_through_file_and_document_interfaces() {
+    let Ok(monomers) = load_monomer_library(None) else { return };
+    for text in [LINKED_PEPTIDE, LINKED_ADDUCT] {
+        let document = parse(text.as_bytes()).expect("linked fixture must parse");
+        let params = Params { stop_on_any_missing_hydrogen: true, ..Params::default() };
+        let native = run(&document, &monomers, &params).expect("known links must place H");
+        let file = reduce3::pipeline::run(
+            reduce3::mmcif::read_mmcif(text).expect("readable fixture"), &monomers, &params,
+        ).expect("file path must place the same H");
+        let expected = _core::reduce::block_document(&file.structure, &document.blocks()[0])
+            .expect("representable output");
+        assert_eq!(entries(native.document()), entries(&expected));
+        assert_eq!(without_timings(native.report()), without_timings(&file.description));
+    }
 }
 
 #[test]
