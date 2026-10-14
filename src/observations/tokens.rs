@@ -80,15 +80,88 @@ fn declared_parents(source: &Source) -> Result<HashMap<usize, Option<usize>>, St
     Ok(result)
 }
 
-fn ccd_parent<'a>(parents: &'a HashMap<String, String>, atom: &Atom) -> Option<&'a str> {
+fn nucleotide_reference(component: &str, name: &str) -> Option<String> {
+    #[cfg(feature = "reduce3")]
+    {
+        let class = reduce3::resclass::get_class_ext(component, true);
+        (class.is_rna_dna() || class == reduce3::resclass::ResClass::Ccp4MonLibRnaDna)
+            .then(|| reduce3::names::na_reference_name(name))
+    }
+    #[cfg(not(feature = "reduce3"))]
+    {
+        let _ = (component, name);
+        None
+    }
+}
+
+fn ccd_parent<'a>(
+    parents: &'a HashMap<String, String>,
+    atom: &Atom,
+) -> Result<Option<&'a str>, String> {
     if let Some(parent) = parents.get(&atom.name) {
-        return Some(parent);
+        return Ok(Some(parent));
     }
-    if matches!(atom.element.as_str(), "D" | "T") {
-        let alias = atom.name.replacen(&atom.element, "H", 1);
-        return parents.get(&alias).map(String::as_str);
+    let name = if matches!(atom.element.as_str(), "D" | "T") {
+        atom.name.replacen(&atom.element, "H", 1)
+    } else {
+        atom.name.clone()
+    };
+    if let Some(parent) = parents.get(&name) {
+        return Ok(Some(parent));
     }
-    None
+    let Some(reference) = nucleotide_reference(&atom.component, &name) else {
+        return Ok(None);
+    };
+    let mut found: Option<&str> = None;
+    for (child, parent) in parents {
+        if nucleotide_reference(&atom.component, child).as_ref() == Some(&reference) {
+            if let Some(previous) = found
+                && nucleotide_reference(&atom.component, previous)
+                    != nucleotide_reference(&atom.component, parent)
+            {
+                return Err(parent_error(
+                    atom,
+                    parent,
+                    "nucleotide aliases have conflicting parents",
+                ));
+            }
+            found = Some(parent);
+        }
+    }
+    Ok(found)
+}
+
+fn dictionary_parent(
+    source: &Source,
+    atom: &Atom,
+    name: &str,
+    rows: &[usize],
+) -> Result<usize, String> {
+    let heavy = || {
+        rows.iter()
+            .copied()
+            .filter(|&i| !residue::hydrogen(&source.atoms[i].element))
+    };
+    if let Some(row) = heavy().find(|&i| source.atoms[i].name == name) {
+        return Ok(row);
+    }
+    if let Some(reference) = nucleotide_reference(&atom.component, name) {
+        let mut matching = heavy().filter(|&i| {
+            nucleotide_reference(&atom.component, &source.atoms[i].name).as_ref()
+                == Some(&reference)
+        });
+        if let Some(row) = matching.next() {
+            if matching.next().is_some() {
+                return Err(parent_error(
+                    atom,
+                    name,
+                    "Dictionary parent alias is ambiguous",
+                ));
+            }
+            return Ok(row);
+        }
+    }
+    Err(parent_error(atom, name, "Dictionary parent is absent"))
 }
 
 fn ligand_parent(
@@ -104,12 +177,11 @@ fn ligand_parent(
         parent.ok_or_else(|| parent_error(atom, "struct_conn", "bonded parent is absent"))?
     } else if let Some(name) = parents
         .get(&atom.component)
-        .and_then(|map| ccd_parent(map, atom))
+        .map(|map| ccd_parent(map, atom))
+        .transpose()?
+        .flatten()
     {
-        rows.iter()
-            .copied()
-            .find(|&i| source.atoms[i].name == name && !residue::hydrogen(&source.atoms[i].element))
-            .ok_or_else(|| parent_error(atom, name, "Dictionary parent is absent"))?
+        dictionary_parent(source, atom, name, rows)?
     } else {
         return Ok(residue::nearest(atom.position, heavy));
     };
@@ -284,7 +356,9 @@ fn add_ligands(
                 && (declared.contains_key(&row)
                     || parents
                         .get(&source.atoms[row].component)
-                        .and_then(|map| ccd_parent(map, &source.atoms[row]))
+                        .map(|map| ccd_parent(map, &source.atoms[row]))
+                        .transpose()?
+                        .flatten()
                         .is_some())
             {
                 return Err(parent_error(
