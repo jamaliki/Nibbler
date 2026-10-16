@@ -366,21 +366,32 @@ impl PyPreparedChemistry {
 }
 
 #[pyfunction]
-#[pyo3(signature = (model, registry=None, model_number=1, alternate_id=None))]
+#[pyo3(signature = (model, registry=None, model_number=1, alternate_id=None, chem_data=None, use_observed_hydrogens=true))]
 fn prepare_mmcif_chemistry(
     py: Python<'_>,
     model: &PyMmcifModel,
     registry: Option<&PyComponentRegistry>,
     model_number: i64,
     alternate_id: Option<String>,
+    chem_data: Option<std::path::PathBuf>,
+    use_observed_hydrogens: bool,
 ) -> PyResult<PyPreparedChemistry> {
     let graph = py
         .detach(|| {
-            crate::pdbx::prepare_chemistry(
+            if registry.is_some() && chem_data.is_some() {
+                return Err(crate::pdbx::SemanticError::new("PDBX_LINK_PRODUCT",
+                    "Supply registry or chem_data, not both", Vec::new()));
+            }
+            let library = chem_data.as_deref().map(|root| {
+                crate::pdbx::chemical_library_registry(model.model.coordinates(), root)
+                    .map_err(|message| crate::pdbx::SemanticError::new("PDBX_LINK_PRODUCT", message, Vec::new()))
+            }).transpose()?;
+            crate::pdbx::prepare_product(
                 model.model.coordinates(),
-                registry.map(|r| r.registry.as_ref()),
+                registry.map(|r| r.registry.as_ref()).or(library.as_ref()),
                 model_number,
                 alternate_id.as_deref(),
+                use_observed_hydrogens,
             )
         })
         .map_err(model_error_to_python)?;

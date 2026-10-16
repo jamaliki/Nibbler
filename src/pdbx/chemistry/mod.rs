@@ -1,6 +1,7 @@
 //! Explicit linked-product preparation. Ordinary model construction stays lossless.
 
 mod input;
+pub(crate) mod library;
 mod links;
 mod product;
 mod rearrange;
@@ -273,7 +274,13 @@ pub fn prepare_chemistry(
     model_number: i64,
     alternate_id: Option<&str>,
 ) -> Result<PreparedChemistry, SemanticError> {
-    let mut graph = input::build(model, registry, model_number, alternate_id)?;
+    prepare_product(model, registry, model_number, alternate_id, true)
+}
+
+pub(crate) fn prepare_product(model: &PdbxModel, registry: Option<&ComponentRegistry>,
+    model_number: i64, alternate_id: Option<&str>, use_observed_hydrogens: bool,
+) -> Result<PreparedChemistry, SemanticError> {
+    let mut graph = input::build(model, registry, model_number, alternate_id, use_observed_hydrogens)?;
     links::add(model, &mut graph)?;
     product::resolve(&mut graph)?;
     Ok(graph)

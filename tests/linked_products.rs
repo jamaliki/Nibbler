@@ -139,3 +139,28 @@ fn malformed_leaving_flag_does_not_become_unknown() {
         "PDBX_ITEM_TYPE"
     );
 }
+
+#[test]
+fn ccd_alias_keeps_the_observed_source_row() {
+    let text = sulfur_addition().replace("link covale", "link metalc")
+        .replace("_chem_comp_atom.pdbx_leaving_atom_flag", "_chem_comp_atom.alt_atom_id\n_chem_comp_atom.pdbx_leaving_atom_flag")
+        .replace(" 0 N", " 0 . N")
+        .replace("L C C 0 . N", "L C C 0 CX N")
+        .replace("HETATM 1 C C .", "HETATM 1 C CX .")
+        .replace("link metalc A L C", "link metalc A L CX");
+    let graph = prepare(&text);
+    let carbon = &graph.atoms()[atom(&graph, "L", "C")];
+    assert_eq!(carbon.source_row, Some(0));
+    assert_eq!(carbon.coordinates, Some([0., 0., 0.]));
+}
+
+#[test]
+fn canonical_names_take_precedence_over_overlapping_aliases() {
+    let text = sulfur_addition().replace("link covale", "link metalc")
+        .replace("_chem_comp_atom.pdbx_leaving_atom_flag", "_chem_comp_atom.alt_atom_id\n_chem_comp_atom.pdbx_leaving_atom_flag")
+        .replace(" 0 N", " 0 . N")
+        .replace("L C C 0 . N", "L C C 0 C2 N");
+    let graph = prepare(&text);
+    assert_eq!(graph.atoms()[atom(&graph, "L", "C")].source_row, Some(0));
+    assert_eq!(graph.atoms()[atom(&graph, "L", "C2")].source_row, None);
+}

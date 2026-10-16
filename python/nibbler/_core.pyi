@@ -184,6 +184,8 @@ def prepare_mmcif_chemistry(
     registry: Registry | None = None,
     model_number: int = 1,
     alternate_id: str | None = None,
+    chem_data: str | None = None,
+    use_observed_hydrogens: bool = True,
 ) -> PreparedChemistry: ...
 def select_mmcif_conformer(
     model: MmcifModel, model_number: int | None = None, seed: int = 0
@@ -230,6 +232,8 @@ def reduce_document(
 ) -> tuple[CifDocument, str, str]: ...
 def reduce_required_parent_sources(document: CifDocument, expected_keys: str, *,
                                    model: int = 1, chem_data: str | None = None) -> list[int]: ...
+def reduce_chemical_sources(document: CifDocument, *, chem_data: str,
+                            model: int = 1) -> list[str]: ...
 def validate_geometry_document(
     document: CifDocument,
     chem_data: str,
@@ -267,7 +271,7 @@ class ObservationPacker:
                       topology_policy: str = "observed_connectivity", protein_only: bool = False,
                       complete_tokens: bool = False, expected_keys: str | None = None,
                       validate: bool = False, with_keys: bool = True, chem_data: str | None = None,
-                      target_uncertainties: str | None = None
+                      target_uncertainties: str | None = None, product_targets: str | None = None
                       ) -> tuple[dict[str, tuple[str, list[int], bytearray]], list[list[str]]]:
         """Pack a frozen source with the packer's current feature tables."""
         ...
@@ -277,5 +281,5 @@ class ObservationPacker:
              topology_policy: str = "observed_connectivity", protein_only: bool = False,
              complete_tokens: bool = False, expected_keys: str | None = None,
              validate: bool = False, with_keys: bool = True, chem_data: str | None = None,
-             target_uncertainties: str | None = None
+             target_uncertainties: str | None = None, product_targets: str | None = None
              ) -> tuple[dict[str, tuple[str, list[int], bytearray]], list[list[str]]]: ...

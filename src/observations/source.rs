@@ -12,6 +12,8 @@ pub(super) struct Atom {
     pub component: String,
     pub entity: String,
     pub auth_sequence: String,
+    pub auth_chain: String,
+    pub auth_component: String,
     pub insertion: String,
     pub alternate: String,
     pub sequence: i64,
@@ -129,7 +131,7 @@ fn endpoint(
     partner: usize,
     atoms: &[Atom],
     lookup: &HashMap<Endpoint, Vec<usize>>,
-) -> Option<usize> {
+) -> Result<Option<usize>, String> {
     let field = |name: &str| text(table, row, table.column(&format!("ptnr{partner}_{name}")));
     let chain = field("label_asym_id");
     let component = field("label_comp_id");
@@ -138,7 +140,7 @@ fn endpoint(
         .iter()
         .any(|s| normal(s).is_empty())
     {
-        return None;
+        return Ok(None);
     }
     let sequence = numeric::parse_integer(normal(&field("label_seq_id"))).unwrap_or(-1);
     let alternate = text(
@@ -146,25 +148,36 @@ fn endpoint(
         row,
         table.column(&format!("pdbx_ptnr{partner}_label_alt_id")),
     );
-    lookup
-        .get(&(
+    let author = field("auth_seq_id");
+    let author_chain = field("auth_asym_id");
+    let author_component = field("auth_comp_id");
+    let insertion = text(table, row, table.column(&format!("pdbx_ptnr{partner}_PDB_ins_code")));
+    let candidates = lookup.get(&(
             normal(&chain).to_owned(),
             sequence,
             normal(&component).to_owned(),
             normal(&name).to_owned(),
-        ))?
-        .iter()
+        ));
+    let selected: Vec<_> = candidates.into_iter().flatten()
         .copied()
-        .find(|&i| {
-            normal(&alternate).is_empty() || normal(&atoms[i].alternate) == normal(&alternate)
-        })
+        .filter(|&i| {
+            (normal(&alternate).is_empty() || normal(&atoms[i].alternate) == normal(&alternate))
+                && (normal(&author).is_empty() || normal(&atoms[i].auth_sequence) == normal(&author))
+                && (normal(&author_chain).is_empty() || normal(&atoms[i].auth_chain) == normal(&author_chain))
+                && (normal(&author_component).is_empty() || normal(&atoms[i].auth_component) == normal(&author_component))
+                && (normal(&insertion).is_empty() || normal(&atoms[i].insertion) == normal(&insertion))
+        }).collect();
+    if selected.len() > 1 {
+        return Err(format!("Connection row {} partner {partner} has ambiguous atom identity", row + 1));
+    }
+    Ok(selected.first().copied())
 }
 
-fn connections(entries: &[crate::cif::CifEntry], atoms: &[Atom]) -> Connections {
+fn connections(entries: &[crate::cif::CifEntry], atoms: &[Atom]) -> Result<Connections, String> {
     let mut pairs = BTreeSet::new();
     let mut hydrogen_pairs = BTreeSet::new();
     let Some(table) = BlockCategory::find(entries, "struct_conn") else {
-        return (Vec::new(), Vec::new());
+        return Ok((Vec::new(), Vec::new()));
     };
     let mut lookup: HashMap<Endpoint, Vec<usize>> = HashMap::new();
     for (index, atom) in atoms.iter().enumerate() {
@@ -194,8 +207,8 @@ fn connections(entries: &[crate::cif::CifEntry], atoms: &[Atom]) -> Connections 
         }) {
             continue;
         }
-        let first = endpoint(&table, row, 1, atoms, &lookup);
-        let second = endpoint(&table, row, 2, atoms, &lookup);
+        let first = endpoint(&table, row, 1, atoms, &lookup)?;
+        let second = endpoint(&table, row, 2, atoms, &lookup)?;
         let hydrogen = |row: usize| matches!(atoms[row].element.as_str(), "H" | "D" | "T");
         if let (Some(a), Some(b)) = (first, second) {
             if hydrogen(a) != hydrogen(b) {
@@ -212,10 +225,10 @@ fn connections(entries: &[crate::cif::CifEntry], atoms: &[Atom]) -> Connections 
             hydrogen_pairs.insert((child, None));
         }
     }
-    (
+    Ok((
         pairs.into_iter().collect(),
         hydrogen_pairs.into_iter().collect(),
-    )
+    ))
 }
 
 pub(super) fn read(document: &CifDocument, model: i64) -> Result<Source, String> {
@@ -242,6 +255,8 @@ pub(super) fn read(document: &CifDocument, model: i64) -> Result<Source, String>
         "pdbx_PDB_ins_code",
         "label_alt_id",
         "group_PDB",
+        "auth_asym_id",
+        "auth_comp_id",
     ]
     .map(|name| table.column(name));
     let model_column = table.column("pdbx_PDB_model_num");
@@ -306,6 +321,8 @@ pub(super) fn read(document: &CifDocument, model: i64) -> Result<Source, String>
             component: fields[3].clone(),
             entity: fields[4].clone(),
             auth_sequence: fields[5].clone(),
+            auth_chain: fields[9].clone(),
+            auth_component: fields[10].clone(),
             insertion: fields[6].clone(),
             alternate: fields[7].clone(),
             sequence,
@@ -361,7 +378,7 @@ pub(super) fn read(document: &CifDocument, model: i64) -> Result<Source, String>
     for (row, atom) in atoms.iter().enumerate() {
         groups[atom.group].push(row);
     }
-    let (bonds, hydrogen_bonds) = connections(block.entries(), &atoms);
+    let (bonds, hydrogen_bonds) = connections(block.entries(), &atoms)?;
     Ok(Source {
         atoms,
         groups,

@@ -6,9 +6,12 @@ use std::collections::{BTreeMap, BTreeSet};
 #[derive(Clone, Debug)]
 pub(super) struct Residue {
     pub atoms: BTreeMap<String, usize>,
+    pub aliases: BTreeMap<String, usize>,
     pub component_type: Option<String>,
     pub selected_alt: Option<String>,
     pub entity_id: String,
+    pub auth_chain: String,
+    pub auth_component: String,
 }
 
 type ResidueKey = (String, Option<i64>, String, Option<String>);
@@ -22,17 +25,17 @@ pub(super) fn build(
     registry: Option<&ComponentRegistry>,
     model_number: i64,
     alternate: Option<&str>,
+    use_observed_hydrogens: bool,
 ) -> Result<PreparedChemistry, SemanticError> {
     if model_number < 1 {
         return Err(fail("Model number must be positive"));
     }
     let mut groups: BTreeMap<ResidueKey, Vec<(usize, &AtomSite)>> = BTreeMap::new();
-    for (row, atom) in model
-        .atom_sites
-        .iter()
-        .enumerate()
-        .filter(|(_, a)| a.model_number == model_number)
-    {
+    for (row, atom) in model.atom_sites.iter().enumerate().filter(|(_, a)| {
+        a.model_number == model_number
+            && (use_observed_hydrogens
+                || !matches!(a.element.to_ascii_uppercase().as_str(), "H" | "D" | "T"))
+    }) {
         groups
             .entry((
                 atom.label_asym_id.clone(),
@@ -109,6 +112,7 @@ fn supplement(
             }
             a.formal_charge = a.formal_charge.or(c.formal_charge);
             a.leaving = a.leaving.or(c.leaving);
+            a.alternate_id = a.alternate_id.clone().or(c.alternate_id.clone());
         }
     }
     result.atoms.extend(
@@ -162,7 +166,7 @@ fn add_residue(
     };
     let residue = graph.residues.len();
     let mut indices = BTreeMap::new();
-    let observed: BTreeMap<_, _> = rows
+    let mut observed: BTreeMap<_, _> = rows
         .iter()
         .map(|&(r, a)| (a.label_atom_id.as_str(), (r, a)))
         .collect();
@@ -171,6 +175,20 @@ fn add_residue(
     }
     if let Some(comp) = definition.filter(|c| !c.atoms.is_empty()) {
         let names: BTreeSet<_> = comp.atoms.iter().map(|a| a.atom_id.as_str()).collect();
+        for atom in &comp.atoms {
+            if let Some(alias) = atom
+                .alternate_id
+                .as_deref()
+                .filter(|&alias| !names.contains(alias))
+                && let Some(site) = observed.remove(alias)
+            {
+                if observed.insert(atom.atom_id.as_str(), site).is_some() {
+                    return Err(fail(
+                        "Canonical and alternate CCD names select the same atom",
+                    ));
+                }
+            }
+        }
         if names.len() != comp.atoms.len() {
             return Err(fail("Duplicate atom in component definition"));
         }
@@ -259,11 +277,29 @@ fn add_residue(
             graph.adjacency.push(Vec::new());
         }
     }
+    let mut aliases = BTreeMap::new();
+    if let Some(comp) = definition {
+        for atom in &comp.atoms {
+            if let Some(alias) = atom
+                .alternate_id
+                .as_ref()
+                .filter(|alias| !indices.contains_key(*alias))
+                && let Some(&index) = indices.get(&atom.atom_id)
+            {
+                if aliases.insert(alias.clone(), index).is_some() {
+                    return Err(fail("CCD alternate atom name has multiple targets"));
+                }
+            }
+        }
+    }
     graph.residues.push(Residue {
         atoms: indices,
+        aliases,
         component_type: definition.and_then(|c| c.component_type.clone()),
         selected_alt,
         entity_id: first.label_entity_id.clone(),
+        auth_chain: first.auth_asym_id.clone(),
+        auth_component: first.auth_comp_id.clone(),
     });
     Ok(())
 }

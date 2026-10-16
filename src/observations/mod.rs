@@ -15,6 +15,7 @@ mod source;
 mod tokens;
 mod topology;
 pub(crate) mod uncertainty;
+pub(crate) mod product;
 
 use crate::cif::CifDocument;
 pub(crate) use record::Tokens;
@@ -45,6 +46,36 @@ pub(crate) fn missing_hydrogen_dictionaries(document: &CifDocument, model: i64, 
 
 pub(crate) fn components(document: &CifDocument, model: i64) -> Result<Vec<String>, String> {
     Ok(PreparedSource::read(document, model)?.components())
+}
+
+#[cfg(feature = "reduce3")]
+pub(crate) fn chemical_sources(document: &CifDocument, model: i64, chem_data: &Path)
+    -> Result<Vec<std::path::PathBuf>, String> {
+    let source = source::read(document, model)?;
+    let library = crate::reduce::load_monomer_library(Some(chem_data)).map_err(|error| error.to_string())?;
+    let mut files = BTreeSet::new();
+    for name in ["geostd/list/mon_lib_list.cif", "geostd/list/geostd_list.cif",
+        "mon_lib/list/mon_lib_list.cif", "geostd/ener_lib.cif"] {
+        let file = library.root.join(name);
+        if file.is_file() { files.insert(file); }
+    }
+    for rows in &source.groups {
+        let Some(&row) = rows.first() else { continue; };
+        let name = &source.atoms[row].component;
+        let names = rows.iter().filter_map(|&row| {
+            let atom = &source.atoms[row];
+            (!residue::hydrogen(&atom.element)).then(|| atom.name.clone())
+        }).collect::<Vec<_>>();
+        if let Some(dictionary) = reduce3::hplace::hydrogen_dictionary(&library, name, &names, false) {
+            files.insert(dictionary.source.clone());
+        }
+        if name.bytes().all(|value| value.is_ascii_alphanumeric()) && !name.is_empty() {
+            let file = library.root.join("chemical_components").join(name[..1].to_ascii_lowercase())
+                .join(format!("data_{name}.cif"));
+            if file.is_file() { files.insert(file); }
+        }
+    }
+    Ok(files.into_iter().collect())
 }
 
 #[cfg(feature = "reduce3")]

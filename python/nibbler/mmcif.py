@@ -45,6 +45,8 @@ def prepare_chemistry(
     registry: Registry | None = None,
     model_number: int = 1,
     alternate_id: str | None = None,
+    chem_data: str | None = None,
+    use_observed_hydrogens: bool = True,
 ) -> PreparedChemistry:
     """Resolve authored covalent products without changing the source model.
 
@@ -56,6 +58,9 @@ def prepare_chemistry(
     uses the highest summed occupancy per residue; selection is not clash-aware.
     A supplied alternate takes precedence where present. Unknown linked chemistry
     raises :class:`nibbler.ChemistryError`. This does not assign a pH or place atoms.
+    ``chem_data`` supplies cached CCD templates and cannot accompany ``registry``.
+    Set ``use_observed_hydrogens=False`` to derive expected H counts from the
+    templates and product rules, independent of H atoms already in the source.
     """
     if isinstance(model_number, bool) or not isinstance(model_number, int):
         raise TypeError("model_number must be an integer")
@@ -64,7 +69,7 @@ def prepare_chemistry(
     model = source if isinstance(source, MmcifModel) else read(source)
     try:
         return _core.prepare_mmcif_chemistry(
-            model, registry, model_number, alternate_id
+            model, registry, model_number, alternate_id, chem_data, use_observed_hydrogens
         )
     except ValueError as error:
         raise_chemistry_error(error)

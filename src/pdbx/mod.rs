@@ -24,6 +24,8 @@ pub use assembly_overlap::{AssemblyDeduplication, deduplicate_assembly_copies};
 pub use chemistry::{
     BondSource, ChemicalEdit, PreparedChemistry, ProductAtom, ProductBond, prepare_chemistry,
 };
+pub(crate) use chemistry::library::registry as chemical_library_registry;
+pub(crate) use chemistry::prepare_product;
 pub use conformer::{
     ConformerAtom, ConformerSelection, select_atom_conformers, select_conformer,
     select_conformer_document,

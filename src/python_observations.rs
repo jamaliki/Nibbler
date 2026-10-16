@@ -199,7 +199,7 @@ impl ObservationPacker {
         Ok(PreparedObservationSource { source })
     }
 
-    #[pyo3(signature = (document, *, model=1, complete=false, topology_policy="observed_connectivity", protein_only=false, complete_tokens=false, expected_keys=None, validate=false, with_keys=true, chem_data=None, target_uncertainties=None))]
+    #[pyo3(signature = (document, *, model=1, complete=false, topology_policy="observed_connectivity", protein_only=false, complete_tokens=false, expected_keys=None, validate=false, with_keys=true, chem_data=None, target_uncertainties=None, product_targets=None))]
     #[allow(clippy::too_many_arguments)]
     fn pack<'py>(
         &self,
@@ -215,26 +215,28 @@ impl ObservationPacker {
         with_keys: bool,
         chem_data: Option<PathBuf>,
         target_uncertainties: Option<&str>,
+        product_targets: Option<&str>,
     ) -> PyResult<(Bound<'py, PyDict>, Vec<[String; 5]>)> {
         self.finish_pack(py, || observations::pack(document.document(), &self.schema, &self.features,
             &self.hydrogen_parents, &self.elements, &self.excluded, &observations::PackOptions {
                 model, complete, topology_policy, protein_only, chem_data: chem_data.as_deref(),
-            }), protein_only, complete_tokens, expected_keys, validate, with_keys, target_uncertainties)
+            }), protein_only, complete_tokens, expected_keys, validate, with_keys, target_uncertainties, product_targets)
     }
 
-    #[pyo3(signature = (source, *, complete=false, topology_policy="observed_connectivity", protein_only=false, complete_tokens=false, expected_keys=None, validate=false, with_keys=true, chem_data=None, target_uncertainties=None))]
+    #[pyo3(signature = (source, *, complete=false, topology_policy="observed_connectivity", protein_only=false, complete_tokens=false, expected_keys=None, validate=false, with_keys=true, chem_data=None, target_uncertainties=None, product_targets=None))]
     #[allow(clippy::too_many_arguments)]
     fn pack_prepared<'py>(
         &self, py: Python<'py>, source: &PreparedObservationSource, complete: bool,
         topology_policy: &str, protein_only: bool, complete_tokens: bool,
         expected_keys: Option<&str>, validate: bool, with_keys: bool,
         chem_data: Option<PathBuf>, target_uncertainties: Option<&str>,
+        product_targets: Option<&str>,
     ) -> PyResult<(Bound<'py, PyDict>, Vec<[String; 5]>)> {
         self.finish_pack(py, || source.source.pack(&self.schema, &self.features,
             &self.hydrogen_parents, &self.elements, &self.excluded, &observations::PackOptions {
                 model: source.source.model, complete, topology_policy, protein_only,
                 chem_data: chem_data.as_deref(),
-            }), protein_only, complete_tokens, expected_keys, validate, with_keys, target_uncertainties)
+            }), protein_only, complete_tokens, expected_keys, validate, with_keys, target_uncertainties, product_targets)
     }
 
     fn protein_document(
@@ -262,9 +264,14 @@ impl ObservationPacker {
     #[allow(clippy::too_many_arguments)]
     fn finish_pack<'py>(&self, py: Python<'py>, build: impl FnOnce() -> Result<Tokens, String> + Send,
         protein_only: bool, complete_tokens: bool, expected_keys: Option<&str>, validate: bool,
-        with_keys: bool, target_uncertainties: Option<&str>) -> PyResult<(Bound<'py, PyDict>, Vec<[String; 5]>)> {
+        with_keys: bool, target_uncertainties: Option<&str>, product_targets: Option<&str>) -> PyResult<(Bound<'py, PyDict>, Vec<[String; 5]>)> {
         let result = py.detach(|| {
             let mut result = build()?;
+            if let Some(json) = product_targets {
+                let values: Vec<observations::product::ProductTarget> =
+                    serde_json::from_str(json).map_err(|error| error.to_string())?;
+                observations::product::apply(&mut result, &self.schema, &values)?;
+            }
             if let Some(json) = target_uncertainties {
                 let values: Vec<observations::uncertainty::TargetUncertainty> =
                     serde_json::from_str(json).map_err(|error| error.to_string())?;

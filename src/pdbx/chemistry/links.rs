@@ -47,9 +47,15 @@ pub(super) fn add(model: &PdbxModel, graph: &mut PreparedChemistry) -> Result<()
             "pdbx_role",
             "ptnr1_auth_seq_id",
             "ptnr2_auth_seq_id",
+            "pdbx_ptnr1_PDB_ins_code",
+            "pdbx_ptnr2_PDB_ins_code",
+            "ptnr1_auth_asym_id",
+            "ptnr2_auth_asym_id",
+            "ptnr1_auth_comp_id",
+            "ptnr2_auth_comp_id",
         ],
     ) {
-        let values: Vec<_> = (0..19).map(|i| optional_text(&row, i)).collect();
+        let values: Vec<_> = (0..25).map(|i| optional_text(&row, i)).collect();
         let kind = values[1].as_deref().unwrap_or("").to_ascii_lowercase();
         if !matches!(kind.as_str(), "covale" | "disulf" | "metalc") {
             continue;
@@ -133,6 +139,7 @@ fn endpoint(
     let offset = if second { 6 } else { 2 };
     let alt = values[if second { 11 } else { 10 }].as_deref();
     let author = values[if second { 18 } else { 17 }].as_deref();
+    let insertion = values[if second { 20 } else { 19 }].as_deref();
     let chain = values[offset].as_deref().and_then(|name| index.get(name));
     let number = values[offset + 2]
         .as_deref()
@@ -151,7 +158,12 @@ fn endpoint(
         .filter_map(|&r| {
             values[offset + 3]
                 .as_ref()
-                .and_then(|name| graph.residues[r].atoms.get(name))
+                .and_then(|name| {
+                    graph.residues[r]
+                        .atoms
+                        .get(name)
+                        .or_else(|| graph.residues[r].aliases.get(name))
+                })
                 .map(|&a| (a, &graph.atoms[a]))
         })
         .filter(|(_, a)| {
@@ -159,7 +171,13 @@ fn endpoint(
                 .as_deref()
                 .is_none_or(|c| c == a.component_id)
                 && author.is_none_or(|s| s == a.auth_sequence_id)
-                && values[offset + 3].as_deref() == Some(a.atom_id.as_str())
+                && insertion.is_none_or(|s| a.insertion_code.as_deref() == Some(s))
+                && values[if second { 22 } else { 21 }]
+                    .as_deref()
+                    .is_none_or(|s| graph.residues[a.residue].auth_chain == s)
+                && values[if second { 24 } else { 23 }]
+                    .as_deref()
+                    .is_none_or(|s| graph.residues[a.residue].auth_component == s)
         })
         .collect();
     let selected: Vec<_> = candidates

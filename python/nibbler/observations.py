@@ -18,6 +18,15 @@ prepare_source returns an immutable selected-model snapshot. Its dictionary and
 component queries share that source with pack_prepared, which reads the packer's
 current feature tables and does not accept a second model argument. Later edits
 to the document do not alter the snapshot. kaveh-data creates one per pack call.
+
+product_targets accepts a JSON list of occurrence-specific product records with
+parent_key, sequence_id, formal_charge, hybridization, hydrogens, complete, and
+modified fields. The packer applies these before token selection. Ligand H and
+charge labels require complete product coverage and a matching observed H count;
+an empty list clears both known masks. Other modified protein residues retain
+observed H coordinates but lose exact state and absent-H labels. The supported
+linked Cys states keep their existing rules. Omitting product_targets retains
+the caller's component-level feature policy.
 """
 
 from ._core import ObservationPacker, PreparedObservationSource

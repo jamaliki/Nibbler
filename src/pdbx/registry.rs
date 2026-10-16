@@ -38,6 +38,7 @@ pub(super) fn resolve_builtin(component_id: &str) -> Option<ComponentDefinition>
     let atoms = record.element.map_or_else(Vec::new, |element| {
         vec![ComponentAtom {
             atom_id: upper,
+            alternate_id: None,
             element: element.to_owned(),
             formal_charge: record.charge,
             leaving: None,

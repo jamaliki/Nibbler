@@ -87,6 +87,7 @@ fn attach_component_atoms(
             "type_symbol",
             "charge",
             "pdbx_leaving_atom_flag",
+            "alt_atom_id",
         ],
     ) {
         let component_id = required_text(&row, "chem_comp_atom", "comp_id", 0)?;
@@ -95,6 +96,7 @@ fn attach_component_atoms(
             .or_insert_with(|| component_shell(component_id, resolution));
         definition.atoms.push(ComponentAtom {
             atom_id: required_text(&row, "chem_comp_atom", "atom_id", 1)?,
+            alternate_id: optional_text(&row, 5),
             element: required_text(&row, "chem_comp_atom", "type_symbol", 2)?,
             formal_charge: optional_charge(&row, "chem_comp_atom", "charge", 3)?,
             leaving: match optional_text(&row, 4).as_deref() {
