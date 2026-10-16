@@ -279,6 +279,7 @@ impl ObservationPacker {
             }
             if complete_tokens { result.complete(&self.schema)?; }
             if let Some(keys) = expected_keys { result.align(keys)?; }
+            result.protein_gaps();
             if validate { result.validate(&self.schema)?; }
             Ok::<_, String>(result)
         }).map_err(PyValueError::new_err)?;

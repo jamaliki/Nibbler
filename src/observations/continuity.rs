@@ -29,31 +29,23 @@ pub(super) fn apply(source: &Source, mapping: &[usize], tokens: &mut Tokens) {
         let atom = &source.atoms[rows[0]];
         let kind = source.entity_types.get(&atom.entity).map(|s| s.to_ascii_lowercase());
         let nucleic = kind.is_some_and(|s| s.contains("ribonucleotide"));
-        if atom.sequence > 0 && (atom.protein || nucleic) {
+        if atom.sequence > 0 && !atom.protein && nucleic {
             chains.entry((&atom.chain, &atom.entity)).or_default().insert(atom.sequence, group);
         }
     }
     for groups in chains.values() {
         let mut previous: Option<(i64, usize)> = None;
-        let (mut offset, mut segment) = (0, 0);
+        let mut segment = 0;
         for (&number, &group) in groups {
-            let atom = &source.atoms[source.groups[group][0]];
             if let Some((before, left)) = previous {
-                let gap = number > before + 1;
-                let broken = distant(source, left, group, atom.protein);
-                if gap || broken {
+                if number == before + 1 && distant(source, left, group, false) {
                     segment += 1;
-                    if broken { offset += (INDEX_SEPARATION - (number - before)).max(0); }
                 }
             }
             for &row in &source.groups[group] {
                 let token = mapping[row];
                 if token == usize::MAX { continue; }
-                if atom.protein {
-                    tokens.sequence[token] = number + offset;
-                } else {
-                    tokens.polymer_segments[token] = segment;
-                }
+                tokens.polymer_segments[token] = segment;
             }
             previous = Some((number, group));
         }
@@ -76,7 +68,7 @@ pub(super) fn retained_proteins(tokens: &mut Tokens) {
             let position = tokens.positions[row * 96 + 3..][..3]
                 .try_into().unwrap_or([f32::NAN; 3]);
             if let Some((before, site)) = previous
-                && residue::distance(site, position) > 4.
+                && number == before + 1 && residue::distance(site, position) > 4.
             {
                 offset += (INDEX_SEPARATION - (number - before)).max(0);
             }

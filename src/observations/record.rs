@@ -182,6 +182,10 @@ impl Tokens {
         Ok(())
     }
 
+    pub fn protein_gaps(&mut self) {
+        super::continuity::retained_proteins(self);
+    }
+
     pub fn align(&mut self, expected: &str) -> Result<(), String> {
         let wanted: Vec<[String; 5]> =
             serde_json::from_str(expected).map_err(|error| error.to_string())?;
