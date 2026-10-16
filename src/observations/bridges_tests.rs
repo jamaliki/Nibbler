@@ -129,6 +129,7 @@ fn ambiguous_or_mistyped_bridge_isotope_aliases_fail() {
         let mut input = source("EJ2", true);
         input.atoms.push(super::super::source::Atom { source_row: 9, name: name.into(), element: name.into(),
             chain: "L".into(), component: "EJ2".into(), entity: ".".into(), auth_sequence: "601".into(),
+            auth_chain: "L".into(), auth_component: "EJ2".into(),
             insertion: ".".into(), alternate: ".".into(), sequence: -1,
             position: input.atoms[8].position, protein: false, group: 0 });
         input.groups[0].push(9);

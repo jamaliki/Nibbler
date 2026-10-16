@@ -38,6 +38,13 @@ def arrays(result):
             for name, (dtype, shape, buffer) in buffers.items()}, keys
 
 
+def product_options(document, catalog):
+    from kaveh_data.product import prepare_product
+
+    product = prepare_product(document, catalog)
+    return dict(product_targets=json.dumps([] if product is None else product.targets()))
+
+
 def legacy_tokens(raw, catalog, complete):
     from kaveh_data import ap_novo_pdb
     from kaveh_data.pdb_dataset import StoredPdbView
@@ -80,7 +87,8 @@ def test_selected_pdb_targets_match_python_tokens(kind, complete):
         raw, catalog = fixtures._cif().encode(), fixtures._catalog()
     document = nibbler.mmcif.select_conformer(nibbler.cif.read(raw)).document
     expected, expected_keys = legacy_tokens(document.to_canonical().encode(), catalog, complete)
-    actual, keys = arrays(packer(catalog).pack(document, complete=complete, validate=True))
+    actual, keys = arrays(packer(catalog).pack(document, complete=complete, validate=True,
+                                             **product_options(document, catalog)))
     assert keys == expected_keys
     assert set(actual) == set(expected)
     for name in actual:
@@ -174,12 +182,13 @@ def test_ligand_hydrogen_coverage_matches_python(ambiguous):
         f"HETATM 15 H H1 . LIG B 2 1 H1 LIG B 1 ? {xyz} 1 10 ? 1\n")
     document = nibbler.mmcif.select_conformer(nibbler.cif.read(raw.encode())).document
     expected, keys = legacy_tokens(document.to_canonical().encode(), fixtures._catalog(), True)
-    actual, actual_keys = arrays(packer(fixtures._catalog()).pack(document, complete=True, validate=True))
+    actual, actual_keys = arrays(packer(fixtures._catalog()).pack(document, complete=True, validate=True,
+        **product_options(document, fixtures._catalog())))
     assert actual_keys == keys
     for name in actual:
         np.testing.assert_array_equal(actual[name], expected[name], err_msg=name)
     ligand = actual["is_ligand"] & (actual["chain_idx"] == 1)
-    assert actual["ligand_hydrogen_known"][ligand].all() == (not ambiguous)
+    assert not actual["ligand_hydrogen_known"][ligand].any()
     assert actual["mask"][ligand, 15:].sum() == (not ambiguous)
 
 
@@ -209,10 +218,26 @@ def test_complete_filter_and_identity_alignment_remap_attachments(complete_prote
         rows = np.flatnonzero(expected["is_ligand"] & (expected["chain_idx"] == chain))
         expected["res_idx"][rows] = np.arange(len(rows))
     actual, actual_keys = arrays(packer(catalog).pack(document, complete=True, complete_tokens=True,
-                                                     expected_keys=json.dumps(wanted_keys), validate=True))
+        expected_keys=json.dumps(wanted_keys), validate=True, **product_options(document, catalog)))
     assert actual_keys == wanted_keys
     for name in actual:
         np.testing.assert_array_equal(actual[name], expected[name], err_msg=name)
+
+
+def test_modified_lysine_clears_exact_state_and_absent_hydrogen_labels():
+    aa = next(i for i, residue in enumerate(schema.SPEC["residues"]) if residue["residue"] == "LYS")
+    state = schema.SPEC["residues"][aa]["states"][0]
+    document = state_document(aa, state)
+    native = packer()
+    before, keys = arrays(native.pack(document, complete=True, topology_policy="entity_sequence",
+                                      protein_only=True))
+    assert before["state_known"].tolist() == [True]
+    target = dict(parent_key=[*keys[0][:4], "NZ"], sequence_id=int(keys[0][1]),
+                  formal_charge=0, hybridization=4, hydrogens=1, complete=False, modified=True)
+    after, _ = arrays(native.pack(document, complete=True, topology_policy="entity_sequence", protein_only=True,
+                                  product_targets=json.dumps([target])))
+    assert not after["state_known"].any()
+    np.testing.assert_array_equal(after["atom_presence_known"][:, 15:], after["mask"][:, 15:])
 
 
 @pytest.mark.parametrize("with_keys", [False, True])

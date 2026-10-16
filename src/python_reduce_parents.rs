@@ -43,7 +43,16 @@ fn reduce_hydrogen_parents(
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(reduce_hydrogen_parents, module)?)?;
     module.add_function(wrap_pyfunction!(reduce_required_parent_sources, module)?)?;
+    module.add_function(wrap_pyfunction!(reduce_chemical_sources, module)?)?;
     Ok(())
+}
+
+#[pyfunction]
+#[pyo3(signature = (document, *, chem_data, model=1))]
+fn reduce_chemical_sources(py: Python<'_>, document: &PyCifDocument, chem_data: PathBuf,
+    model: i64) -> PyResult<Vec<PathBuf>> {
+    py.detach(|| observations::chemical_sources(document.document(), model, &chem_data))
+        .map_err(PyValueError::new_err)
 }
 
 #[pyfunction]

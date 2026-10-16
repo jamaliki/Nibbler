@@ -618,12 +618,14 @@ TST C1 N1 doub y
             [
                 super::super::model::ComponentAtom {
                     atom_id: "C1".to_owned(),
+                    alternate_id: None,
                     element: "C".to_owned(),
                     formal_charge: Some(1),
                     leaving: None,
                 },
                 super::super::model::ComponentAtom {
                     atom_id: "N1".to_owned(),
+                    alternate_id: None,
                     element: "N".to_owned(),
                     formal_charge: Some(0),
                     leaving: None,

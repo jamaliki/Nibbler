@@ -230,6 +230,7 @@ fn component_atom_loop(atoms: &[(&ComponentDefinition, &ComponentAtom)]) -> CifE
         "_chem_comp_atom.type_symbol",
         "_chem_comp_atom.charge",
         "_chem_comp_atom.pdbx_leaving_atom_flag",
+        "_chem_comp_atom.alt_atom_id",
     ];
     let values = atoms
         .iter()
@@ -280,6 +281,7 @@ fn component_atom_value(
     match item.to_ascii_lowercase().as_str() {
         "comp_id" => CifValue::text(&component.id),
         "atom_id" => CifValue::text(&atom.atom_id),
+        "alt_atom_id" => optional_text(atom.alternate_id.as_deref()),
         "type_symbol" => CifValue::text(&atom.element),
         "charge" => optional_integer(atom.formal_charge.map(i64::from)),
         "pdbx_leaving_atom_flag" => atom.leaving.map_or(CifValue::Unknown, |value| {

@@ -93,6 +93,11 @@ def required_parent_sources(
         chem_data=None if chem_data is None else fspath(chem_data))
 
 
+def chemical_sources(document: CifDocument, *, chem_data: str | PathLike[str], model_id: int = 1) -> list[str]:
+    """List the selected restraint, CCD, and library-index files for provenance."""
+    return _core.reduce_chemical_sources(document, chem_data=fspath(chem_data), model=model_id)
+
+
 def run(
     source: Source | CifDocument | MmcifModel,
     *,
