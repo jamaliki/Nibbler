@@ -29,14 +29,17 @@ pub(super) fn pdb(source: &Source) -> Vec<[i64; 3]> {
             let atom = &source.atoms[here];
             match (atom.name.as_str(), source.atoms[other].name.as_str()) {
                 ("SG", _) => result[atom.group][2] = 1,
-                ("N", "C") => result[atom.group][0] = 0,
-                ("C", "N") => result[atom.group][1] = 0,
+                ("N", "C") if !super::continuity::distant(source, atom.group, source.atoms[other].group, true)
+                    => result[atom.group][0] = 0,
+                ("C", "N") if !super::continuity::distant(source, atom.group, source.atoms[other].group, true)
+                    => result[atom.group][1] = 0,
                 _ => {}
             }
         }
     }
     for ((chain, index), (group, sites)) in &backbone {
         if let Some((next, following)) = backbone.get(&(chain, index + 1))
+            && !super::continuity::distant(source, *group, *next, true)
             && let (Some(c), Some(n)) = (sites[2], following[0])
         {
             let value = distance(c, n);
@@ -72,7 +75,7 @@ pub(super) fn protein(source: &Source, policy: &str) -> Result<Vec<[i64; 3]>, St
             }
         }
         let first = &source.atoms[rows[0]];
-        backbone.insert((&first.chain, first.sequence), sites);
+        backbone.insert((&first.chain, first.sequence), (sites, group));
         if policy == "entity_sequence" {
             result[group][0] = i64::from(first.sequence == 1);
             if let Some(&length) = source.lengths.get(&first.entity) {
@@ -83,13 +86,14 @@ pub(super) fn protein(source: &Source, policy: &str) -> Result<Vec<[i64; 3]>, St
     if policy == "observed_connectivity" {
         for (group, rows) in source.groups.iter().enumerate() {
             let first = &source.atoms[rows[0]];
-            let here = backbone[&(&first.chain, first.sequence)];
+            let (here, _) = backbone[&(&first.chain, first.sequence)];
             for (end, step, a, b) in [(0, -1, 0, 1), (1, 1, 1, 0)] {
-                if let Some(neighbour) = backbone.get(&(&first.chain, first.sequence + step))
+                if let Some((neighbour, other)) = backbone.get(&(&first.chain, first.sequence + step))
                     && let (Some(left), Some(right)) = (here[a], neighbour[b])
                 {
                     let value = distance(left, right);
-                    if value > 0.8 && value < 1.8 {
+                    if value > 0.8 && value < 1.8
+                        && !super::continuity::distant(source, group, *other, true) {
                         result[group][end] = 0;
                     }
                 }

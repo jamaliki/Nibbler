@@ -29,6 +29,7 @@ pub(super) struct Source {
     pub hydrogen_bonds: Vec<(usize, Option<usize>)>,
     pub has_protein_annotations: bool,
     pub lengths: HashMap<String, i64>,
+    pub entity_types: HashMap<String, String>,
 }
 
 type Occurrence = (String, i64, String, String, String, String);
@@ -386,6 +387,7 @@ pub(super) fn read(document: &CifDocument, model: i64) -> Result<Source, String>
         hydrogen_bonds,
         has_protein_annotations: !types.is_empty(),
         lengths: entity_lengths(block.entries()),
+        entity_types: types,
     })
 }
 

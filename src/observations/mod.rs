@@ -14,6 +14,7 @@ mod schema;
 mod source;
 mod tokens;
 mod topology;
+mod continuity;
 pub(crate) mod uncertainty;
 pub(crate) mod product;
 

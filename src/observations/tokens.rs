@@ -544,8 +544,9 @@ pub(super) fn pack(
         for &(ligand, _) in &result.attachments {
             result.covalent[ligand] = 1;
         }
-        renumber_ligands(&mut result);
     }
+    super::continuity::apply(source, &mapping, &mut result);
+    renumber_ligands(&mut result);
     if result.keys.iter().collect::<BTreeSet<_>>().len() != result.keys.len() {
         return Err("PDB tokens have duplicate mmCIF identities".into());
     }

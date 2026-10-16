@@ -28,6 +28,7 @@ pub(crate) struct Tokens {
     pub presence: Vec<u8>,
     pub identity: Vec<i64>,
     pub sequence: Vec<i64>,
+    pub polymer_segments: Vec<i64>,
     pub chains: Vec<i64>,
     pub ligand: Vec<u8>,
     pub charges: Vec<f32>,
@@ -53,6 +54,7 @@ impl Tokens {
             presence: Vec::new(),
             identity: Vec::new(),
             sequence: Vec::new(),
+            polymer_segments: Vec::new(),
             chains: Vec::new(),
             ligand: Vec::new(),
             charges: Vec::new(),
@@ -84,6 +86,7 @@ impl Tokens {
         self.presence.extend(packed.presence.map(u8::from));
         self.identity.push(identity as i64);
         self.sequence.push(atom.sequence);
+        self.polymer_segments.push(0);
         self.chains.push(0);
         self.ligand.push(u8::from(ligand));
         self.charges.push(f32::from(features[0]));
@@ -136,6 +139,7 @@ impl Tokens {
         self.topology = selected(&self.topology, indices, 3);
         self.identity = selected(&self.identity, indices, 1);
         self.sequence = selected(&self.sequence, indices, 1);
+        self.polymer_segments = selected(&self.polymer_segments, indices, 1);
         self.chains = selected(&self.chains, indices, 1);
         self.ligand = selected(&self.ligand, indices, 1);
         self.charges = selected(&self.charges, indices, 1);
@@ -282,7 +286,12 @@ pub(super) fn renumber_ligands(tokens: &mut Tokens) {
     let mut counters = HashMap::new();
     for row in 0..tokens.identity.len() {
         if tokens.ligand[row] != 0 {
-            let next = counters.entry(tokens.chains[row]).or_insert(0);
+            let (next, segment) = counters.entry(tokens.chains[row])
+                .or_insert((0, tokens.polymer_segments[row]));
+            if *segment != tokens.polymer_segments[row] {
+                *next += 1;
+                *segment = tokens.polymer_segments[row];
+            }
             tokens.sequence[row] = *next;
             *next += 1;
         }
