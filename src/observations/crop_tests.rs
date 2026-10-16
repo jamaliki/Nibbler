@@ -40,11 +40,21 @@ fn empty_and_protein_free_views_have_no_mass() {
 fn rejects_invalid_buffers() {
     assert!(plan(&[], &[], &[0], &[1], 50, None).is_err());
     assert!(plan(&[0; 12], &(-1_i64).to_ne_bytes(), &[0], &[1], 50, None).is_err());
-    assert!(plan(&[0; 12], &(1_i64).to_ne_bytes(), &[0], &[1], 50, None).is_err());
     assert!(plan(&[0; 12], &(0_i64).to_ne_bytes(), &[2], &[1], 50, None).is_err());
     assert!(plan(&[0; 12], &(0_i64).to_ne_bytes(), &[0], &[1], 49, None).is_err());
     assert!(plan(&[0; 12], &(0_i64).to_ne_bytes(), &[0], &[1], 50, Some(&[])).is_err());
     assert!(plan(&[0; 12], &(0_i64).to_ne_bytes(), &[0], &[1], 50, Some(&[2])).is_err());
+}
+
+#[test]
+fn sparse_chain_ids_survive_complete_residue_filtering() {
+    let result = fixture(60, &vec![0; 60], &vec![130; 60]);
+    assert_eq!(result.centers.len(), 60);
+    assert_eq!(result.words, 3);
+    assert_eq!(result.bits, [0, 0, 4].repeat(60));
+    assert!((result.mass - 1.).abs() < 1e-14);
+    assert_eq!(fixture(17, &vec![0; 17], &vec![41; 17]).mass, 0.);
+    assert_eq!(fixture(2, &[1, 1], &[1, 2]).mass, 0.);
 }
 
 #[test]

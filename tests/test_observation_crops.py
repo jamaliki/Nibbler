@@ -18,7 +18,7 @@ def fixture(kind):
     rng = np.random.default_rng(731)
     sizes = {"protein": [700], "ligand": [500, 24], "partial": [500, 70],
              "fallback": [500, *([5] * 12)], "many-chains": [50] * 70,
-             "ties": [500]}[kind]
+             "ties": [500], "sparse": [50, 10]}[kind]
     chains = np.repeat(np.arange(len(sizes)), sizes).astype(np.int64)
     count = len(chains)
     pos = np.zeros((count, 32, 3), dtype=np.float32)
@@ -29,13 +29,16 @@ def fixture(kind):
     if kind == "ties":
         pos[:, 0] = np.arange(count)[:, None] % 11
     ligand = chains > 0 if kind in {"ligand", "partial", "fallback"} else np.zeros(count, dtype=bool)
+    if kind == "sparse":
+        ligand = chains > 0
+        chains = np.where(chains == 0, 130, 193).astype(np.int64)
     mask = np.ones((count, 32), dtype=bool)
     mask[rng.choice(np.flatnonzero(~ligand), 9, replace=False), 1] = False
     return dict(pos=pos, chain_idx=chains, is_ligand=ligand, mask=mask)
 
 
 @pytest.mark.parametrize("size", [50, 384, 512])
-@pytest.mark.parametrize("kind", ["protein", "ligand", "partial", "fallback", "many-chains", "ties"])
+@pytest.mark.parametrize("kind", ["protein", "ligand", "partial", "fallback", "many-chains", "ties", "sparse"])
 def test_native_spatial_plans_match_python(kind, size):
     tokens = fixture(kind)
     expected, expected_mass = tokens_module.crop_plans(tokens, crop_size=size)

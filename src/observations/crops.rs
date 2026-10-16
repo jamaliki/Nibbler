@@ -74,9 +74,7 @@ impl View {
                 usize::try_from(value).map_err(|_| "Spatial-crop chain indices must be nonnegative")
             })
             .collect::<Result<_, _>>()?;
-        if chains.iter().any(|&chain| chain >= count) {
-            return Err("Spatial-crop chain indices exceed the token count".into());
-        }
+        // Complete-residue filtering preserves chain IDs and can leave gaps.
         let chain_count = chains.iter().max().map_or(0, |value| value + 1);
         let ligand: Vec<bool> = ligand.iter().map(|&value| value != 0).collect();
         let mut chain_sizes = vec![0; chain_count];
