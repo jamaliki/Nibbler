@@ -18,6 +18,12 @@ prepare_source returns an immutable selected-model snapshot. Its dictionary and
 component queries share that source with pack_prepared, which reads the packer's
 current feature tables and does not accept a second model argument. Later edits
 to the document do not alter the snapshot. kaveh-data creates one per pack call.
+atom_table exports full source atom buffers and identity columns before dense
+token selection, including ncAA and nucleotide atoms and explicit connection
+endpoints. Its parent and connection endpoints index the exported table, while
+source_atom_row identifies the original atom_site row. crop_plans accepts paired
+chain_minimum and chain_protein byte arrays for typed polymer crops; the default
+keeps the existing protein and small-molecule crop policy.
 
 product_targets accepts a JSON list of occurrence-specific product records with
 parent_key, sequence_id, formal_charge, hybridization, hydrogens, complete, and

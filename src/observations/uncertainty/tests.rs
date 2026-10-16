@@ -2,7 +2,7 @@ use super::*;
 use crate::observations::{residue::Packed, schema::{Residue, State}, source::Atom};
 
 fn atom() -> Atom {
-    Atom { source_row: 8, name: "N".into(), element: "N".into(), chain: "A".into(),
+    Atom { source_row: 8, occupancy: 1.0, name: "N".into(), element: "N".into(), chain: "A".into(),
         component: "ALA".into(), entity: "1".into(), auth_sequence: "93".into(),
         auth_chain: "A".into(), auth_component: "ALA".into(),
         insertion: "?".into(), alternate: ".".into(), sequence: 7, position: [1., 2., 3.],

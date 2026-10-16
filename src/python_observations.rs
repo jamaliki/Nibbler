@@ -107,7 +107,7 @@ impl ObservationPacker {
     }
 
     #[staticmethod]
-    #[pyo3(signature = (positions, chains, ligand, usable, *, crop_size=384, centre_eligible=None))]
+    #[pyo3(signature = (positions, chains, ligand, usable, *, crop_size=384, centre_eligible=None, chain_minimum=None, chain_protein=None))]
     fn crop_plans<'py>(
         py: Python<'py>,
         positions: &[u8],
@@ -116,9 +116,12 @@ impl ObservationPacker {
         usable: &[u8],
         crop_size: usize,
         centre_eligible: Option<&[u8]>,
+        chain_minimum: Option<&[u8]>,
+        chain_protein: Option<&[u8]>,
     ) -> PyResult<(Bound<'py, PyDict>, f64)> {
         let value = py
-            .detach(|| observations::crops::plan(positions, chains, ligand, usable, crop_size, centre_eligible))
+            .detach(|| observations::crops::plan_with_chain_policy(positions, chains, ligand, usable, crop_size,
+                centre_eligible, chain_minimum, chain_protein))
             .map_err(PyValueError::new_err)?;
         let result = PyDict::new(py);
         let count = value.centers.len();

@@ -21,6 +21,8 @@ struct View {
     center_eligible: Vec<bool>,
     chain_sizes: Vec<usize>,
     chain_ligand: Vec<bool>,
+    chain_minimum: Vec<usize>,
+    chain_protein: Vec<bool>,
     size: usize,
 }
 
@@ -90,6 +92,8 @@ impl View {
             usable: usable.iter().map(|&value| value != 0).collect(),
             center_eligible: center_eligible.map_or_else(|| vec![true; count], |values| values.iter().map(|&value| value != 0).collect()),
             chain_sizes,
+            chain_minimum: chain_ligand.iter().map(|&ligand| if ligand { 1 } else { 50 }).collect(),
+            chain_protein: chain_ligand.iter().map(|&ligand| !ligand).collect(),
             chain_ligand,
             size,
         })
@@ -137,7 +141,7 @@ impl View {
                 if self.chain_ligand[chain] {
                     counts[chain] == self.chain_sizes[chain]
                 } else {
-                    counts[chain] >= 50
+                    counts[chain] >= self.chain_minimum[chain]
                 }
             })
             .collect();
@@ -163,13 +167,13 @@ impl View {
         for &index in &selected {
             if self.usable[index] {
                 counts[self.chains[index]] += 1;
-                protein[self.chains[index]] |= !self.ligand[index];
+                protein[self.chains[index]] |= self.chain_protein[self.chains[index]];
             }
         }
         let retained: Vec<bool> = counts
             .iter()
-            .zip(&protein)
-            .map(|(&count, &protein)| count > 0 && (!protein || count >= 50))
+            .enumerate()
+            .map(|(chain, &count)| count > 0 && count >= self.chain_minimum[chain])
             .collect();
         if !retained
             .iter()
@@ -194,6 +198,7 @@ fn compare(left: &(f32, usize), right: &(f32, usize)) -> Ordering {
         .then_with(|| left.1.cmp(&right.1))
 }
 
+#[cfg(test)]
 pub(crate) fn plan(
     positions: &[u8],
     chains: &[u8],
@@ -202,7 +207,32 @@ pub(crate) fn plan(
     size: usize,
     center_eligible: Option<&[u8]>,
 ) -> Result<CropPlans, String> {
-    let view = View::read(positions, chains, ligand, usable, size, center_eligible)?;
+    plan_with_chain_policy(positions, chains, ligand, usable, size, center_eligible, None, None)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn plan_with_chain_policy(
+    positions: &[u8], chains: &[u8], ligand: &[u8], usable: &[u8], size: usize,
+    center_eligible: Option<&[u8]>, chain_minimum: Option<&[u8]>, chain_protein: Option<&[u8]>,
+) -> Result<CropPlans, String> {
+    let mut view = View::read(positions, chains, ligand, usable, size, center_eligible)?;
+    if let (Some(minimum), Some(protein)) = (chain_minimum, chain_protein) {
+        if minimum.len() != view.chain_sizes.len() * 8 || protein.len() != view.chain_sizes.len()
+            || protein.iter().any(|&value| value > 1) {
+            return Err("Crop chain policy must cover every chain ID".into());
+        }
+        view.chain_minimum = minimum.chunks_exact(8).map(|row|
+            usize::try_from(i64::from_ne_bytes(std::array::from_fn(|i| row[i])))
+                .map_err(|_| "Crop chain minimum must be positive"))
+            .collect::<Result<Vec<_>, _>>()?;
+        view.chain_protein = protein.iter().map(|&value| value != 0).collect();
+        if view.chain_minimum.iter().enumerate().any(|(chain, &count)| count == 0
+            || view.chain_protein[chain] && (count < 50 || view.chain_ligand[chain])) {
+            return Err("Protein crop chains require at least 50 residues and cannot be ligands".into());
+        }
+    } else if chain_minimum.is_some() || chain_protein.is_some() {
+        return Err("Crop chain minima and protein flags must be supplied together".into());
+    }
     let total = view.center_eligible.iter().filter(|&&value| value).count();
     let ligand_count = view.ligand.iter().zip(&view.center_eligible).filter(|&(ligand, eligible)| *ligand && *eligible).count();
     let mut result = CropPlans {

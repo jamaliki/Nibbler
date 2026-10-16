@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 pub(crate) struct PreparedSource {
-    source: source::Source,
+    pub(crate) source: source::Source,
     pub model: i64,
 }
 

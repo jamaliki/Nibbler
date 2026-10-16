@@ -4,7 +4,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::cif::{BlockCategory, CifDocument, CifValueRef, numeric};
 
-pub(super) struct Atom {
+pub(crate) struct Atom {
     pub source_row: u32,
     pub name: String,
     pub element: String,
@@ -18,15 +18,17 @@ pub(super) struct Atom {
     pub alternate: String,
     pub sequence: i64,
     pub position: [f32; 3],
+    pub occupancy: f32,
     pub protein: bool,
     pub group: usize,
 }
 
-pub(super) struct Source {
+pub(crate) struct Source {
     pub atoms: Vec<Atom>,
     pub groups: Vec<Vec<usize>>,
     pub bonds: Vec<(usize, usize)>,
     pub hydrogen_bonds: Vec<(usize, Option<usize>)>,
+    pub connections: Vec<Connection>,
     pub has_protein_annotations: bool,
     pub lengths: HashMap<String, i64>,
     pub entity_types: HashMap<String, String>,
@@ -35,7 +37,14 @@ pub(super) struct Source {
 type Occurrence = (String, i64, String, String, String, String);
 type Residue = (String, i64, String, String);
 type Endpoint = (String, i64, String, String);
-type Connections = (Vec<(usize, usize)>, Vec<(usize, Option<usize>)>);
+pub(crate) struct Connection {
+    pub row: usize,
+    pub atoms: [Option<usize>; 2],
+    pub kind: String,
+    pub order: String,
+    pub symmetries: [String; 2],
+}
+type Connections = (Vec<(usize, usize)>, Vec<(usize, Option<usize>)>, Vec<Connection>);
 
 fn text(table: &BlockCategory<'_>, row: usize, column: Option<usize>) -> String {
     match column.and_then(|c| table.value(row, c)) {
@@ -177,8 +186,9 @@ fn endpoint(
 fn connections(entries: &[crate::cif::CifEntry], atoms: &[Atom]) -> Result<Connections, String> {
     let mut pairs = BTreeSet::new();
     let mut hydrogen_pairs = BTreeSet::new();
+    let mut records = Vec::new();
     let Some(table) = BlockCategory::find(entries, "struct_conn") else {
-        return Ok((Vec::new(), Vec::new()));
+        return Ok((Vec::new(), Vec::new(), Vec::new()));
     };
     let mut lookup: HashMap<Endpoint, Vec<usize>> = HashMap::new();
     for (index, atom) in atoms.iter().enumerate() {
@@ -199,6 +209,16 @@ fn connections(entries: &[crate::cif::CifEntry], atoms: &[Atom]) -> Result<Conne
     ];
     for row in 0..table.row_count() {
         let kind = normal(&text(&table, row, kind)).to_ascii_lowercase();
+        let local_covalent = (kind.starts_with("covale") || kind.starts_with("disulf"))
+            && symmetries.iter().all(|&column| matches!(normal(&text(&table, row, column)), "" | "1_555"));
+        let endpoints = [endpoint(&table, row, 1, atoms, &lookup), endpoint(&table, row, 2, atoms, &lookup)];
+        let [first, second] = if local_covalent {
+            let [first, second] = endpoints;
+            [first?, second?]
+        } else { endpoints.map(|value| value.ok().flatten()) };
+        records.push(Connection { row, atoms: [first, second], kind: kind.clone(),
+            order: text(&table, row, table.column("pdbx_value_order")),
+            symmetries: symmetries.map(|column| text(&table, row, column)) });
         if !(kind.starts_with("covale") || kind.starts_with("disulf")) {
             continue;
         }
@@ -208,8 +228,6 @@ fn connections(entries: &[crate::cif::CifEntry], atoms: &[Atom]) -> Result<Conne
         }) {
             continue;
         }
-        let first = endpoint(&table, row, 1, atoms, &lookup)?;
-        let second = endpoint(&table, row, 2, atoms, &lookup)?;
         let hydrogen = |row: usize| matches!(atoms[row].element.as_str(), "H" | "D" | "T");
         if let (Some(a), Some(b)) = (first, second) {
             if hydrogen(a) != hydrogen(b) {
@@ -229,6 +247,7 @@ fn connections(entries: &[crate::cif::CifEntry], atoms: &[Atom]) -> Result<Conne
     Ok((
         pairs.into_iter().collect(),
         hydrogen_pairs.into_iter().collect(),
+        records,
     ))
 }
 
@@ -328,6 +347,7 @@ pub(super) fn read(document: &CifDocument, model: i64) -> Result<Source, String>
             alternate: fields[7].clone(),
             sequence,
             position,
+            occupancy: checked_number(&table, row, occupancy_column, "occupancy")?.map_or(1.0, |n| n as f32),
             protein,
             group,
         });
@@ -379,12 +399,13 @@ pub(super) fn read(document: &CifDocument, model: i64) -> Result<Source, String>
     for (row, atom) in atoms.iter().enumerate() {
         groups[atom.group].push(row);
     }
-    let (bonds, hydrogen_bonds) = connections(block.entries(), &atoms)?;
+    let (bonds, hydrogen_bonds, connections) = connections(block.entries(), &atoms)?;
     Ok(Source {
         atoms,
         groups,
         bonds,
         hydrogen_bonds,
+        connections,
         has_protein_annotations: !types.is_empty(),
         lengths: entity_lengths(block.entries()),
         entity_types: types,

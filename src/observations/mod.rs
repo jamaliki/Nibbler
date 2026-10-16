@@ -11,7 +11,7 @@ mod record;
 mod prepared;
 mod residue;
 mod schema;
-mod source;
+pub(crate) mod source;
 mod tokens;
 mod topology;
 mod continuity;
