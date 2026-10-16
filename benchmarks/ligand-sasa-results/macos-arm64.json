@@ -1,0 +1,277 @@
+{
+  "schema": "nibbler.ligand-sasa-benchmark.v1",
+  "platform": "macOS-26.7-arm64-arm-64bit",
+  "python": "3.12.13",
+  "point_count": 256,
+  "probe_radius_a": 1.4,
+  "warmups": 7,
+  "samples": 101,
+  "rows": [
+    {
+      "file": "1a1e.cif.gz",
+      "source_sha256": "2eb0d403e52e39c0ac43009c1525dff55bf8e6ca8907ee6ef5e3f9912eb29541",
+      "timed_cif_sha256": "f709a67692f8114c2f9a8be31e82f4d5b934590a46ce6ddec1a04a92031d5404",
+      "timed_cif_bytes": 246706,
+      "ligand_atoms": 0,
+      "total_sasa_a2": 0,
+      "timings": {
+        "read_document": {
+          "p50_ms": 0.813042,
+          "p90_ms": 0.843834
+        },
+        "read_document_sasa": {
+          "p50_ms": 1.056958,
+          "p90_ms": 1.102167
+        },
+        "sasa_document": {
+          "p50_ms": 0.243209,
+          "p90_ms": 0.2705
+        },
+        "read_model": {
+          "p50_ms": 2.538875,
+          "p90_ms": 2.669167
+        },
+        "read_model_sasa": {
+          "p50_ms": 2.592042,
+          "p90_ms": 2.678833
+        },
+        "sasa_model": {
+          "p50_ms": 0.038166,
+          "p90_ms": 0.052166
+        }
+      },
+      "added_read_percent": {
+        "document": 30.000418182578525,
+        "model": 2.094116488602249
+      }
+    },
+    {
+      "file": "1dpn.cif.gz",
+      "source_sha256": "73b6bf7fa79774369b87ba8e7fdce0f8bc638639d5b4d937f838dbb74c467cf1",
+      "timed_cif_sha256": "4895a6bc3c48114425facdb25b18fd073c8707fe506537cbb8d28177cfb9653e",
+      "timed_cif_bytes": 173161,
+      "ligand_atoms": 4,
+      "total_sasa_a2": 332.7857092972509,
+      "timings": {
+        "read_document": {
+          "p50_ms": 0.5815,
+          "p90_ms": 0.601209
+        },
+        "read_document_sasa": {
+          "p50_ms": 0.693709,
+          "p90_ms": 0.713916
+        },
+        "sasa_document": {
+          "p50_ms": 0.10675,
+          "p90_ms": 0.110625
+        },
+        "read_model": {
+          "p50_ms": 1.257667,
+          "p90_ms": 1.290125
+        },
+        "read_model_sasa": {
+          "p50_ms": 1.284167,
+          "p90_ms": 1.332709
+        },
+        "sasa_model": {
+          "p50_ms": 0.025334,
+          "p90_ms": 0.027208
+        }
+      },
+      "added_read_percent": {
+        "document": 19.296474634565786,
+        "model": 2.1070760384108045
+      }
+    },
+    {
+      "file": "1xan.cif.gz",
+      "source_sha256": "ff05a053c1e83770a7817aed2b31e36a52a9bb872991f593f994934f30fe917e",
+      "timed_cif_sha256": "35af305da966cc90ee7e04c31237fefb4e83666a539b3b0262b8b140328418e1",
+      "timed_cif_bytes": 418676,
+      "ligand_atoms": 74,
+      "total_sasa_a2": 293.5366387224011,
+      "timings": {
+        "read_document": {
+          "p50_ms": 1.211792,
+          "p90_ms": 1.258958
+        },
+        "read_document_sasa": {
+          "p50_ms": 1.774416,
+          "p90_ms": 1.836125
+        },
+        "sasa_document": {
+          "p50_ms": 0.527,
+          "p90_ms": 0.557875
+        },
+        "read_model": {
+          "p50_ms": 4.136,
+          "p90_ms": 4.218875
+        },
+        "read_model_sasa": {
+          "p50_ms": 4.340125,
+          "p90_ms": 4.464042
+        },
+        "sasa_model": {
+          "p50_ms": 0.181375,
+          "p90_ms": 0.214792
+        }
+      },
+      "added_read_percent": {
+        "document": 46.42909014088226,
+        "model": 4.9353239845260966
+      }
+    },
+    {
+      "file": "1cul.cif.gz",
+      "source_sha256": "7c83f8d4b73fd7962677af37ad17fbf6d790ab411641b22cc5c2ef6f47c64e6b",
+      "timed_cif_sha256": "faa738e5757c6fb7167e1d4e5a98e71ba632e0ab77edf237643bbad8207b95ba",
+      "timed_cif_bytes": 585835,
+      "ligand_atoms": 124,
+      "total_sasa_a2": 611.7893207691916,
+      "timings": {
+        "read_document": {
+          "p50_ms": 1.779875,
+          "p90_ms": 1.827833
+        },
+        "read_document_sasa": {
+          "p50_ms": 2.668166,
+          "p90_ms": 2.759209
+        },
+        "sasa_document": {
+          "p50_ms": 0.882292,
+          "p90_ms": 0.978
+        },
+        "read_model": {
+          "p50_ms": 5.928375,
+          "p90_ms": 6.054125
+        },
+        "read_model_sasa": {
+          "p50_ms": 6.314625,
+          "p90_ms": 6.455458
+        },
+        "sasa_model": {
+          "p50_ms": 0.343459,
+          "p90_ms": 0.3975
+        }
+      },
+      "added_read_percent": {
+        "document": 49.90749350375727,
+        "model": 6.5152761085457644
+      }
+    },
+    {
+      "file": "1a3g.cif.gz",
+      "source_sha256": "6b454ef64eed3f9b4cab87b0a9ed860d8ef88a45e76a7b887191e67df0f3cb4b",
+      "timed_cif_sha256": "5308c161b9c6b3af586f14b377e4b8fa58f280ebec26f80b01cb479bc269bf6e",
+      "timed_cif_bytes": 709166,
+      "ligand_atoms": 45,
+      "total_sasa_a2": 64.02090662127142,
+      "timings": {
+        "read_document": {
+          "p50_ms": 2.1155,
+          "p90_ms": 2.186916
+        },
+        "read_document_sasa": {
+          "p50_ms": 3.029041,
+          "p90_ms": 3.131375
+        },
+        "sasa_document": {
+          "p50_ms": 0.887292,
+          "p90_ms": 0.94475
+        },
+        "read_model": {
+          "p50_ms": 7.169,
+          "p90_ms": 7.357209
+        },
+        "read_model_sasa": {
+          "p50_ms": 7.428625,
+          "p90_ms": 7.63725
+        },
+        "sasa_model": {
+          "p50_ms": 0.220125,
+          "p90_ms": 0.265166
+        }
+      },
+      "added_read_percent": {
+        "document": 43.18321909714016,
+        "model": 3.6214953271028083
+      }
+    },
+    {
+      "file": "1qfe.cif.gz",
+      "source_sha256": "dddc29ebd748b8b32c8984a3bf944c5fe51e50d39cea20e59291cc4e01fc627d",
+      "timed_cif_sha256": "f8484e503d26f9c8c94e07ebcf76dbacb10c725ab98193fdf690e6ac1233eded",
+      "timed_cif_bytes": 390252,
+      "ligand_atoms": 22,
+      "total_sasa_a2": 13.573781203594992,
+      "timings": {
+        "read_document": {
+          "p50_ms": 1.181709,
+          "p90_ms": 1.230125
+        },
+        "read_document_sasa": {
+          "p50_ms": 1.732917,
+          "p90_ms": 1.7795
+        },
+        "sasa_document": {
+          "p50_ms": 0.462167,
+          "p90_ms": 0.505333
+        },
+        "read_model": {
+          "p50_ms": 4.00425,
+          "p90_ms": 4.1065
+        },
+        "read_model_sasa": {
+          "p50_ms": 4.153125,
+          "p90_ms": 4.241042
+        },
+        "sasa_model": {
+          "p50_ms": 0.115166,
+          "p90_ms": 0.153833
+        }
+      },
+      "added_read_percent": {
+        "document": 46.64498620218684,
+        "model": 3.717924705000941
+      }
+    },
+    {
+      "file": "6w13.cif.gz",
+      "source_sha256": "67764e6c314016ca45110d9f7d7e76bdc22776062e301da989e5a900f9dffdfb",
+      "timed_cif_sha256": "2703b621d764c687b8fd7475ce36d2695e81cb6fd6908d7463aad98518cb6ceb",
+      "timed_cif_bytes": 329357,
+      "ligand_atoms": 21,
+      "total_sasa_a2": 148.58449616356415,
+      "timings": {
+        "read_document": {
+          "p50_ms": 1.113542,
+          "p90_ms": 1.1435
+        },
+        "read_document_sasa": {
+          "p50_ms": 1.509834,
+          "p90_ms": 1.557334
+        },
+        "sasa_document": {
+          "p50_ms": 0.372875,
+          "p90_ms": 0.395125
+        },
+        "read_model": {
+          "p50_ms": 3.416042,
+          "p90_ms": 3.527042
+        },
+        "read_model_sasa": {
+          "p50_ms": 3.521666,
+          "p90_ms": 3.644166
+        },
+        "sasa_model": {
+          "p50_ms": 0.091666,
+          "p90_ms": 0.130167
+        }
+      },
+      "added_read_percent": {
+        "document": 35.58841965547774,
+        "model": 3.091999454339267
+      }
+    }
+  ]
+}

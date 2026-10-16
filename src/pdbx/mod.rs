@@ -9,6 +9,7 @@ mod error;
 pub(crate) mod fields;
 mod model;
 mod registry;
+mod sasa;
 mod selected_document;
 mod source;
 mod validation;
@@ -33,6 +34,7 @@ pub use conformer::{
 pub use error::SemanticError;
 pub use model::PdbxModel;
 pub use registry::ComponentRegistry;
+pub use sasa::{ligand_sasa, model_ligand_sasa};
 pub use selected_document::selected_atom_document;
 pub use source::{build_component_registry, build_model, build_model_with_registry};
 pub use validation::{validate_document, validate_model};

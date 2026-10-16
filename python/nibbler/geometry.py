@@ -19,8 +19,9 @@ reference decision must run the reference validator for those graphs.
 """
 
 from ._core import RestraintGraph
+from ._core import atom_sasa as sasa
 
-__all__ = ["RestraintGraph", "validate"]
+__all__ = ["RestraintGraph", "sasa", "validate"]
 
 
 def validate(

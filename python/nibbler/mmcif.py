@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import Literal
 
 from . import _core, cif
@@ -18,6 +19,48 @@ from ._native import (
 from .cif import Destination
 from .components import Registry
 from .contracts import Profile, ValidationReport
+
+
+def ligand_sasa(
+    source: Source | CifDocument | MmcifModel,
+    *,
+    atom_rows: Sequence[int] | None = None,
+    model_number: int = 1,
+    probe_radius: float = 1.4,
+    point_count: int = 256,
+    radii: Mapping[str, float] | None = None,
+) -> dict[int, float]:
+    """Return ligand SASA in A^2 keyed by zero-based source atom_site row.
+
+    Only ligand atoms receive sphere samples. All occupied non-water heavy atoms
+    in the chosen model can occlude them. Automatic selection includes non-polymer
+    and branched entities, including ions; explicit atom_rows overrides selection.
+    Select alternate locations with select_conformer before calling this function.
+    Assemblies and symmetry contacts count only when present as explicit atoms.
+
+    Uses elemental Bondi radii and a Fibonacci Shrake-Rupley sphere. radii overrides
+    element symbols; unknown elements raise ValueError. H, D, T and water do not
+    count. This heavy-atom convention does not infer missing H or use ProtOr radii.
+    Existing documents need no second parse, CCD lookup, or model construction.
+    The native calculation releases the GIL. Sum the values for total ligand SASA.
+    """
+    if isinstance(model_number, bool) or not isinstance(model_number, int):
+        raise TypeError("model_number must be an integer")
+    if isinstance(point_count, bool) or not isinstance(point_count, int):
+        raise TypeError("point_count must be an integer")
+    overrides = (
+        None if radii is None else {key.upper(): value for key, value in radii.items()}
+    )
+    if isinstance(source, MmcifModel):
+        rows, areas = _core.ligand_sasa_model(
+            source, atom_rows, model_number, probe_radius, point_count, overrides
+        )
+    else:
+        document = source if isinstance(source, CifDocument) else cif.read(source)
+        rows, areas = _core.ligand_sasa_document(
+            document, atom_rows, model_number, probe_radius, point_count, overrides
+        )
+    return dict(zip(rows, areas, strict=True))
 
 
 def read(

@@ -1,5 +1,9 @@
 # Benchmark contract
 
+`python -m benchmarks.ligand_sasa --file complex.cif.gz` measures ligand SASA
+on existing documents and models, then compares matched reads with and without
+the calculation. See [the SASA measurement contract](../docs/ligand-sasa.md#performance).
+
 Nibbler benchmarks publish timing only after proving that the measured result is
 correct. End-to-end construction of a projected table or complete document is the unit
 of work; token counters are diagnostic tools, not release evidence.

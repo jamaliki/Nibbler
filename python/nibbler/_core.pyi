@@ -17,6 +17,30 @@ AngleRestraint: TypeAlias = tuple[int, int, int, float, float]
 ChiralRestraint: TypeAlias = tuple[int, int, int, int, float, float, bool, bool]
 PlaneRestraint: TypeAlias = tuple[Sequence[int], Sequence[float]]
 
+def atom_sasa(
+    coordinates: Sequence[Sequence[float]],
+    radii: Sequence[float],
+    atom_indices: Sequence[int],
+    probe_radius: float = 1.4,
+    point_count: int = 256,
+) -> list[float]: ...
+def ligand_sasa_document(
+    document: CifDocument,
+    atom_rows: Sequence[int] | None = None,
+    model_number: int = 1,
+    probe_radius: float = 1.4,
+    point_count: int = 256,
+    radii: Mapping[str, float] | None = None,
+) -> tuple[list[int], list[float]]: ...
+def ligand_sasa_model(
+    model: MmcifModel,
+    atom_rows: Sequence[int] | None = None,
+    model_number: int = 1,
+    probe_radius: float = 1.4,
+    point_count: int = 256,
+    radii: Mapping[str, float] | None = None,
+) -> tuple[list[int], list[float]]: ...
+
 class GeometryCheck(TypedDict):
     status: Literal["checked"]
     count: int

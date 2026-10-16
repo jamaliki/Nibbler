@@ -6,6 +6,11 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
 
 ### Added
 
+- Native ligand-only SASA through `mmcif.ligand_sasa`, with source-row areas,
+  decoded-model reuse, explicit ligand selection, adjustable radii and sampling,
+  and a coordinate-array API at `geometry.sasa`. Parsing performs no SASA work
+  unless the caller requests this separate operation.
+
 - Reduce3's fixed mode limits conjugated O-H displacement to 0.12 A from both
   local planes and checks the final coordinates independently of contact scores.
   The 6TBR regression retains its Gln contact without a large TYR224 H tilt.

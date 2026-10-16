@@ -133,6 +133,18 @@ assembly = nibbler.mmcif.assembly(document)  # the first _pdbx_struct_assembly
 result = nibbler.reduce.run(assembly, chem_data="chem_data")
 ```
 
+Calculate ligand-only SASA using a parsed model's coordinates:
+
+```python
+areas_a2 = nibbler.mmcif.ligand_sasa(model)  # {source_atom_row: area}
+total_a2 = sum(areas_a2.values())
+```
+
+Only ligand atoms receive surface samples; nearby protein atoms still occlude
+them. This separate native operation leaves parsing unchanged when unused.
+See [ligand SASA](docs/ligand-sasa.md) for atom selection, radii, alternate
+locations, accuracy and benchmarks.
+
 Scan results are bounded and yielded in input order:
 
 ```python
@@ -200,6 +212,7 @@ part of the portable release matrix.
 - [Python binding and scan diagrams](python/README.md)
 - [Schema, PGO, and release workflow diagrams](tools/README.md)
 - [Python API reference](docs/python-api.md)
+- [Ligand solvent-accessible surface area](docs/ligand-sasa.md)
 - [Native chemistry and Probe validation](docs/native-validation.md)
 - [Explicit linked products, conformers, and assembly overlap](docs/structure-preparation.md)
 - [Engineering and review standard](ENGINEERING.md)

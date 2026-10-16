@@ -5,6 +5,60 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};
 
 use crate::geometry::{Angle, Bond, Chirality, Plane, RestraintGraph};
+use crate::python::PyCifDocument;
+
+#[pyfunction]
+#[pyo3(signature = (coordinates, radii, atom_indices, probe_radius=1.4, point_count=256))]
+/// Return selected atom areas in A^2 from coordinates and van der Waals radii in A.
+///
+/// All input atoms can occlude the selected atoms. The caller must select models,
+/// conformers, waters and hydrogens before supplying arrays. Results follow
+/// atom_indices order. More sphere points improve the Shrake-Rupley estimate at
+/// greater cost. Native work releases the GIL.
+fn atom_sasa(
+    py: Python<'_>,
+    coordinates: Vec<[f64; 3]>,
+    radii: Vec<f64>,
+    atom_indices: Vec<usize>,
+    probe_radius: f64,
+    point_count: usize,
+) -> PyResult<Vec<f64>> {
+    py.detach(|| {
+        crate::geometry::sasa(
+            &coordinates,
+            &radii,
+            &atom_indices,
+            probe_radius,
+            point_count,
+        )
+    })
+    .map_err(PyValueError::new_err)
+}
+
+#[pyfunction]
+#[pyo3(signature = (document, atom_rows=None, model_number=1, probe_radius=1.4, point_count=256, radii=None))]
+fn ligand_sasa_document(
+    py: Python<'_>,
+    document: &PyCifDocument,
+    atom_rows: Option<Vec<usize>>,
+    model_number: i64,
+    probe_radius: f64,
+    point_count: usize,
+    radii: Option<std::collections::HashMap<String, f64>>,
+) -> PyResult<(Vec<usize>, Vec<f64>)> {
+    let radii = radii.unwrap_or_default();
+    py.detach(|| {
+        crate::pdbx::ligand_sasa(
+            document.document(),
+            atom_rows.as_deref(),
+            model_number,
+            probe_radius,
+            point_count,
+            &radii,
+        )
+    })
+    .map_err(PyValueError::new_err)
+}
 
 #[pyclass(name = "RestraintGraph", module = "nibbler.geometry", frozen)]
 struct PyRestraintGraph {
@@ -92,6 +146,8 @@ impl PyRestraintGraph {
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(atom_sasa, module)?)?;
+    module.add_function(wrap_pyfunction!(ligand_sasa_document, module)?)?;
     module.add_class::<PyRestraintGraph>()?;
     Ok(())
 }

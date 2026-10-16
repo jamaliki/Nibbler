@@ -5,6 +5,10 @@
 
 mod evaluate;
 mod math;
+mod sasa;
+
+pub(crate) use sasa::validate_sasa_options;
+pub use sasa::{SASA_POINTS, sasa};
 
 use std::collections::HashSet;
 

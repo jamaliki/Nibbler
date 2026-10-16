@@ -160,6 +160,31 @@ struct PyMmcifModel {
     model: NativeMmcifModel,
 }
 
+#[pyfunction]
+#[pyo3(signature = (model, atom_rows=None, model_number=1, probe_radius=1.4, point_count=256, radii=None))]
+fn ligand_sasa_model(
+    py: Python<'_>,
+    model: &PyMmcifModel,
+    atom_rows: Option<Vec<usize>>,
+    model_number: i64,
+    probe_radius: f64,
+    point_count: usize,
+    radii: Option<std::collections::HashMap<String, f64>>,
+) -> PyResult<(Vec<usize>, Vec<f64>)> {
+    let radii = radii.unwrap_or_default();
+    py.detach(|| {
+        crate::pdbx::model_ligand_sasa(
+            model.model.coordinates(),
+            atom_rows.as_deref(),
+            model_number,
+            probe_radius,
+            point_count,
+            &radii,
+        )
+    })
+    .map_err(PyValueError::new_err)
+}
+
 /// Immutable chemical component definitions loaded by `nibbler.components.read`.
 #[pyclass(name = "Registry", module = "nibbler.components", frozen)]
 struct PyComponentRegistry {
@@ -1108,6 +1133,7 @@ fn parse_missing_policy(policy: &str) -> PyResult<ArrowMissingPolicy> {
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(ligand_sasa_model, module)?)?;
     module.add_class::<PyCifDocument>()?;
     module.add_class::<PyCifTable>()?;
     module.add_class::<PyMmcifModel>()?;

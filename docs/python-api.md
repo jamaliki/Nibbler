@@ -245,6 +245,13 @@ and its writer rejects values outside its lossless supported encodings.
 
 ## Biological assemblies
 
+`mmcif.ligand_sasa(source, *, atom_rows=None, model_number=1, probe_radius=1.4,
+point_count=256, radii=None)` returns ligand areas in A^2 keyed by zero-based
+source atom rows. Existing semantic models reuse decoded coordinates. The
+separate operation samples only ligand surfaces; nearby protein atoms occlude
+them. See [ligand SASA](ligand-sasa.md) for selection and accuracy rules,
+the `geometry.sasa` array API, and the measured cost.
+
 `mmcif.assembly` writes out every copy of one biological assembly as explicit
 coordinates, so a consumer of the coordinates sees the contacts between copies:
 
