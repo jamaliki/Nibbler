@@ -27,6 +27,25 @@ fn packed(source: &Source) -> observations::Tokens {
 }
 
 #[test]
+fn product_targets_preserve_the_checked_hydride_charge_and_both_bonds() {
+    for component in ["NWN", "EJ2"] {
+        for observed in [false, true] {
+            let mut tokens = packed(&source(component, observed));
+            let positions = tokens.positions.clone();
+            observations::product::apply(&mut tokens, &schema(), &[])
+                .expect("Empty product targets must preserve checked bridge chemistry");
+            assert_eq!(tokens.charges[8], -1.);
+            assert_eq!(tokens.charge_known[8], 1);
+            assert_eq!(tokens.hydrogen_known[8], 1);
+            assert_eq!(tokens.bridge_edges, [(8, 0, 1), (8, 1, 1)]);
+            assert_eq!(tokens.positions, positions);
+            assert_eq!(tokens.charge_known[0..2], [0, 0]);
+            tokens.validate(&schema()).expect("Product targets must retain valid hydride labels");
+        }
+    }
+}
+
+#[test]
 fn absent_hydride_has_unknown_coordinates_and_known_charge_with_both_bonds() {
     for component in ["NWN", "EJ2"] {
         let input = source(component, false);

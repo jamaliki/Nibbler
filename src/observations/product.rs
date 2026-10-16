@@ -36,7 +36,7 @@ pub(crate) fn apply(
         .collect::<HashMap<_, _>>();
     let prior = tokens.hydrogen_known.clone();
     for row in 0..tokens.identity.len() {
-        if tokens.ligand[row] != 0 {
+        if tokens.ligand[row] != 0 && tokens.identity[row] != 65 {
             tokens.hydrogen_known[row] = 0;
             tokens.charge_known[row] = 0;
         }
