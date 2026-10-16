@@ -143,6 +143,11 @@ def run(
     ``REDUCE3_CHEM_DATA``, ``CHEM_DATA``, or the active conda environment. The run
     releases the GIL.
 
+    Fixed mode restricts conjugated O-H poses to 0.12 A from both local planes
+    and checks the final coordinates independently of contact scores. Setting
+    either score preference to zero does not disable this geometry check.
+    Ordinary alcohols, thiols and Reduce2 compatibility mode remain unchanged.
+
     ``allow_missing_restraints_for`` keeps named components as contact context
     when they lack a dictionary. It adds no hydrogens to those components and
     records them in the report. Known dictionaries and strict checks for all

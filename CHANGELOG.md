@@ -6,6 +6,11 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
 
 ### Added
 
+- Reduce3's fixed mode limits conjugated O-H displacement to 0.12 A from both
+  local planes and checks the final coordinates independently of contact scores.
+  The 6TBR regression retains its Gln contact without a large TYR224 H tilt.
+  Ordinary alcohols, thiols and Reduce2 compatibility mode remain unchanged.
+
 - Reduce3 indexes deposited bond endpoints within each unchanged atom hierarchy,
   avoiding repeated full-structure scans while keeping exact match rules and
   candidate order.
@@ -36,8 +41,8 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
   17.4 ms (same output), and Reduce3 is built without its command-line-only features.
 - `nibbler.reduce.run` and `reduce::Params::default()` consider Asn/Gln/His flips by
   default (`add_flip_movers=True`; Reduce2's default is False).
-- Reduce3's fixed mode keeps a hydroxyl hydrogen on a planar atom (tyrosine and other
-  phenols, enols, carboxylic acids) in that atom's plane and an acid's hydrogen syn to
+- Reduce3's fixed mode favors a hydroxyl hydrogen in its planar partner's plane
+  (tyrosine and other phenols, enols, carboxylic acids), and an acid's hydrogen syn to
   its carbonyl oxygen; `nibbler.reduce.run` takes `planar_hydroxyl_preference` and
   `acid_syn_preference` (1.0 each, 0 turns them off; compat mode never applies them).
 - Reduce3's fixed mode no longer leaves a histidine with neither ring hydrogen (an
