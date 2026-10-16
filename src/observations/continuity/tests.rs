@@ -38,10 +38,10 @@ fn protein_gaps_accumulate_without_changing_source_keys_or_existing_gaps() {
         "1 B 1 101 ALA CA C 90 0 0 1\n",
         "1 B 2 102 ALA CA C 93.8 0 0 1\n"));
     let mut tokens = packed(&source, true);
-    assert_eq!(tokens.sequence, [1, 2, 4, 5, 9, 11, 1, 2]);
+    assert_eq!(tokens.sequence, [1, 2, 67, 68, 133, 198, 1, 2]);
     assert_eq!(tokens.keys[2][1], "3");
     tokens.select(&[1, 3]).expect("Crop must retain index gaps");
-    assert_eq!(tokens.sequence, [2, 5]);
+    assert_eq!(tokens.sequence, [2, 68]);
 }
 
 #[test]
@@ -54,10 +54,10 @@ fn nucleotide_gaps_survive_alignment_for_rna_dna_and_prime_aliases() {
                  1 A 3 103 A P P 9 0 0 1\n1 A 3 103 A \"{oxygen}\" O 11 0 0 1\n\
                  1 A 5 105 A P P 12.6 0 0 1\n"));
             let mut tokens = packed(&source, false);
-            assert_eq!(tokens.sequence, [0, 1, 2, 3, 5, 6, 8]);
+            assert_eq!(tokens.sequence, [0, 1, 2, 3, 68, 69, 134]);
             let expected = serde_json::to_string(&tokens.keys).expect("Keys must encode");
             tokens.align(&expected).expect("Alignment must preserve polymer breaks");
-            assert_eq!(tokens.sequence, [0, 1, 2, 3, 5, 6, 8]);
+            assert_eq!(tokens.sequence, [0, 1, 2, 3, 68, 69, 134]);
             assert_eq!(tokens.keys[4][1], "103");
         }
     }
@@ -66,8 +66,15 @@ fn nucleotide_gaps_survive_alignment_for_rna_dna_and_prime_aliases() {
 #[test]
 fn missing_nucleotide_link_atoms_break_adjacency_but_nonpolymers_do_not() {
     let rows = "1 A 1 1 A P P 0 0 0 1\n1 A 2 2 A P P 1.6 0 0 1\n";
-    assert_eq!(packed(&input("polyribonucleotide", rows), false).sequence, [0, 2]);
+    assert_eq!(packed(&input("polyribonucleotide", rows), false).sequence, [0, 65]);
     assert_eq!(packed(&input("other", rows), false).sequence, [0, 1]);
+}
+
+#[test]
+fn a_larger_deposited_gap_stays_larger_than_the_clipping_range() {
+    let source = input("polypeptide(L)",
+        "1 A 1 1 ALA CA C 0 0 0 1\n1 A 100 100 ALA CA C 90 0 0 1\n");
+    assert_eq!(packed(&source, true).sequence, [1, 100]);
 }
 
 #[test]

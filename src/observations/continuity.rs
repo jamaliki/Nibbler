@@ -3,6 +3,8 @@
 use super::{record::Tokens, residue, source::Source};
 use std::collections::BTreeMap;
 
+pub(super) const INDEX_SEPARATION: i64 = 65;
+
 fn site(source: &Source, group: usize, name: &str) -> Option<[f32; 3]> {
     source.groups[group].iter().find_map(|&row| {
         let atom = &source.atoms[row];
@@ -32,7 +34,7 @@ pub(super) fn apply(source: &Source, mapping: &[usize], tokens: &mut Tokens) {
         }
     }
     for groups in chains.values() {
-        let mut previous = None;
+        let mut previous: Option<(i64, usize)> = None;
         let (mut offset, mut segment) = (0, 0);
         for (&number, &group) in groups {
             let atom = &source.atoms[source.groups[group][0]];
@@ -41,7 +43,7 @@ pub(super) fn apply(source: &Source, mapping: &[usize], tokens: &mut Tokens) {
                 let broken = distant(source, left, group, atom.protein);
                 if gap || broken {
                     segment += 1;
-                    if !gap { offset += 1; }
+                    if broken { offset += (INDEX_SEPARATION - (number - before)).max(0); }
                 }
             }
             for &row in &source.groups[group] {

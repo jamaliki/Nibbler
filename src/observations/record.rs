@@ -289,7 +289,7 @@ pub(super) fn renumber_ligands(tokens: &mut Tokens) {
             let (next, segment) = counters.entry(tokens.chains[row])
                 .or_insert((0, tokens.polymer_segments[row]));
             if *segment != tokens.polymer_segments[row] {
-                *next += 1;
+                *next += super::continuity::INDEX_SEPARATION - 1;
                 *segment = tokens.polymer_segments[row];
             }
             tokens.sequence[row] = *next;
