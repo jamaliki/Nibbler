@@ -60,5 +60,31 @@ pub(super) fn apply(source: &Source, mapping: &[usize], tokens: &mut Tokens) {
     }
 }
 
+pub(super) fn retained_proteins(tokens: &mut Tokens) {
+    let mut chains = BTreeMap::<_, Vec<usize>>::new();
+    for row in 0..tokens.identity.len() {
+        if tokens.ligand[row] == 0 && tokens.masks[row * 32 + 1] != 0 {
+            chains.entry(tokens.chains[row]).or_default().push(row);
+        }
+    }
+    for rows in chains.values_mut() {
+        rows.sort_unstable_by_key(|&row| tokens.sequence[row]);
+        let mut previous: Option<(i64, [f32; 3])> = None;
+        let mut offset = 0;
+        for &row in rows.iter() {
+            let number = tokens.sequence[row];
+            let position = tokens.positions[row * 96 + 3..][..3]
+                .try_into().unwrap_or([f32::NAN; 3]);
+            if let Some((before, site)) = previous
+                && residue::distance(site, position) > 4.
+            {
+                offset += (INDEX_SEPARATION - (number - before)).max(0);
+            }
+            tokens.sequence[row] = number + offset;
+            previous = Some((number, position));
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests;

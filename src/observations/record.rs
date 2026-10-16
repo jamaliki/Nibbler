@@ -177,7 +177,9 @@ impl Tokens {
                     })
             })
             .collect();
-        self.select(&indices)
+        self.select(&indices)?;
+        super::continuity::retained_proteins(self);
+        Ok(())
     }
 
     pub fn align(&mut self, expected: &str) -> Result<(), String> {

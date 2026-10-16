@@ -78,6 +78,30 @@ fn a_larger_deposited_gap_stays_larger_than_the_clipping_range() {
 }
 
 #[test]
+fn removing_an_incomplete_residue_adds_a_full_gap_without_changing_source_keys() {
+    let source = input("polypeptide(L)", concat!(
+        "1 A 1 1 ALA CA C 0 0 0 1\n1 A 2 2 ALA CA C 3.8 0 0 1\n",
+        "1 A 3 3 ALA CA C 7.6 0 0 1\n1 A 4 4 ALA CA C 11.4 0 0 1\n"));
+    let mut tokens = packed(&source, true);
+    for row in 0..4 {
+        tokens.masks[row * 32 + 1] = 1;
+        tokens.masks[row * 32 + 4] = u8::from(row != 1);
+        tokens.positions[row * 96 + 3..][..3].copy_from_slice(&source.atoms[row].position);
+    }
+    let mut names = vec![String::new(); 32];
+    names[1] = "CA".into();
+    names[4] = "CB".into();
+    let schema = crate::observations::Schema { slots: 32, hydrogen_start: 15,
+        residues: vec![crate::observations::schema::Residue { residue: "ALA".into(), names,
+            parents: vec![-1; 32], states: Vec::new() }] };
+    tokens.complete(&schema).expect("Complete-residue selection must preserve source identities");
+    assert_eq!(tokens.sequence, [1, 66, 67]);
+    assert_eq!(tokens.keys[1][1], "3");
+    tokens.complete(&schema).expect("Repeated completeness checks must preserve index gaps");
+    assert_eq!(tokens.sequence, [1, 66, 67]);
+}
+
+#[test]
 fn distant_ca_atoms_do_not_establish_internal_peptide_topology() {
     let mut source = input("polypeptide(L)", concat!(
         "1 A 1 101 ALA N N -1 0 0 1\n1 A 1 101 ALA CA C 0 0 0 1\n",
