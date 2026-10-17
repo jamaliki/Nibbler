@@ -212,10 +212,10 @@ def prepare_mmcif_chemistry(
     use_observed_hydrogens: bool = True,
 ) -> PreparedChemistry: ...
 def select_mmcif_conformer(
-    model: MmcifModel, model_number: int | None = None, seed: int = 0
+    model: MmcifModel, model_number: int | None = None, seed: int = 0, policy: str = "occupancy"
 ) -> ConformerSelection: ...
 def select_document_conformer(
-    document: CifDocument, model_number: int | None = None, seed: int = 0
+    document: CifDocument, model_number: int | None = None, seed: int = 0, policy: str = "occupancy"
 ) -> ConformerSelection: ...
 def select_conformer_arrays(
     coordinates: list[list[float]],

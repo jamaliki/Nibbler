@@ -237,15 +237,24 @@ impl PyConformerSelection {
 }
 
 #[pyfunction]
-#[pyo3(signature = (model, model_number=None, seed=0))]
+#[pyo3(signature = (model, model_number=None, seed=0, policy="occupancy"))]
 fn select_mmcif_conformer(
     py: Python<'_>,
     model: &PyMmcifModel,
     model_number: Option<i64>,
     seed: u64,
+    policy: &str,
 ) -> PyResult<PyConformerSelection> {
+    let policy = conformer_policy(policy)?;
     let selected = py
-        .detach(|| crate::pdbx::select_conformer(model.model.coordinates(), model_number, seed))
+        .detach(|| {
+            crate::pdbx::select_conformer_with_policy(
+                model.model.coordinates(),
+                model_number,
+                seed,
+                policy,
+            )
+        })
         .map_err(model_error_to_python)?;
     Ok(PyConformerSelection {
         selected,
@@ -256,20 +265,37 @@ fn select_mmcif_conformer(
 }
 
 #[pyfunction]
-#[pyo3(signature = (document, model_number=None, seed=0))]
+#[pyo3(signature = (document, model_number=None, seed=0, policy="occupancy"))]
 fn select_document_conformer(
     py: Python<'_>,
     document: &PyCifDocument,
     model_number: Option<i64>,
     seed: u64,
+    policy: &str,
 ) -> PyResult<PyConformerSelection> {
+    let policy = conformer_policy(policy)?;
     let selected = py
-        .detach(|| crate::pdbx::select_conformer_document(&document.document, model_number, seed))
+        .detach(|| {
+            crate::pdbx::select_conformer_document_with_policy(
+                &document.document,
+                model_number,
+                seed,
+                policy,
+            )
+        })
         .map_err(model_error_to_python)?;
     Ok(PyConformerSelection {
         selected,
         source: Some(Arc::clone(&document.document)),
     })
+}
+
+fn conformer_policy(value: &str) -> PyResult<crate::pdbx::ConformerPolicy> {
+    match value {
+        "occupancy" => Ok(crate::pdbx::ConformerPolicy::Occupancy),
+        "random_clash_aware" => Ok(crate::pdbx::ConformerPolicy::RandomClashAware),
+        _ => Err(PyValueError::new_err("Unknown conformer policy")),
+    }
 }
 
 #[pyfunction]

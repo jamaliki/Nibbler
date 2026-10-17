@@ -1,6 +1,8 @@
 //! Decode source sites and authored bond exclusions without reading CCD metadata.
 
-use super::{ConformerAtom, ConformerSelection, fail, select_atom_conformers};
+use super::{
+    ConformerAtom, ConformerPolicy, ConformerSelection, fail, select_with_links,
+};
 use crate::pdbx::{PdbxModel, SemanticError};
 use crate::pdbx::{fields, model, source};
 use std::collections::{BTreeMap, HashMap};
@@ -15,6 +17,20 @@ pub fn select_conformer(
     number: Option<i64>,
     seed: u64,
 ) -> Result<ConformerSelection, SemanticError> {
+    select_conformer_with_policy(model, number, seed, ConformerPolicy::Occupancy)
+}
+
+/// Select a deposited model with explicit alternative ordering.
+///
+/// # Errors
+///
+/// Returns the validation and search errors from [`select_conformer`].
+pub fn select_conformer_with_policy(
+    model: &PdbxModel,
+    number: Option<i64>,
+    seed: u64,
+    policy: ConformerPolicy,
+) -> Result<ConformerSelection, SemanticError> {
     if let Some(block) = model.document.blocks().first() {
         crate::pdbx::selected_document::check_tables(block.entries())?;
     }
@@ -24,6 +40,7 @@ pub fn select_conformer(
         &model.document,
         number,
         seed,
+        policy,
     )
 }
 
@@ -37,6 +54,20 @@ pub fn select_conformer_document(
     number: Option<i64>,
     seed: u64,
 ) -> Result<ConformerSelection, SemanticError> {
+    select_conformer_document_with_policy(document, number, seed, ConformerPolicy::Occupancy)
+}
+
+/// Select source rows with an explicit alternative-ordering policy.
+///
+/// # Errors
+///
+/// Returns the validation and search errors from [`select_conformer_document`].
+pub fn select_conformer_document_with_policy(
+    document: &crate::cif::CifDocument,
+    number: Option<i64>,
+    seed: u64,
+    policy: ConformerPolicy,
+) -> Result<ConformerSelection, SemanticError> {
     let [block] = document.blocks() else {
         return Err(fail("Conformer selection requires one data block"));
     };
@@ -44,7 +75,7 @@ pub fn select_conformer_document(
     crate::pdbx::selected_document::check_tables(block.entries())?;
     let atoms = source::atom_sites(categories)?;
     let connections = source::connections(categories)?;
-    select_sites(&atoms, &connections, document, number, seed)
+    select_sites(&atoms, &connections, document, number, seed, policy)
 }
 
 fn select_sites(
@@ -53,6 +84,7 @@ fn select_sites(
     document: &crate::cif::CifDocument,
     number: Option<i64>,
     seed: u64,
+    policy: ConformerPolicy,
 ) -> Result<ConformerSelection, SemanticError> {
     let number = number
         .or_else(|| atom_sites.iter().map(|a| a.model_number).min())
@@ -70,7 +102,7 @@ fn select_sites(
             return Err(fail(format!("Deposited model {number} has no atoms")));
         }
         return Ok(ConformerSelection {
-            schema_version: "clash-aware-altloc.v1",
+            schema_version: policy.schema(),
             atom_rows: rows,
             assignments: BTreeMap::new(),
             search_nodes: 0,
@@ -132,6 +164,8 @@ fn select_sites(
                 "ptnr2_auth_seq_id",
                 "ptnr1_symmetry",
                 "ptnr2_symmetry",
+                "pdbx_ptnr1_PDB_ins_code",
+                "pdbx_ptnr2_PDB_ins_code",
             ],
         ) {
             if let Some(id) = fields::optional_text(&row, 0) {
@@ -144,12 +178,15 @@ fn select_sites(
                         fields::optional_text(&row, 4),
                         fields::optional_text(&row, 5),
                         fields::optional_text(&row, 6),
+                        fields::optional_text(&row, 7),
+                        fields::optional_text(&row, 8),
                     ],
                 );
             }
         }
     }
     let mut excluded = Vec::new();
+    let mut linked = Vec::new();
     for c in connections
         .iter()
         .filter(|c| matches!(c.kind.as_str(), "covale" | "disulf" | "metalc"))
@@ -162,6 +199,7 @@ fn select_sites(
         let matches = |endpoint: &model::ConnectionEndpoint, partner: usize| {
             let alt = q.and_then(|q| q[partner].as_deref());
             let author = q.and_then(|q| q[partner + 2].as_deref());
+            let insertion = q.and_then(|q| q[partner + 6].as_deref());
             index
                 .get(&(endpoint.asym_id.as_str(), endpoint.atom_id.as_str()))
                 .into_iter()
@@ -179,6 +217,7 @@ fn select_sites(
                             .as_ref()
                             .is_none_or(|s| s == &a.label_comp_id)
                         && author.is_none_or(|s| s == a.auth_seq_id)
+                        && insertion.is_none_or(|s| a.insertion_code.as_deref() == Some(s))
                         && alt.is_none_or(|s| a.label_alt_id.as_deref().is_none_or(|v| v == s)))
                     .then_some(i)
                 })
@@ -187,10 +226,14 @@ fn select_sites(
         for a in matches(&c.first, 0) {
             for b in matches(&c.second, 1) {
                 excluded.push([a, b]);
+                if q.is_some_and(|values| values[0].is_some() && values[1].is_some())
+                    && atoms[a].alternate.is_some() && atoms[b].alternate.is_some() {
+                    linked.push([a, b]);
+                }
             }
         }
     }
-    let mut selected = select_atom_conformers(&atoms, &excluded, seed)?;
+    let mut selected = select_with_links(&atoms, &excluded, &linked, seed, policy)?;
     let mut identities = HashMap::new();
     for &i in &selected.atom_rows {
         let component = atom_sites[rows[i]].label_comp_id.as_str();

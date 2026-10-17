@@ -6,6 +6,11 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
 
 ### Added
 
+- Seeded `random_clash_aware` conformer selection varies residue alternatives
+  even when occupancies differ. It preserves source rows and occupancy values,
+  keeps explicitly qualified inter-residue link alternatives together, and
+  resolves authored insertion codes. The default remains occupancy-first.
+
 - Native ligand-only SASA through `mmcif.ligand_sasa`, with source-row areas,
   decoded-model reuse, explicit ligand selection, adjustable radii and sampling,
   and a coordinate-array API at `geometry.sasa`. Parsing performs no SASA work

@@ -7,7 +7,10 @@ mod source;
 
 use contacts::contacts;
 use serde::Serialize;
-pub use source::{select_conformer, select_conformer_document};
+pub use source::{
+    select_conformer, select_conformer_document, select_conformer_document_with_policy,
+    select_conformer_with_policy,
+};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// One input site. Group identifiers name residue occurrences.
@@ -60,6 +63,24 @@ struct Group {
 type Pair = (usize, usize);
 type Constraints = HashMap<Pair, HashSet<Pair>>;
 
+/// Search ordering does not change source occupancies or clash constraints.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConformerPolicy {
+    /// Prefer higher summed residue occupancy; use the seed for ties.
+    Occupancy,
+    /// Seeded random alternative order, excluding zero-occupancy alternatives.
+    RandomClashAware,
+}
+
+impl ConformerPolicy {
+    pub(super) fn schema(self) -> &'static str {
+        match self {
+            Self::Occupancy => "clash-aware-altloc.v1",
+            Self::RandomClashAware => "random-clash-aware-altloc.v1",
+        }
+    }
+}
+
 fn fail(message: impl Into<String>) -> SemanticError {
     SemanticError::new("PDBX_CONFORMER_CONFLICT", message, vec!["atom_site".into()])
 }
@@ -79,6 +100,27 @@ pub fn select_atom_conformers(
     atoms: &[ConformerAtom],
     excluded_bonds: &[[usize; 2]],
     seed: u64,
+) -> Result<ConformerSelection, SemanticError> {
+    select_atom_conformers_with_policy(atoms, excluded_bonds, seed, ConformerPolicy::Occupancy)
+}
+
+/// Select alternatives with an explicit search-order policy.
+///
+/// # Errors
+///
+/// Returns the validation and search errors from [`select_atom_conformers`].
+pub fn select_atom_conformers_with_policy(
+    atoms: &[ConformerAtom],
+    excluded_bonds: &[[usize; 2]],
+    seed: u64,
+    policy: ConformerPolicy,
+) -> Result<ConformerSelection, SemanticError> {
+    select_with_links(atoms, excluded_bonds, &[], seed, policy)
+}
+
+pub(super) fn select_with_links(
+    atoms: &[ConformerAtom], excluded_bonds: &[[usize; 2]], linked_alternatives: &[[usize; 2]],
+    seed: u64, policy: ConformerPolicy,
 ) -> Result<ConformerSelection, SemanticError> {
     if atoms.iter().any(|a| {
         !a.occupancy.is_finite()
@@ -101,7 +143,7 @@ pub fn select_atom_conformers(
     let (mut groups, memberships) = groups(atoms);
     if groups.is_empty() {
         return Ok(ConformerSelection {
-            schema_version: "clash-aware-altloc.v1",
+            schema_version: policy.schema(),
             atom_rows: (0..atoms.len()).collect(),
             assignments: BTreeMap::new(),
             search_nodes: 0,
@@ -109,7 +151,22 @@ pub fn select_atom_conformers(
             model_number: None,
         });
     }
-    let (constraints, preferences) = contacts(atoms, &memberships, &exclusions, &mut groups);
+    let (mut constraints, preferences) = contacts(atoms, &memberships, &exclusions, &mut groups);
+    for &[first, second] in linked_alternatives {
+        if let (Some((g, v)), Some((h, w))) = (memberships[first], memberships[second]) {
+            if g == h { continue; }
+            groups[g].neighbors.insert(h);
+            groups[h].neighbors.insert(g);
+            for a in 0..groups[g].labels.len() {
+                for b in 0..groups[h].labels.len() {
+                    if (a == v) != (b == w) {
+                        let (pair, variants) = if g < h { ((g, h), (a, b)) } else { ((h, g), (b, a)) };
+                        constraints.entry(pair).or_default().insert(variants);
+                    }
+                }
+            }
+        }
+    }
     let mut assigned = vec![None; groups.len()];
     let mut nodes = 0;
     let mut visited = HashSet::new();
@@ -147,6 +204,7 @@ pub fn select_atom_conformers(
             &mut assigned,
             &mut nodes,
             seed,
+            policy,
         ) {
             if nodes > 100_000 {
                 return Err(SemanticError::new(
@@ -180,7 +238,7 @@ pub fn select_atom_conformers(
         })
         .collect();
     Ok(ConformerSelection {
-        schema_version: "clash-aware-altloc.v1",
+        schema_version: policy.schema(),
         atom_rows,
         assignments,
         search_nodes: nodes,
@@ -247,12 +305,16 @@ fn solve(
     assigned: &mut [Option<usize>],
     nodes: &mut usize,
     seed: u64,
+    policy: ConformerPolicy,
 ) -> bool {
     let Some(&g) = component.get(depth) else {
         return true;
     };
     let mut options: Vec<_> = (0..groups[g].labels.len())
-        .filter(|v| !groups[g].blocked.contains(v))
+        .filter(|v| {
+            !groups[g].blocked.contains(v)
+                && (policy == ConformerPolicy::Occupancy || groups[g].occupancy[*v] > 0.)
+        })
         .collect();
     let preference = |v: usize| {
         groups[g]
@@ -265,6 +327,13 @@ fn solve(
             .count()
     };
     options.sort_by(|&a, &b| {
+        if policy == ConformerPolicy::RandomClashAware {
+            return tie(seed ^ 0xa0761d6478bd642f, groups[g].residue, a).cmp(&tie(
+                seed ^ 0xa0761d6478bd642f,
+                groups[g].residue,
+                b,
+            ));
+        }
         groups[g].occupancy[b]
             .total_cmp(&groups[g].occupancy[a])
             .then_with(|| preference(b).cmp(&preference(a)))
@@ -300,6 +369,7 @@ fn solve(
             assigned,
             nodes,
             seed,
+            policy,
         ) {
             return true;
         }

@@ -22,14 +22,15 @@ pub(crate) use assembly::assembly_mapping_names;
 
 pub use assembly::{MAX_ASSEMBLY_ATOM_SITES, assembly_document, assembly_document_with_mapping};
 pub use assembly_overlap::{AssemblyDeduplication, deduplicate_assembly_copies};
+pub(crate) use chemistry::library::registry as chemical_library_registry;
+pub(crate) use chemistry::prepare_product;
 pub use chemistry::{
     BondSource, ChemicalEdit, PreparedChemistry, ProductAtom, ProductBond, prepare_chemistry,
 };
-pub(crate) use chemistry::library::registry as chemical_library_registry;
-pub(crate) use chemistry::prepare_product;
 pub use conformer::{
-    ConformerAtom, ConformerSelection, select_atom_conformers, select_conformer,
-    select_conformer_document,
+    ConformerAtom, ConformerPolicy, ConformerSelection, select_atom_conformers,
+    select_atom_conformers_with_policy, select_conformer, select_conformer_document,
+    select_conformer_document_with_policy, select_conformer_with_policy,
 };
 pub use error::SemanticError;
 pub use model::PdbxModel;

@@ -123,15 +123,19 @@ def select_conformer(
     *,
     model_number: int | None = None,
     seed: int = 0,
+    policy: str = "occupancy",
 ) -> ConformerSelection:
     """Select clash-free residue alternatives without changing chemical identity.
 
-    Selection prefers higher occupancy and uses the seed to order ties. Nearby
+    The default prefers higher occupancy and uses the seed to order ties. Nearby
     residues on different chains prefer matching letters on equal occupancy.
     The native search uses sparse spatial contacts and a 100,000-choice limit;
     an unresolved conflict raises ``ChemistryError`` rather than returning clashes.
     ``atom_rows`` indexes the source table. ``document`` creates the selected view
     only when requested. This never substitutes a modified residue's parent.
+    ``policy="random_clash_aware"`` randomizes the search order even when
+    occupancies differ. It excludes zero-occupancy alternatives and preserves
+    source occupancies. Search is not uniform over all valid assignments.
     """
     if model_number is not None and (
         isinstance(model_number, bool) or not isinstance(model_number, int)
@@ -139,11 +143,13 @@ def select_conformer(
         raise TypeError("model_number must be an integer")
     if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
         raise TypeError("seed must be a nonnegative integer")
+    if policy not in {"occupancy", "random_clash_aware"}:
+        raise ValueError("Unknown conformer policy")
     try:
         if isinstance(source, MmcifModel):
-            return _core.select_mmcif_conformer(source, model_number, seed)
+            return _core.select_mmcif_conformer(source, model_number, seed, policy)
         document = source if isinstance(source, CifDocument) else cif.read(source)
-        return _core.select_document_conformer(document, model_number, seed)
+        return _core.select_document_conformer(document, model_number, seed, policy)
     except ValueError as error:
         raise_chemistry_error(error)
 

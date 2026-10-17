@@ -4,6 +4,35 @@
 
 use _core::pdbx::{ConformerAtom, select_atom_conformers};
 
+#[test]
+fn random_order_samples_unequal_occupancies_and_replays() {
+    use _core::pdbx::{ConformerPolicy, select_atom_conformers_with_policy};
+    let atoms = [atom(0, "A", Some("A"), 0., 0.95), atom(0, "A", Some("B"), 10., 0.05)];
+    let mut choices = std::collections::HashSet::new();
+    for seed in 0..32 {
+        let choose = || select_atom_conformers_with_policy(&atoms, &[], seed,
+            ConformerPolicy::RandomClashAware).expect("random assignment");
+        let first = choose();
+        assert_eq!(first.atom_rows, choose().atom_rows);
+        assert_eq!(first.schema_version, "random-clash-aware-altloc.v1");
+        choices.insert(first.atom_rows[0]);
+    }
+    assert_eq!(choices.len(), 2);
+    assert_eq!(atoms[0].occupancy, 0.95);
+}
+
+#[test]
+fn random_order_keeps_clash_constraints_and_ignores_zero_occupancy() {
+    use _core::pdbx::{ConformerPolicy, select_atom_conformers_with_policy};
+    let atoms = [atom(0, "A", Some("A"), 0., 0.9), atom(0, "A", Some("B"), 10., 0.1),
+        atom(0, "A", Some("C"), 30., 0.), atom(1, "B", None, 0.5, 1.)];
+    for seed in 0..32 {
+        let selection = select_atom_conformers_with_policy(&atoms, &[], seed,
+            ConformerPolicy::RandomClashAware).expect("compatible assignment");
+        assert_eq!(selection.atom_rows, [1, 3]);
+    }
+}
+
 fn atom(residue: usize, chain: &str, alt: Option<&str>, x: f64, occupancy: f64) -> ConformerAtom {
     ConformerAtom {
         residue,
