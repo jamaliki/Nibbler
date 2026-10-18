@@ -2,6 +2,7 @@
 
 use super::schema::Residue;
 use super::source::Atom;
+use crate::pdbx::ShortText;
 
 pub(super) struct Packed {
     pub position: [[f32; 3]; 32],
@@ -25,14 +26,16 @@ impl Packed {
     }
 }
 
-pub(super) fn hydrogen(element: &str) -> bool {
-    matches!(element, "H" | "D" | "T")
+/// Whether the element is H, D or T. A test against `&str` reads the bytes and skips the
+/// UTF-8 check of `as_str`.
+#[inline]
+pub(super) fn hydrogen(element: &ShortText) -> bool {
+    *element == "H" || *element == "D" || *element == "T"
 }
 
-fn protein_hydrogen(element: &str) -> bool {
-    element.eq_ignore_ascii_case("H")
-        || element.eq_ignore_ascii_case("D")
-        || element.eq_ignore_ascii_case("T")
+/// Whether the element is H, D or T in either case.
+fn protein_hydrogen(element: &ShortText) -> bool {
+    ["H", "D", "T", "h", "d", "t"].iter().any(|value| element == value)
 }
 
 pub(super) fn finite(xyz: [f32; 3]) -> bool {
@@ -65,26 +68,26 @@ pub(super) fn nearest(position: [f32; 3], heavy: &[(usize, [f32; 3])]) -> Option
     (first.1 > 0.5 && first.1 < 1.6 && second - first.1 >= 0.2).then_some(first.0)
 }
 
-fn protein_parent(schema: &Residue, atom: &Atom, heavy: &[(usize, [f32; 3])]) -> Option<usize> {
-    let named_parent = |name: &str| {
-        schema
-            .names
+fn protein_parent(schema: &Residue, names: &[ShortText], atom: &Atom, heavy: &[(usize, [f32; 3])]) -> Option<usize> {
+    let named_parent = |name: &ShortText| {
+        names
             .iter()
             .zip(&schema.parents)
             .find_map(|(slot, &parent)| (slot == name && parent >= 0).then_some(parent as usize))
     };
     let parent = named_parent(&atom.name)
-        .or_else(|| match atom.name.as_str() {
-            "H1" | "D1" | "T1" => named_parent("H"),
-            _ => None,
+        .or_else(|| {
+            (atom.name == "H1" || atom.name == "D1" || atom.name == "T1")
+                .then(|| named_parent(&ShortText::new("H")))
+                .flatten()
         })
         .or_else(|| {
             if atom.element.eq_ignore_ascii_case("D") || atom.element.eq_ignore_ascii_case("T") {
-                named_parent(
+                named_parent(&ShortText::new(
                     &atom
                         .name
                         .replacen(&atom.element.to_ascii_uppercase(), "H", 1),
-                )
+                ))
             } else {
                 None
             }
@@ -98,8 +101,10 @@ fn protein_parent(schema: &Residue, atom: &Atom, heavy: &[(usize, [f32; 3])]) ->
     nearest(atom.position, heavy)
 }
 
+/// Pack the atoms of one residue. `names` holds the schema's slot names as `ShortText`.
 pub(super) fn pack(
     schema: &Residue,
+    names: &[ShortText],
     atoms: &[&Atom],
     topology: [i64; 3],
     linked: Option<bool>,
@@ -109,9 +114,10 @@ pub(super) fn pack(
     let mut result = Packed::empty(topology);
     let mut invalid = false;
     for atom in atoms.iter().filter(|atom| !protein_hydrogen(&atom.element)) {
-        let slot = schema.names[..15]
+        let slot = names[..15]
             .iter()
-            .position(|name| !name.is_empty() && *name == atom.name);
+            .zip(&schema.names[..15])
+            .position(|(name, text)| !text.is_empty() && *name == atom.name);
         let Some(slot) = slot else {
             invalid = true;
             continue;
@@ -123,13 +129,18 @@ pub(super) fn pack(
         result.position[slot] = atom.position;
         result.mask[slot] = true;
     }
-    let heavy: Vec<_> = (0..15)
-        .filter(|&slot| result.mask[slot])
-        .map(|slot| (slot, result.position[slot]))
-        .collect();
-    let mut groups: [Vec<&Atom>; 15] = std::array::from_fn(|_| Vec::new());
+    let mut heavy = [(0, [0.; 3]); 15];
+    let mut count = 0;
+    for slot in (0..15).filter(|&slot| result.mask[slot]) {
+        heavy[count] = (slot, result.position[slot]);
+        count += 1;
+    }
+    let heavy = &heavy[..count];
+    // Each hydrogen with its parent slot, sorted by parent and then by name; the sort keeps
+    // atom order among equal names.
+    let mut children: Vec<(usize, &Atom)> = Vec::new();
     for atom in atoms.iter().filter(|atom| protein_hydrogen(&atom.element)) {
-        let Some(parent) = protein_parent(schema, atom, &heavy) else {
+        let Some(parent) = protein_parent(schema, names, atom, heavy) else {
             invalid = true;
             continue;
         };
@@ -137,21 +148,18 @@ pub(super) fn pack(
             invalid = true;
             continue;
         }
-        groups[parent].push(atom);
+        children.push((parent, atom));
     }
-    for (parent, group) in groups.iter_mut().enumerate() {
-        let slots: Vec<_> = schema
-            .parents
-            .iter()
-            .enumerate()
-            .filter_map(|(slot, &value)| (value == parent as i64).then_some(slot))
-            .collect();
-        if group.len() > slots.len() {
+    children.sort_by(|first, second| first.0.cmp(&second.0).then_with(|| first.1.name.cmp(&second.1.name)));
+    for group in children.chunk_by(|first, second| first.0 == second.0) {
+        let parent = group[0].0 as i64;
+        let mut slots = schema.parents.iter().enumerate()
+            .filter_map(|(slot, &value)| (value == parent).then_some(slot));
+        if group.len() > slots.clone().count() {
             invalid = true;
             continue;
         }
-        group.sort_by(|first, second| first.name.cmp(&second.name));
-        for (&slot, atom) in slots.iter().zip(group.iter()) {
+        for (slot, (_, atom)) in slots.by_ref().zip(group) {
             result.position[slot] = atom.position;
             result.mask[slot] = true;
         }
@@ -172,7 +180,7 @@ pub(super) fn pack(
             }
         }
     }
-    let matches: Vec<_> = schema
+    let mut matches = schema
         .states
         .iter()
         .enumerate()
@@ -180,10 +188,8 @@ pub(super) fn pack(
             linked.is_none_or(|value| state.linked == value)
                 && state.present.iter().zip(result.mask).all(|(&a, b)| a == b)
                 && (!constrain_termini || state.topology()[..2] == topology[..2])
-        })
-        .collect();
-    if matches.len() == 1 {
-        let (index, state) = matches[0];
+        });
+    if let (Some((index, state)), None) = (matches.next(), matches.next()) {
         result.state = index as i64;
         result.state_known = true;
         result.topology = state.topology();

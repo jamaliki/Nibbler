@@ -3,7 +3,10 @@
 use std::borrow::Cow;
 
 use super::dictionary_source::split_tag;
-use super::document::{CifEntry, CifItem, CifLoop, CifValueRef};
+use super::document::{CifEntry, CifItem, CifLoop, CifValueRef, RowValues};
+use super::text_column::TextCell;
+#[cfg(feature = "python")]
+use super::document::TextColumn;
 
 /// Whether `tag` belongs to `category`, ignoring ASCII case.
 pub(crate) fn in_category(tag: &str, category: &str) -> bool {
@@ -82,20 +85,84 @@ impl<'a> BlockCategory<'a> {
         }
     }
 
+    /// Return direct access to a column that a columnar loop stores as text.
+    #[cfg(feature = "python")]
+    pub(crate) fn text_column(&self, column: usize) -> Option<TextColumn<'a>> {
+        match self {
+            Self::Loop(cif_loop) => cif_loop.text_column(column),
+            Self::Items(_) => None,
+        }
+    }
+
     /// Return a present value as text (a number as its source lexeme when it has one), or
     /// `None` for `?`, `.`, and absent values.
     pub(crate) fn text(&self, row: usize, column: usize) -> Option<Cow<'a, str>> {
-        match self.value(row, column)? {
-            CifValueRef::Text(text) => Some(Cow::Borrowed(text.as_str())),
-            CifValueRef::Integer(number, original) => Some(original.map_or_else(
-                || Cow::Owned(number.to_string()),
-                |text| Cow::Borrowed(text.as_str()),
-            )),
-            CifValueRef::Float(number, _, original) => Some(original.map_or_else(
-                || Cow::Owned(number.to_string()),
-                |text| Cow::Borrowed(text.as_str()),
-            )),
-            CifValueRef::Unknown | CifValueRef::NotApplicable => None,
+        value_text(self.value(row, column)?)
+    }
+
+    /// Return row `row`, whose values match [`Self::value`] and [`Self::text`].
+    #[inline]
+    pub(crate) fn row(&self, row: usize) -> CategoryRow<'_, 'a> {
+        let values = match self {
+            Self::Loop(cif_loop) => Some(cif_loop.row_values(row)),
+            Self::Items(_) => None,
+        };
+        CategoryRow {
+            table: self,
+            row,
+            values,
         }
+    }
+}
+
+/// The text of a present value: text as written, or a number's source spelling.
+fn value_text(value: CifValueRef<'_>) -> Option<Cow<'_, str>> {
+    match value {
+        CifValueRef::Text(text) => Some(Cow::Borrowed(text.as_str())),
+        CifValueRef::Integer(number, original) => Some(original.map_or_else(
+            || Cow::Owned(number.to_string()),
+            |text| Cow::Borrowed(text.as_str()),
+        )),
+        CifValueRef::Float(number, _, original) => Some(original.map_or_else(
+            || Cow::Owned(number.to_string()),
+            |text| Cow::Borrowed(text.as_str()),
+        )),
+        CifValueRef::Unknown | CifValueRef::NotApplicable => None,
+    }
+}
+
+/// One row of a [`BlockCategory`]. A loop row's cells are found once, not once per value.
+#[derive(Clone, Copy)]
+pub(crate) struct CategoryRow<'c, 'a> {
+    table: &'c BlockCategory<'a>,
+    row: usize,
+    values: Option<RowValues<'a>>,
+}
+
+impl<'a> CategoryRow<'_, 'a> {
+    /// Return the value in `column`, as [`BlockCategory::value`] does.
+    #[inline]
+    pub(crate) fn value(self, column: usize) -> Option<CifValueRef<'a>> {
+        match self.values {
+            Some(values) => values.get(column),
+            None => self.table.value(self.row, column),
+        }
+    }
+
+    /// Return the text in `column`, as [`BlockCategory::text`] does.
+    #[inline]
+    pub(crate) fn text(self, column: usize) -> Option<Cow<'a, str>> {
+        match self.plain(column) {
+            Some(TextCell::Text(text)) => Some(Cow::Borrowed(text)),
+            Some(TextCell::Unknown | TextCell::NotApplicable) => None,
+            None => value_text(self.value(column)?),
+        }
+    }
+
+    /// Return the value in `column` when it is an unquoted parsed cell, as
+    /// [`RowValues::plain`] does; `None` for any other value.
+    #[inline]
+    pub(crate) fn plain(self, column: usize) -> Option<TextCell<'a>> {
+        self.values?.plain(column)
     }
 }

@@ -17,8 +17,16 @@ impl PreparedSource {
     }
 
     pub(crate) fn components(&self) -> Vec<String> {
-        self.source.atoms.iter().filter(|atom| !atom.protein)
-            .map(|atom| atom.component.clone()).collect::<BTreeSet<_>>().into_iter().collect()
+        // Atoms of one residue sit together, so skip repeats before the set lookup.
+        let mut names = BTreeSet::new();
+        let mut previous = None;
+        for atom in self.source.atoms.iter().filter(|atom| !atom.protein) {
+            if previous != Some(&atom.component) {
+                names.insert(atom.component.as_str());
+                previous = Some(&atom.component);
+            }
+        }
+        names.into_iter().map(str::to_owned).collect()
     }
 
     #[cfg(feature = "reduce3")]

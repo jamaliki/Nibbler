@@ -1,5 +1,4 @@
 use super::{PreparedChemistry, SemanticError, rearrange, valence};
-use std::collections::BTreeSet;
 
 pub(super) fn resolve(graph: &mut PreparedChemistry) -> Result<(), SemanticError> {
     let mut linked: Vec<_> = graph
@@ -105,11 +104,62 @@ pub(super) fn displace_h(graph: &mut PreparedChemistry, a: usize, count: usize) 
     removed
 }
 
-fn leaving_groups(graph: &PreparedChemistry, parent: usize) -> Vec<Vec<usize>> {
+/// A set of atom indices that empties in constant time.
+///
+/// Each atom stores the generation that last added it, so starting a new set only
+/// increments the current generation.
+struct Visited {
+    generation: Vec<u32>,
+    current: u32,
+}
+
+impl Visited {
+    fn new(count: usize) -> Self {
+        Self {
+            generation: vec![0; count],
+            current: 0,
+        }
+    }
+
+    fn clear(&mut self) {
+        if self.current == u32::MAX {
+            self.generation.fill(0);
+            self.current = 0;
+        }
+        self.current += 1;
+    }
+
+    fn contains(&self, atom: usize) -> bool {
+        self.generation.get(atom) == Some(&self.current)
+    }
+
+    /// Add `atom`; false when it was already present.
+    fn insert(&mut self, atom: usize) -> bool {
+        if atom >= self.generation.len() {
+            self.generation.resize(atom + 1, 0);
+        }
+        let added = self.generation[atom] != self.current;
+        self.generation[atom] = self.current;
+        added
+    }
+}
+
+fn leaving_groups(
+    graph: &PreparedChemistry,
+    parent: usize,
+    visited: &mut Visited,
+) -> Vec<Vec<usize>> {
     let mut groups = Vec::new();
-    let mut visited = BTreeSet::from([parent]);
+    visited.clear();
+    visited.insert(parent);
     for (start, _) in graph.neighbors(parent) {
-        if graph.atoms[start].residue != graph.atoms[parent].residue || visited.contains(&start) {
+        if graph.atoms[start].residue != graph.atoms[parent].residue || visited.contains(start) {
+            continue;
+        }
+        // A group that contains a heavy atom which does not leave is rejected. Its other
+        // atoms are left unvisited, but a later start that reaches them also reaches this
+        // atom and is rejected too, so the accepted groups are unchanged.
+        if !graph.atoms[start].leaving && !graph.atoms[start].is_hydrogen() {
             continue;
         }
         let mut group = Vec::new();
@@ -143,6 +193,7 @@ fn remove_leaving_groups(
     graph: &mut PreparedChemistry,
     linked: &[usize],
 ) -> Result<(), SemanticError> {
+    let mut visited = Visited::new(graph.atoms.len());
     for &a in linked {
         let inter: Vec<_> = graph.adjacency[a]
             .iter()
@@ -174,7 +225,7 @@ fn remove_leaving_groups(
                 )
             }
         });
-        let mut groups = leaving_groups(graph, a);
+        let mut groups = leaving_groups(graph, a, &mut visited);
         groups.sort_by_key(|g| g.iter().any(|&i| graph.atoms[i].coordinates.is_some()));
         for group in groups {
             if budget == 0 {

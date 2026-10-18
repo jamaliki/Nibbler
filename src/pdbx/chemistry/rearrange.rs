@@ -1,5 +1,5 @@
 use super::{
-    PreparedChemistry, SemanticError,
+    PreparedChemistry, SemanticError, ShortText,
     product::{displace_h, overvalent, valid},
 };
 
@@ -38,7 +38,7 @@ pub(super) fn lower_pi(
                 continue;
             };
             let mut new_h = graph.atoms[h].clone();
-            new_h.atom_id = format!("H@{}", graph.atoms[b].atom_id);
+            new_h.atom_id = ShortText::new(&format!("H@{}", graph.atoms[b].atom_id));
             new_h.template_atom_id = None;
             new_h.deposited_charge = None;
             new_h.residue = graph.atoms[b].residue;
@@ -54,7 +54,7 @@ pub(super) fn lower_pi(
             new_h.impacted = false;
             let index = graph.atoms.len();
             graph.atoms.push(new_h);
-            graph.adjacency.push(Vec::new());
+            graph.adjacency.push(super::BondList::default());
             graph.remove(&[h], "hydrogen_transfer");
             graph.add_bond(b, index, 1, super::BondSource::HydrogenTransfer)?;
             graph.atoms[donor].impacted = true;

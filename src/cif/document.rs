@@ -3,6 +3,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use super::source::SourceBuffer;
+use super::text_column::TextCell;
 
 /// The lexical form used by a parsed text value.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -303,10 +304,15 @@ pub(crate) struct SourceCell {
     span_end: u32,
 }
 
+/// Cells per lookup block in [`SourceCells`].
+const BLOCK_SHIFT: u32 = 16;
+
 #[derive(Clone, Debug)]
 struct SourceCells {
     chunks: Vec<Vec<SourceCell>>,
     offsets: Vec<usize>,
+    /// For each block of `1 << BLOCK_SHIFT` cells, the chunk that holds its first cell.
+    blocks: Vec<usize>,
     len: usize,
 }
 
@@ -318,21 +324,57 @@ impl SourceCells {
             offsets.push(len);
             len += chunk.len();
         }
+        let mut blocks = Vec::with_capacity((len >> BLOCK_SHIFT) + 1);
+        let mut chunk = 0;
+        for first in (0..len).step_by(1 << BLOCK_SHIFT) {
+            while offsets.get(chunk + 1).is_some_and(|&next| next <= first) {
+                chunk += 1;
+            }
+            blocks.push(chunk);
+        }
         Self {
             chunks,
             offsets,
+            blocks,
             len,
         }
     }
 
+    #[inline]
     fn get(&self, index: usize) -> Option<SourceCell> {
         if index >= self.len {
             return None;
         }
-        let chunk_index = self.offsets.partition_point(|offset| *offset <= index) - 1;
-        self.chunks[chunk_index]
-            .get(index - self.offsets[chunk_index])
+        // Start from the block's first chunk; only short chunks make the loop step.
+        let mut chunk = *self.blocks.get(index >> BLOCK_SHIFT)?;
+        while self
+            .offsets
+            .get(chunk + 1)
+            .is_some_and(|&next| next <= index)
+        {
+            chunk += 1;
+        }
+        self.chunks
+            .get(chunk)?
+            .get(index - self.offsets[chunk])
             .copied()
+    }
+
+    /// Return cells `start..start + count` when one chunk holds them all.
+    #[inline]
+    fn run(&self, start: usize, count: usize) -> Option<&[SourceCell]> {
+        let mut chunk = *self.blocks.get(start >> BLOCK_SHIFT)?;
+        while self
+            .offsets
+            .get(chunk + 1)
+            .is_some_and(|&next| next <= start)
+        {
+            chunk += 1;
+        }
+        let first = start - self.offsets.get(chunk)?;
+        self.chunks
+            .get(chunk)?
+            .get(first..first.checked_add(count)?)
     }
 }
 
@@ -464,6 +506,53 @@ impl LoopColumn {
     }
 }
 
+/// One text column of a columnar loop, read without dispatching on the loop storage.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TextColumn<'a> {
+    column: &'a StringColumn,
+    mask: Option<&'a [u8]>,
+    rows: usize,
+}
+
+impl<'a> TextColumn<'a> {
+    /// Return the value in `row`, as [`CifLoop::value`] does.
+    #[inline]
+    pub(crate) fn value(self, row: usize) -> Option<CifValueRef<'a>> {
+        if row >= self.rows {
+            return None;
+        }
+        Some(match self.mask.map_or(0, |mask| mask[row]) {
+            1 => CifValueRef::NotApplicable,
+            2 => CifValueRef::Unknown,
+            _ => CifValueRef::Text(TextValueRef {
+                text: self.column.value(row),
+                quote_style: QuoteStyle::Unquoted,
+            }),
+        })
+    }
+
+    /// Return a key that two rows share only if their values are equal.
+    ///
+    /// Equal values need not share a key: text columns built from rows store a value
+    /// again whenever it differs from the previous row.
+    #[inline]
+    pub(crate) fn key(self, row: usize) -> Option<u64> {
+        if row >= self.rows {
+            return None;
+        }
+        let state = self.mask.map_or(0, |mask| mask[row]);
+        Some((u64::from(state) << 32) | u64::from(self.column.indices[row]))
+    }
+
+    /// Return the shared text, the entry offsets into it, the row indices (0 for the
+    /// empty string, otherwise the entry plus one), the missing-state mask, and the
+    /// row count.
+    pub(crate) fn parts(self) -> (&'a str, &'a [u32], &'a [u32], Option<&'a [u8]>, usize) {
+        let column = self.column;
+        (&column.data, &column.offsets, &column.indices, self.mask, self.rows)
+    }
+}
+
 #[derive(Clone, Debug)]
 enum LoopStorage {
     Owned(Vec<CifValue>),
@@ -565,23 +654,141 @@ impl CifLoop {
         })
     }
 
+    /// Whether any value is a typed number that keeps its source spelling. Parsed loops
+    /// hold only text, and columnar loops hold numbers without a spelling.
+    #[cfg(feature = "python")]
+    pub(crate) fn holds_number_spellings(&self) -> bool {
+        match &self.storage {
+            LoopStorage::Owned(values) => values.iter().any(|value| {
+                matches!(
+                    value,
+                    CifValue::Integer(_, Some(_)) | CifValue::Float(_, _, Some(_))
+                )
+            }),
+            LoopStorage::Source { .. } | LoopStorage::Columns { .. } => false,
+        }
+    }
+
+    /// Whether column `column_index` holds a typed float. Parsed loops hold only text.
+    #[cfg(feature = "python")]
+    pub(crate) fn holds_floats(&self, column_index: usize) -> bool {
+        match &self.storage {
+            LoopStorage::Owned(values) => values
+                .iter()
+                .skip(column_index)
+                .step_by(self.column_count().max(1))
+                .any(|value| matches!(value, CifValue::Float(..))),
+            LoopStorage::Source { .. } => false,
+            LoopStorage::Columns { columns, .. } => columns
+                .get(column_index)
+                .is_some_and(|column| matches!(column.values, ColumnValues::Floats(_))),
+        }
+    }
+
+    /// Return direct access to a column that this loop stores as text.
+    pub(crate) fn text_column(&self, column_index: usize) -> Option<TextColumn<'_>> {
+        if column_index >= self.column_count() {
+            return None;
+        }
+        let LoopStorage::Columns { columns, .. } = &self.storage else {
+            return None;
+        };
+        let column = columns.get(column_index)?;
+        let ColumnValues::Strings(strings) = &column.values else {
+            return None;
+        };
+        Some(TextColumn {
+            column: strings,
+            mask: column.mask.as_deref(),
+            rows: self.row_count(),
+        })
+    }
+
     /// Return one value by row and column index.
     #[must_use]
     pub fn value(&self, row_index: usize, column_index: usize) -> Option<CifValueRef<'_>> {
-        if column_index >= self.column_count() || row_index >= self.row_count() {
+        let columns = self.column_count();
+        // `row_index < value_count / columns` holds exactly when the whole row fits, so the
+        // check needs no division.
+        let start = row_index.checked_mul(columns)?;
+        if column_index >= columns || start.checked_add(columns)? > self.value_count() {
             return None;
         }
         match &self.storage {
-            LoopStorage::Owned(values) => values
-                .get(row_index * self.column_count() + column_index)
-                .map(CifValue::as_ref),
+            LoopStorage::Owned(values) => values.get(start + column_index).map(CifValue::as_ref),
             LoopStorage::Source { source, cells } => cells
-                .get(row_index * self.column_count() + column_index)
+                .get(start + column_index)
                 .map(|cell| cell.value(source)),
             LoopStorage::Columns { columns, .. } => columns
                 .get(column_index)
                 .map(|column| column.value(row_index)),
         }
+    }
+}
+
+/// The values of one loop row, found with one lookup for the whole row.
+#[derive(Clone, Copy)]
+pub(crate) enum RowValues<'a> {
+    /// The row's parsed cells, which one chunk holds.
+    Cells(&'a [SourceCell], &'a SourceBuffer),
+    /// Any other row, read value by value.
+    Loop(&'a CifLoop, usize),
+}
+
+impl<'a> RowValues<'a> {
+    /// Return the value in `column`, as [`CifLoop::value`] does.
+    #[inline]
+    pub(crate) fn get(self, column: usize) -> Option<CifValueRef<'a>> {
+        match self {
+            Self::Cells(cells, source) => cells.get(column).map(|cell| cell.value(source)),
+            Self::Loop(cif_loop, row) => cif_loop.value(row, column),
+        }
+    }
+
+    /// Return the value in `column` when it is an unquoted parsed cell: its text, or `?`
+    /// or `.` as a missing state, as [`Self::get`] gives them. Return `None` for any other
+    /// value, which the caller reads with [`Self::get`].
+    #[inline]
+    pub(crate) fn plain(self, column: usize) -> Option<TextCell<'a>> {
+        let Self::Cells(cells, source) = self else {
+            return None;
+        };
+        let cell = cells.get(column)?;
+        let text = source
+            .as_str()
+            .get(cell.span_start as usize..cell.span_end as usize)?;
+        match text.as_bytes() {
+            [] | [b'\'' | b'"' | b';', ..] => None,
+            b"?" => Some(TextCell::Unknown),
+            b"." => Some(TextCell::NotApplicable),
+            _ => Some(TextCell::Text(text)),
+        }
+    }
+}
+
+impl CifLoop {
+    /// Return the values of row `row_index`. Reading a row this way gives the same values
+    /// as [`CifLoop::value`], with one cell lookup per row instead of one per value.
+    #[inline]
+    pub(crate) fn row_values(&self, row_index: usize) -> RowValues<'_> {
+        if let LoopStorage::Source { source, cells } = &self.storage {
+            let columns = self.column_count();
+            // The whole row fits exactly when `row_index < row_count()`, which the check
+            // tests without a division.
+            if let Some(run) = row_index
+                .checked_mul(columns)
+                .filter(|start| {
+                    columns > 0
+                        && start
+                            .checked_add(columns)
+                            .is_some_and(|end| end <= cells.len)
+                })
+                .and_then(|start| cells.run(start, columns))
+            {
+                return RowValues::Cells(run, source);
+            }
+        }
+        RowValues::Loop(self, row_index)
     }
 }
 

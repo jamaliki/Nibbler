@@ -539,8 +539,9 @@ fn project_entries(entries: &[CifEntry], sink: &mut TableSink) -> Result<(), Pro
                     .filter(|&column| sink.wants_loop_value(column))
                     .collect();
                 for row in 0..cif_loop.row_count() {
+                    let values = cif_loop.row_values(row);
                     for &column in &selected {
-                        let value = cif_loop.value(row, column).ok_or_else(|| {
+                        let value = values.get(column).ok_or_else(|| {
                             ProjectionError::new(
                                 ProjectionErrorCode::IncompatibleColumns,
                                 "document loop row lacks its declared column",

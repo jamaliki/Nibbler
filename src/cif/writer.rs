@@ -1,5 +1,6 @@
 use super::document::{
-    BlockKind, CifDocument, CifEntry, CifFrame, CifItem, CifLoop, CifValue, CifValueRef, QuoteStyle,
+    BlockKind, CifDocument, CifEntry, CifFrame, CifItem, CifLoop, CifValue, CifValueRef,
+    QuoteStyle, TextColumn,
 };
 use super::error::{WriteError, WriteErrorCode};
 use super::numeric::{parse_float, parse_integer};
@@ -43,7 +44,7 @@ fn write_document(document: &CifDocument, format: ValueFormatter) -> Result<Stri
             "a CIF document must contain at least one block",
         ));
     }
-    let mut output = String::new();
+    let mut output = Output(Vec::new());
     for block in document.blocks() {
         match block.kind() {
             BlockKind::Data => {
@@ -65,7 +66,39 @@ fn write_document(document: &CifDocument, format: ValueFormatter) -> Result<Stri
         }
         output.push_str("#\n");
     }
-    Ok(output)
+    String::from_utf8(output.0).map_err(|_| {
+        WriteError::new(
+            WriteErrorCode::InvalidDocument,
+            "the written document is not valid UTF-8",
+        )
+    })
+}
+
+/// The document text being written, held as bytes so that rows can copy stored text in
+/// pieces of fixed size. Every byte comes from a `str`, so the text stays UTF-8.
+struct Output(Vec<u8>);
+
+impl Output {
+    #[inline]
+    fn push_str(&mut self, text: &str) {
+        self.0.extend_from_slice(text.as_bytes());
+    }
+
+    #[inline]
+    fn push(&mut self, character: char) {
+        self.push_str(character.encode_utf8(&mut [0; 4]));
+    }
+
+    fn reserve(&mut self, additional: usize) {
+        self.0.reserve(additional);
+    }
+
+    /// Append `data[start..end]`, or return `None` when the range is not in `data`.
+    #[inline]
+    fn push_stored(&mut self, data: &[u8], start: usize, end: usize) -> Option<()> {
+        self.0.extend_from_slice(data.get(start..end)?);
+        Some(())
+    }
 }
 
 /// Format one present text value with the least intrusive deterministic quote style.
@@ -84,16 +117,63 @@ pub fn format_text(text: &str) -> Result<String, WriteError> {
 }
 
 fn format_text_cow(text: &str) -> Result<Cow<'_, str>, WriteError> {
+    Ok(match text_form(text)? {
+        TextForm::Bare => Cow::Borrowed(text),
+        TextForm::Quoted(quote) => Cow::Owned(format!("{quote}{text}{quote}")),
+        TextForm::Field(newline) => Cow::Owned(format!(";{text}{newline};")),
+    })
+}
+
+/// How [`format_text`] writes a text value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TextForm {
+    /// As it is.
+    Bare,
+    /// Between two of the given quote character.
+    Quoted(char),
+    /// As a semicolon text field whose closing line starts after the given line ending.
+    Field(char),
+}
+
+#[inline]
+fn text_form(text: &str) -> Result<TextForm, WriteError> {
+    // One pass decides text of printable ASCII and spaces, which needs none of the checks
+    // in `other_text_form` for control characters, line endings and text-field delimiters.
+    let (mut printable, mut space, mut single, mut double) = (true, false, false, false);
+    for &byte in text.as_bytes() {
+        printable &= matches!(byte, b' '..=b'~');
+        space |= byte == b' ';
+        single |= byte == b'\'';
+        double |= byte == b'"';
+    }
+    if printable {
+        return Ok(
+            if !(space || single || double) && plain_start(text.as_bytes()) {
+                TextForm::Bare
+            } else if !single {
+                TextForm::Quoted('\'')
+            } else if !double {
+                TextForm::Quoted('"')
+            } else {
+                TextForm::Field('\n')
+            },
+        );
+    }
+    other_text_form(text)
+}
+
+/// Return the form of text that holds a byte other than printable ASCII or a space.
+fn other_text_form(text: &str) -> Result<TextForm, WriteError> {
     validate_text_characters(text)?;
     if is_bare_value(text) {
-        return Ok(Cow::Borrowed(text));
+        return Ok(TextForm::Bare);
     }
     let is_single_line = !text.contains('\n') && !text.contains('\r');
     if is_single_line && !text.contains('\'') {
-        return Ok(Cow::Owned(format!("'{text}'")));
+        return Ok(TextForm::Quoted('\''));
     }
     if is_single_line && !text.contains('"') {
-        return Ok(Cow::Owned(format!("\"{text}\"")));
+        return Ok(TextForm::Quoted('"'));
     }
     if contains_text_field_delimiter(text) {
         return Err(WriteError::new(
@@ -101,12 +181,15 @@ fn format_text_cow(text: &str) -> Result<Cow<'_, str>, WriteError> {
             "text contains a line beginning with ';', which terminates a CIF 1.1 text field",
         ));
     }
-    let delimiter_newline = if text.ends_with('\r') { '\r' } else { '\n' };
-    Ok(Cow::Owned(format!(";{text}{delimiter_newline};")))
+    Ok(TextForm::Field(if text.ends_with('\r') {
+        '\r'
+    } else {
+        '\n'
+    }))
 }
 
 fn write_entry(
-    output: &mut String,
+    output: &mut Output,
     entry: &CifEntry,
     format: ValueFormatter,
 ) -> Result<(), WriteError> {
@@ -118,7 +201,7 @@ fn write_entry(
 }
 
 fn write_item(
-    output: &mut String,
+    output: &mut Output,
     item: &CifItem,
     format: ValueFormatter,
 ) -> Result<(), WriteError> {
@@ -135,7 +218,7 @@ fn write_item(
 }
 
 fn write_loop(
-    output: &mut String,
+    output: &mut Output,
     cif_loop: &CifLoop,
     format: ValueFormatter,
 ) -> Result<(), WriteError> {
@@ -156,6 +239,9 @@ fn write_loop(
         output.push('\n');
     }
 
+    if write_text_rows(output, cif_loop)? {
+        return Ok(());
+    }
     for row_index in 0..cif_loop.row_count() {
         let Some(row) = cif_loop.row(row_index) else {
             return Err(WriteError::new(
@@ -188,8 +274,178 @@ fn write_loop(
     Ok(())
 }
 
+/// Write the rows of a loop whose columns are all stored as text, and return whether the
+/// loop was one.
+///
+/// Column storage holds unquoted text, which both [`write_canonical`] and
+/// [`write_preserving`] format with [`format_text`], so the rows need no formatter. A
+/// column whose stored entries all pass [`plain_bytes`] and [`plain_start`] writes each
+/// value as it is. Other columns choose a form once for each run of rows that share a
+/// stored entry, and write quotes around the text instead of formatting a new string.
+fn write_text_rows(output: &mut Output, cif_loop: &CifLoop) -> Result<bool, WriteError> {
+    let rows = cif_loop.row_count();
+    let mut columns = Vec::with_capacity(cif_loop.column_count());
+    // A row holds each column's text and one separator after it.
+    let mut row_bytes = cif_loop.column_count();
+    for column_index in 0..cif_loop.column_count() {
+        let Some(column) = cif_loop.text_column(column_index) else {
+            return Ok(false);
+        };
+        let Some(column) = RowText::new(column, rows) else {
+            return Ok(false);
+        };
+        row_bytes = row_bytes.saturating_add(column.mean_len());
+        columns.push(column);
+    }
+    output.reserve(row_bytes.saturating_mul(rows));
+    for row in 0..rows {
+        let mut line_is_empty = true;
+        for column in &mut columns {
+            let (text, form) = match column.value(row)? {
+                Cell::Stored(start, end) => {
+                    if !line_is_empty {
+                        output.push(' ');
+                    }
+                    if output
+                        .push_stored(column.data.as_bytes(), start, end)
+                        .is_none()
+                    {
+                        return Err(stored_entry_error());
+                    }
+                    line_is_empty = false;
+                    continue;
+                }
+                Cell::Text(text, form) => (text, form),
+            };
+            if let TextForm::Field(newline) = form {
+                if !line_is_empty {
+                    output.push('\n');
+                }
+                output.push(';');
+                output.push_str(text);
+                output.push(newline);
+                output.push_str(";\n");
+                line_is_empty = true;
+                continue;
+            }
+            if !line_is_empty {
+                output.push(' ');
+            }
+            if let TextForm::Quoted(quote) = form {
+                output.push(quote);
+                output.push_str(text);
+                output.push(quote);
+            } else {
+                output.push_str(text);
+            }
+            line_is_empty = false;
+        }
+        if !line_is_empty {
+            output.push('\n');
+        }
+    }
+    Ok(true)
+}
+
+/// One text column as [`write_text_rows`] reads it.
+struct RowText<'a> {
+    data: &'a str,
+    offsets: &'a [u32],
+    indices: &'a [u32],
+    mask: Option<&'a [u8]>,
+    /// Whether every stored entry is written as it is.
+    plain: bool,
+    /// The storage key and form of the last value given a form.
+    last: Option<(u64, TextForm)>,
+}
+
+impl<'a> RowText<'a> {
+    /// Read `column`, or return `None` when it has fewer than `rows` rows.
+    fn new(column: TextColumn<'a>, rows: usize) -> Option<Self> {
+        let (data, offsets, indices, mask, _) = column.parts();
+        if indices.len() < rows || mask.is_some_and(|mask| mask.len() < rows) {
+            return None;
+        }
+        let plain = plain_bytes(data.as_bytes())
+            && offsets.windows(2).all(|pair| {
+                data.get(pair[0] as usize..pair[1] as usize)
+                    .is_some_and(|entry| plain_start(entry.as_bytes()))
+            });
+        Some(Self {
+            data,
+            offsets,
+            indices,
+            mask,
+            plain,
+            last: None,
+        })
+    }
+
+    /// The mean length of a stored entry, or 1 when there are none.
+    fn mean_len(&self) -> usize {
+        self.data
+            .len()
+            .checked_div(self.offsets.len().saturating_sub(1))
+            .unwrap_or(1)
+    }
+
+    /// Return the value in `row`. Missing states are written as `?` and `.`, as
+    /// [`TextColumn::value`] reads them.
+    #[inline]
+    fn value(&mut self, row: usize) -> Result<Cell<'a>, WriteError> {
+        let state = self
+            .mask
+            .and_then(|mask| mask.get(row).copied())
+            .unwrap_or(0);
+        match state {
+            1 => return Ok(Cell::Text(".", TextForm::Bare)),
+            2 => return Ok(Cell::Text("?", TextForm::Bare)),
+            _ => {}
+        }
+        let index = self.indices.get(row).copied().unwrap_or(0);
+        let range = match index as usize {
+            0 => Some((0, 0)),
+            entry => self
+                .offsets
+                .get(entry - 1)
+                .zip(self.offsets.get(entry))
+                .map(|(start, end)| (*start as usize, *end as usize)),
+        };
+        let Some((start, end)) = range else {
+            return Err(stored_entry_error());
+        };
+        if self.plain && index != 0 {
+            return Ok(Cell::Stored(start, end));
+        }
+        let Some(text) = self.data.get(start..end) else {
+            return Err(stored_entry_error());
+        };
+        let key = (u64::from(state) << 32) | u64::from(index);
+        let form = match self.last {
+            Some((last, form)) if last == key => form,
+            _ => text_form(text)?,
+        };
+        self.last = Some((key, form));
+        Ok(Cell::Text(text, form))
+    }
+}
+
+/// One value of a text column: a stored entry to write as it is, given by its byte range,
+/// or text and the form to write it in.
+enum Cell<'a> {
+    Stored(usize, usize),
+    Text(&'a str, TextForm),
+}
+
+fn stored_entry_error() -> WriteError {
+    WriteError::new(
+        WriteErrorCode::InvalidDocument,
+        "a text column refers to an entry it does not hold",
+    )
+}
+
 fn write_frame(
-    output: &mut String,
+    output: &mut Output,
     frame: &CifFrame,
     format: ValueFormatter,
 ) -> Result<(), WriteError> {
@@ -328,6 +584,34 @@ fn validate_text_characters(text: &str) -> Result<(), WriteError> {
     Ok(())
 }
 
+/// Return whether every byte is printable ASCII other than a space or quote.
+#[inline]
+fn plain_bytes(bytes: &[u8]) -> bool {
+    bytes
+        .iter()
+        .all(|byte| matches!(byte, b'!' | b'#'..=b'&' | b'('..=b'~'))
+}
+
+/// Return whether text without spaces or quotes may be written bare: it is not empty, `?`
+/// or `.`, and does not start with a reserved character or word.
+#[inline]
+fn plain_start(bytes: &[u8]) -> bool {
+    let Some(&first) = bytes.first() else {
+        return false;
+    };
+    !matches!(first, b'_' | b'$' | b'#' | b';' | b'[' | b']')
+        && bytes != b"?"
+        && bytes != b"."
+        && !(matches!(first | 0x20, b'd' | b'g' | b'l' | b's')
+            && [&b"data_"[..], b"global_", b"loop_", b"save_", b"stop_"]
+                .iter()
+                .any(|prefix| {
+                    bytes
+                        .get(..prefix.len())
+                        .is_some_and(|start| start.eq_ignore_ascii_case(prefix))
+                }))
+}
+
 fn is_bare_value(text: &str) -> bool {
     // in ASCII text the whitespace characters are U+0009-U+000D and U+0020
     let has_quote_or_space = if text.is_ascii() {
@@ -407,6 +691,65 @@ mod tests {
         assert!(output.contains("_a.two \"gamma\"\n"));
         assert!(output.contains("_a.three\n;delta\nepsilon\n;\n"));
         assert_eq!(crate::cif::parse(output.as_bytes()), Ok(document));
+        Ok(())
+    }
+
+    #[test]
+    fn text_columns_write_as_owned_values() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::cif::{TextCell, TextColumnBuilder};
+        use TextCell::{NotApplicable, Text, Unknown};
+        let rows = [
+            [Text("ATOM"), Text("O5'"), Text("1.5"), Unknown],
+            [Text("ATOM"), Text("O5'"), Text("-2"), NotApplicable],
+            [Text("HETATM"), Text(""), Text("3"), Text("a b")],
+            [
+                Text("HETATM"),
+                Text("it's \"x\""),
+                Text("4"),
+                Text("line\nnext"),
+            ],
+            [Text("ATOM"), Text("data_x"), Text("5"), Text("end\r")],
+            [Text("ATOM"), Text("_x"), Text("6"), Text("?")],
+            [Text("ATOM"), Text("tab\there"), Text("7"), Text(".")],
+            [Text("ATOM"), Text("\u{e9}"), Text("8"), Text("#x")],
+        ];
+        let mut builders: Vec<_> = (0..4)
+            .map(|_| TextColumnBuilder::with_capacity(rows.len()))
+            .collect();
+        let mut values = Vec::new();
+        for row in &rows {
+            for (builder, cell) in builders.iter_mut().zip(row) {
+                builder
+                    .push(*cell)
+                    .ok_or("the column outgrew its offsets")?;
+                values.push(match cell {
+                    Text(text) => CifValue::text(*text),
+                    NotApplicable => CifValue::NotApplicable,
+                    Unknown => CifValue::Unknown,
+                });
+            }
+        }
+        let tags: Vec<String> = ["a", "b", "c", "d"]
+            .iter()
+            .map(|name| format!("_t.{name}"))
+            .collect();
+        let document = |cif_loop| {
+            CifDocument::new(vec![CifBlock::data(
+                "t".to_owned(),
+                vec![CifEntry::Loop(cif_loop)],
+            )])
+        };
+        let columns = document(CifLoop::from_columns(
+            tags.clone(),
+            builders
+                .into_iter()
+                .map(TextColumnBuilder::finish)
+                .collect(),
+            rows.len(),
+        ));
+        let owned = document(CifLoop::new(tags, values));
+        assert_eq!(write_canonical(&columns)?, write_canonical(&owned)?);
+        assert_eq!(write_preserving(&columns)?, write_preserving(&owned)?);
         Ok(())
     }
 

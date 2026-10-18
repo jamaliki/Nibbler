@@ -1,7 +1,7 @@
 //! Borrowed column views over generic CIF entries.
 
 use super::dictionary::{DictionaryError, ItemRange};
-use super::document::{CifEntry, CifItem, CifLoop, CifValueRef};
+use super::document::{CifEntry, CifItem, CifLoop, CifValueRef, TextColumn};
 
 /// A zero-copy view of the scalar and loop occurrences in one block or save frame.
 #[derive(Clone, Copy)]
@@ -104,6 +104,16 @@ impl<'a> CategoryColumn<'a> {
 
     pub(crate) fn values(self) -> impl Iterator<Item = CifValueRef<'a>> {
         (0..self.row_count()).filter_map(move |row| self.value(row))
+    }
+
+    /// Return direct access to the column when its loop stores it as text.
+    pub(crate) fn text_column(self) -> Option<TextColumn<'a>> {
+        match self {
+            Self::Scalar(_) => None,
+            Self::Loop {
+                cif_loop, column, ..
+            } => cif_loop.text_column(column),
+        }
     }
 }
 

@@ -39,7 +39,7 @@ use std::fmt::{self, Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
-use reduce3::cifsource::{CifCell, CifSink, CifSource, CifTable};
+use reduce3::cifsource::{CifCell, CifSink, CifSource, CifTable, ColumnValue};
 use reduce3::model::Structure;
 
 pub use reduce3::hplace::NTermCharge;
@@ -49,7 +49,8 @@ pub use reduce3::{Approach, MonLib, Params};
 
 use crate::cif::{
     BlockCategory, CifBlock, CifDocument, CifEntry, CifItem, CifLoop, CifValue, CifValueRef,
-    TextCell, TextColumnBuilder, in_category, split_tag,
+    LoopColumn, SourceColumnBuilder, TextCell, TextColumn, TextColumnBuilder, in_category,
+    split_tag,
 };
 
 /// The class of a [`ReduceError`].
@@ -161,7 +162,28 @@ pub fn run(
     monomers: &MonLib,
     params: &Params,
 ) -> Result<Reduction, ReduceError> {
-    let block = document
+    run_block(model_block(document)?, monomers, params)
+}
+
+/// [`run`], which with `record` also returns the source rows that the output
+/// `_atom_site` rows copy.
+///
+/// # Errors
+///
+/// Returns the same errors as [`run`].
+#[cfg(feature = "python")]
+pub(crate) fn run_recording(
+    document: &CifDocument,
+    monomers: &MonLib,
+    params: &Params,
+    record: bool,
+) -> Result<(Reduction, Option<SourceCopies>), ReduceError> {
+    run_block_with(model_block(document)?, monomers, params, record)
+}
+
+/// Return the first data block of `document` that has an `_atom_site` loop.
+fn model_block(document: &CifDocument) -> Result<&CifBlock, ReduceError> {
+    document
         .blocks()
         .iter()
         .find(|block| BlockSource::new(block).table("atom_site").is_some())
@@ -170,8 +192,7 @@ pub fn run(
                 ReduceErrorCode::InvalidModel,
                 "no block has an _atom_site loop",
             )
-        })?;
-    run_block(block, monomers, params)
+        })
 }
 
 /// Run Reduce3 on one data block.
@@ -184,8 +205,21 @@ pub fn run_block(
     monomers: &MonLib,
     params: &Params,
 ) -> Result<Reduction, ReduceError> {
+    run_block_with(block, monomers, params, false).map(|(reduction, _)| reduction)
+}
+
+/// [`run_block`], which with `record` also returns the source rows that the output
+/// `_atom_site` rows copy.
+fn run_block_with(
+    block: &CifBlock,
+    monomers: &MonLib,
+    params: &Params,
+    record: bool,
+) -> Result<(Reduction, Option<SourceCopies>), ReduceError> {
     let source = BlockSource::new(block);
-    let mut structure = reduce3::mmcif::structure_from_cif(&source)
+    // The writer compares output coordinates with these numbers instead of parsing
+    // the source again.
+    let (mut structure, numbers) = reduce3::mmcif::structure_and_numbers_from_cif(&source)
         .map_err(|message| ReduceError::new(ReduceErrorCode::InvalidModel, message))?;
     if structure.atoms_size() == 0 {
         return Err(ReduceError::new(
@@ -207,23 +241,23 @@ pub fn run_block(
         || !params.allowed_unplaced_bridge_hydrogens.is_empty() || params.allow_unresolved_bond_targets {
         let model = params.model_id.map(source_model_number).transpose()?
             .ok_or_else(|| ReduceError::new(ReduceErrorCode::InvalidModel, "Target masking requires an explicit source model ID"))?;
-        let source_document = CifDocument::new(vec![block.clone()]);
-        let statuses = crate::observations::uncertainty::from_output(&source_document, model, &output,
+        let statuses = crate::observations::uncertainty::from_output(block, model, &output,
             params.required_hydrogen_parent_sources.as_deref(), params.allow_unresolved_bond_targets)
             .map_err(|message| ReduceError::new(ReduceErrorCode::InvalidModel, message))?;
         serde_json::to_string(&statuses).map_err(|error| ReduceError::new(ReduceErrorCode::ResultTooLarge, error.to_string()))?
     } else { "[]".to_owned() };
-    let document = if params.compat {
-        structure_document(&output.structure, block.code().unwrap_or("default"))?
+    let (document, copies) = if params.compat {
+        (structure_document(&output.structure, block.code().unwrap_or("default"))?, None)
     } else {
-        block_document(&output.structure, block)?
+        block_document_with(&output.structure, block, Some(&numbers), record)?
     };
-    Ok(Reduction {
+    let reduction = Reduction {
         document,
         report: output.description,
         #[cfg(feature = "python")]
         target_uncertainties_json,
-    })
+    };
+    Ok((reduction, copies))
 }
 
 pub(crate) fn source_model_number(model_id: usize) -> Result<i64, ReduceError> {
@@ -308,6 +342,32 @@ mod source_model_tests {
     }
 }
 
+#[cfg(all(test, feature = "python"))]
+mod copy_tests {
+    use super::{Params, SourceCopies, load_monomer_library, run_recording};
+
+    #[test]
+    fn copied_sites_build_the_model_that_a_full_decode_builds() {
+        let monomers = load_monomer_library(None).expect("Reduce tests require REDUCE3_CHEM_DATA");
+        for text in [include_bytes!("../tests/reduce3/1crn.cif").as_slice(),
+                     include_bytes!("../tests/fixtures/chemistry/ligand_ion_water.cif").as_slice()] {
+            let source = crate::cif::parse(text).expect("The fixture must parse");
+            let model = crate::pdbx::build_model(&source).expect("The fixture must form a model");
+            assert!(model.loop_sites().is_some());
+            let (reduction, copies) = run_recording(&source, &monomers, &Params::default(), true)
+                .expect("Reduce3 must protonate the fixture");
+            let copies = copies.expect("The sink must rewrite the source _atom_site loop");
+            assert!(copies.rows.iter().any(|row| *row != SourceCopies::NONE));
+            assert!(copies.rows.iter().any(|row| *row == SourceCopies::NONE) || copies.made.iter().any(|made| *made != 0));
+            let full = crate::pdbx::build_model(reduction.document()).expect("The output must form a model");
+            let copied = crate::pdbx::build_model_with_copies(reduction.document(), &model, &copies.rows, &copies.made)
+                .expect("The copied output must form a model");
+            // Debug text also tells apart the signs of zero.
+            assert_eq!(format!("{copied:?}"), format!("{full:?}"));
+        }
+    }
+}
+
 /// Build a one-block document holding `structure` in the block it was read from:
 /// every category of `block` in order, with the atom tables rebuilt (see the module
 /// documentation). Entries Reduce3 does not change are shared with `block`.
@@ -317,11 +377,25 @@ mod source_model_tests {
 /// Returns [`ReduceErrorCode::InvalidModel`] when `block` has no `_atom_site` loop and
 /// [`ReduceErrorCode::ResultTooLarge`] when a column exceeds the in-memory representation.
 pub fn block_document(structure: &Structure, block: &CifBlock) -> Result<CifDocument, ReduceError> {
+    block_document_with(structure, block, None, false).map(|(document, _)| document)
+}
+
+/// [`block_document`], with the numbers read from `block` with its model. With `record`,
+/// it also returns the source rows that the `_atom_site` rows copy, when the sink
+/// rewrote the source loop.
+fn block_document_with(
+    structure: &Structure,
+    block: &CifBlock,
+    numbers: Option<&reduce3::mmcif::SourceNumbers>,
+    record: bool,
+) -> Result<(CifDocument, Option<SourceCopies>), ReduceError> {
     let code = block.code().unwrap_or("default");
     let mut sink = DocumentSink::with_source(block);
-    reduce3::mmcif::write_cif_preserving(structure, &BlockSource::new(block), code, &mut sink)
+    sink.record = record;
+    reduce3::mmcif::write_cif_preserving_with(structure, &BlockSource::new(block), numbers, code, &mut sink)
         .map_err(|message| ReduceError::new(ReduceErrorCode::InvalidModel, message))?;
-    sink.finish(code)
+    let copies = sink.copies.take();
+    sink.finish(code).map(|document| (document, copies))
 }
 
 /// Build a one-block document holding `structure` as Reduce3 writes it.
@@ -412,7 +486,7 @@ impl CifSource for BlockSource<'_> {
         Self: 't;
 
     fn table(&self, category: &str) -> Option<BlockTable<'_>> {
-        BlockCategory::find(self.block.entries(), category).map(BlockTable)
+        BlockCategory::find(self.block.entries(), category).map(BlockTable::new)
     }
 
     fn categories(&self) -> Vec<String> {
@@ -435,28 +509,54 @@ impl CifSource for BlockSource<'_> {
 
 /// One category of a [`BlockSource`]: a loop, or the category's scalar items as one row.
 #[derive(Clone, Debug)]
-pub struct BlockTable<'a>(BlockCategory<'a>);
+pub struct BlockTable<'a> {
+    category: BlockCategory<'a>,
+    /// Direct access to the columns a columnar loop stores as text.
+    texts: Vec<Option<TextColumn<'a>>>,
+}
+
+impl<'a> BlockTable<'a> {
+    fn new(category: BlockCategory<'a>) -> Self {
+        let texts = match &category {
+            BlockCategory::Loop(cif_loop) => {
+                (0..cif_loop.column_count()).map(|column| cif_loop.text_column(column)).collect()
+            }
+            BlockCategory::Items(_) => Vec::new(),
+        };
+        Self { category, texts }
+    }
+
+    fn value(&self, row: usize, column: usize) -> Option<CifValueRef<'a>> {
+        match self.texts.get(column) {
+            Some(Some(text)) => text.value(row),
+            _ => self.category.value(row, column),
+        }
+    }
+}
 
 impl CifTable for BlockTable<'_> {
     fn row_count(&self) -> usize {
-        self.0.row_count()
+        self.category.row_count()
     }
 
     fn column(&self, tag: &str) -> Option<usize> {
-        self.0.column(tag)
+        self.category.column(tag)
     }
 
     fn cell(&self, row: usize, column: usize) -> Cow<'_, str> {
-        self.0
-            .text(row, column)
-            .unwrap_or(Cow::Borrowed(match self.0.value(row, column) {
-                Some(CifValueRef::NotApplicable) => ".",
-                _ => "?",
-            }))
+        match self.value(row, column) {
+            Some(CifValueRef::Text(text)) => Cow::Borrowed(text.as_str()),
+            Some(CifValueRef::Integer(number, original)) => original
+                .map_or_else(|| Cow::Owned(number.to_string()), |text| Cow::Borrowed(text.as_str())),
+            Some(CifValueRef::Float(number, _, original)) => original
+                .map_or_else(|| Cow::Owned(number.to_string()), |text| Cow::Borrowed(text.as_str())),
+            Some(CifValueRef::NotApplicable) => Cow::Borrowed("."),
+            Some(CifValueRef::Unknown) | None => Cow::Borrowed("?"),
+        }
     }
 
     fn number(&self, row: usize, column: usize) -> Option<f64> {
-        match self.0.value(row, column)? {
+        match self.value(row, column)? {
             CifValueRef::Text(text) => reduce3::cif::parse_f64(text.as_str()),
             CifValueRef::Integer(number, _) => Some(number as f64),
             CifValueRef::Float(number, _, _) => Some(number),
@@ -465,18 +565,32 @@ impl CifTable for BlockTable<'_> {
     }
 
     fn tags(&self) -> Vec<Cow<'_, str>> {
-        self.0.tags().into_iter().map(Cow::Borrowed).collect()
+        self.category.tags().into_iter().map(Cow::Borrowed).collect()
     }
 
     fn is_loop(&self) -> bool {
-        self.0.is_loop()
+        self.category.is_loop()
     }
 
     fn missing(&self, row: usize, column: usize) -> Option<CifCell<'static>> {
-        match self.0.value(row, column) {
+        match self.value(row, column) {
             Some(CifValueRef::Unknown) | None => Some(CifCell::Unknown),
             Some(CifValueRef::NotApplicable) => Some(CifCell::NotApplicable),
             Some(CifValueRef::Text(_) | CifValueRef::Integer(..) | CifValueRef::Float(..)) => None,
+        }
+    }
+
+    fn cell_with_missing(&self, row: usize, column: usize) -> (Option<CifCell<'static>>, Cow<'_, str>) {
+        match self.value(row, column) {
+            Some(CifValueRef::Text(text)) => (None, Cow::Borrowed(text.as_str())),
+            Some(CifValueRef::Integer(value, original)) => {
+                (None, original.map_or_else(|| Cow::Owned(value.to_string()), |text| Cow::Borrowed(text.as_str())))
+            }
+            Some(CifValueRef::Float(value, _, original)) => {
+                (None, original.map_or_else(|| Cow::Owned(value.to_string()), |text| Cow::Borrowed(text.as_str())))
+            }
+            Some(CifValueRef::NotApplicable) => (Some(CifCell::NotApplicable), Cow::Borrowed(".")),
+            Some(CifValueRef::Unknown) | None => (Some(CifCell::Unknown), Cow::Borrowed("?")),
         }
     }
 }
@@ -491,7 +605,70 @@ pub struct DocumentSink<'a> {
     source: Option<&'a CifBlock>,
     entries: Vec<CifEntry>,
     open: Option<OpenLoop>,
+    open_source: Option<OpenSourceLoop<'a>>,
     failure: Option<&'static str>,
+    // Whether to record the source rows of a rewritten `_atom_site` loop in `copies`.
+    record: bool,
+    copies: Option<SourceCopies>,
+}
+
+/// The source row that each row of a rewritten `_atom_site` loop copies, and the columns
+/// in which it does not hold that row's value.
+///
+/// A row's source row is the row named by its first value that Reduce3 copies from the
+/// source loop. Bit `c` of the row's mask is set when column `c` holds any other value.
+/// Columns from 64 on have no bit, and readers treat them as not copied.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct SourceCopies {
+    /// The source row of each output row, or [`SourceCopies::NONE`].
+    pub(crate) rows: Vec<u32>,
+    /// The columns of each output row that do not copy its source row.
+    pub(crate) made: Vec<u64>,
+}
+
+impl SourceCopies {
+    /// The source row of a row that copies no value from the source loop.
+    pub(crate) const NONE: u32 = u32::MAX;
+
+    fn new(rows: usize) -> Self {
+        Self {
+            rows: vec![Self::NONE; rows],
+            made: vec![0; rows],
+        }
+    }
+
+    /// Record the values of column `column`, one per row.
+    fn note(&mut self, column: usize, values: &[ColumnValue]) {
+        let Some(bit) = u32::try_from(column).ok().filter(|bit| *bit < u64::BITS) else {
+            return;
+        };
+        let mask = 1_u64 << bit;
+        for ((row, made), value) in self.rows.iter_mut().zip(&mut self.made).zip(values) {
+            match *value {
+                ColumnValue::Source(source) if *row == Self::NONE => {
+                    match u32::try_from(source) {
+                        // No earlier column copied a value, so all of them are made.
+                        Ok(source) if source != Self::NONE => {
+                            *row = source;
+                            *made |= mask - 1;
+                        }
+                        _ => *made |= mask,
+                    }
+                }
+                ColumnValue::Source(source) if u32::try_from(source) == Ok(*row) => {}
+                _ => *made |= mask,
+            }
+        }
+    }
+}
+
+/// Return the loop of `block` that a sink rewrites when Reduce3 sends `category` column
+/// by column.
+pub(crate) fn source_loop<'a>(block: &'a CifBlock, category: &str) -> Option<&'a CifLoop> {
+    match BlockCategory::find(block.entries(), category) {
+        Some(BlockCategory::Loop(source)) => Some(source),
+        _ => None,
+    }
 }
 
 #[derive(Debug)]
@@ -499,6 +676,80 @@ struct OpenLoop {
     tags: Vec<String>,
     columns: Vec<TextColumnBuilder>,
     rows: usize,
+}
+
+/// A loop that rewrites a source loop, received column by column.
+#[derive(Debug)]
+struct OpenSourceLoop<'a> {
+    source: &'a CifLoop,
+    tags: Vec<String>,
+    columns: Vec<LoopColumn>,
+    rows: usize,
+    copies: Option<SourceCopies>,
+}
+
+const TOO_LARGE: &str = "a column of the output model exceeds 4 GiB of text";
+
+/// Build one output column from the values of `column` of `source` that `values` name.
+fn source_column(
+    source: &CifLoop,
+    column: usize,
+    values: &[ColumnValue],
+    text: &str,
+) -> Result<LoopColumn, &'static str> {
+    let made = |start: usize, end: usize| {
+        text.get(start..end)
+            .map(TextCell::Text)
+            .ok_or("Reduce3 named text outside the text of a loop column")
+    };
+    // A text column shares its entries; any other column is read value by value.
+    let made_count = values.iter().filter(|value| matches!(value, ColumnValue::Made(..))).count();
+    if let Some(mut builder) = source.text_column(column).and_then(|text_column| {
+        SourceColumnBuilder::new(text_column, values.len(), made_count, text.len())
+    }) {
+        for &value in values {
+            match value {
+                ColumnValue::Source(row) => builder.push_source(row),
+                ColumnValue::Made(start, end) => builder.push(made(start, end)?).ok_or(TOO_LARGE)?,
+                ColumnValue::Unknown => builder.push(TextCell::Unknown).ok_or(TOO_LARGE)?,
+                ColumnValue::NotApplicable => builder.push(TextCell::NotApplicable).ok_or(TOO_LARGE)?,
+            }
+        }
+        return Ok(builder.finish());
+    }
+    use std::fmt::Write as _;
+    let mut builder = TextColumnBuilder::with_capacity(values.len());
+    let mut number = String::new();
+    for &value in values {
+        let cell = match value {
+            ColumnValue::Source(row) => match source.value(row, column) {
+                Some(CifValueRef::Text(text)) => TextCell::Text(text.as_str()),
+                Some(CifValueRef::Integer(value, original)) => match original {
+                    Some(text) => TextCell::Text(text.as_str()),
+                    None => {
+                        number.clear();
+                        let _ = write!(number, "{value}");
+                        TextCell::Text(&number)
+                    }
+                },
+                Some(CifValueRef::Float(value, _, original)) => match original {
+                    Some(text) => TextCell::Text(text.as_str()),
+                    None => {
+                        number.clear();
+                        let _ = write!(number, "{value}");
+                        TextCell::Text(&number)
+                    }
+                },
+                Some(CifValueRef::NotApplicable) => TextCell::NotApplicable,
+                Some(CifValueRef::Unknown) | None => TextCell::Unknown,
+            },
+            ColumnValue::Made(start, end) => made(start, end)?,
+            ColumnValue::Unknown => TextCell::Unknown,
+            ColumnValue::NotApplicable => TextCell::NotApplicable,
+        };
+        builder.push(cell).ok_or(TOO_LARGE)?;
+    }
+    Ok(builder.finish())
 }
 
 const fn text_cell(value: CifCell<'_>) -> TextCell<'_> {
@@ -534,6 +785,20 @@ impl<'a> DocumentSink<'a> {
     }
 
     fn close_loop(&mut self) {
+        if let Some(open) = self.open_source.take()
+            && open.rows > 0
+        {
+            if open.columns.len() == open.tags.len() {
+                if open.copies.is_some() {
+                    self.copies = open.copies;
+                }
+                self.entries.push(CifEntry::Loop(CifLoop::from_columns(
+                    open.tags, open.columns, open.rows,
+                )));
+            } else {
+                self.failure = Some("Reduce3 wrote a loop without all of its columns");
+            }
+        }
         if let Some(open) = self.open.take()
             && open.rows > 0
         {
@@ -623,7 +888,7 @@ impl CifSink for DocumentSink<'_> {
         }
         for (column, &value) in open.columns.iter_mut().zip(values) {
             if column.push(text_cell(value)).is_none() {
-                self.failure = Some("a column of the output model exceeds 4 GiB of text");
+                self.failure = Some(TOO_LARGE);
             }
         }
         open.rows += 1;
@@ -631,5 +896,43 @@ impl CifSink for DocumentSink<'_> {
 
     fn end_loop(&mut self) {
         self.close_loop();
+    }
+
+    fn begin_source_loop(&mut self, category: &str, tags: &[&str], rows: usize) -> bool {
+        let Some(source) = self.source.and_then(|block| source_loop(block, category)) else {
+            return false;
+        };
+        if source.tags().len() != tags.len()
+            || source.tags().iter().zip(tags).any(|(source_tag, tag)| source_tag != tag)
+        {
+            return false;
+        }
+        self.close_loop();
+        self.open_source = Some(OpenSourceLoop {
+            source,
+            tags: tags.iter().map(|tag| (*tag).to_owned()).collect(),
+            columns: Vec::with_capacity(tags.len()),
+            rows,
+            copies: (self.record && category == "atom_site").then(|| SourceCopies::new(rows)),
+        });
+        true
+    }
+
+    fn source_column(&mut self, column: usize, values: &[ColumnValue], text: &str) {
+        let Some(open) = self.open_source.as_mut() else {
+            self.failure = Some("Reduce3 wrote a loop column outside a loop");
+            return;
+        };
+        if column != open.columns.len() || column >= open.tags.len() || values.len() != open.rows {
+            self.failure = Some("Reduce3 wrote a loop column out of place");
+            return;
+        }
+        match source_column(open.source, column, values, text) {
+            Ok(built) => open.columns.push(built),
+            Err(failure) => self.failure = Some(failure),
+        }
+        if let Some(copies) = open.copies.as_mut() {
+            copies.note(column, values);
+        }
     }
 }

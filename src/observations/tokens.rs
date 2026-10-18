@@ -1,17 +1,11 @@
 //! Protein residue tokens and heavy ligand atom tokens.
 
-use super::record::{Tokens, renumber_ligands};
+use super::record::{Tokens, renumber_ligands, same_residue};
 use super::source::{Atom, Source};
 use super::{HydrogenParents, ResidueParents, LigandFeatures, Schema, residue, topology};
+use crate::hash::{FastMap, FastSet};
+use crate::pdbx::ShortText;
 use std::collections::{BTreeSet, HashMap};
-
-fn ligand_features(features: &LigandFeatures, atom: &Atom) -> [i16; 4] {
-    features
-        .get(&atom.component)
-        .and_then(|component| component.get(&atom.name))
-        .copied()
-        .unwrap_or([0; 4])
-}
 
 fn hydrogen_overflow(
     source: &Source,
@@ -29,8 +23,8 @@ fn hydrogen_overflow(
         })
         .collect();
     let ccd = features
-        .get(&atom.component)
-        .and_then(|component| component.get(&atom.name));
+        .get(atom.component.as_str())
+        .and_then(|component| component.get(atom.name.as_str()));
     let partners: Vec<_> = source
         .bonds
         .iter()
@@ -64,8 +58,8 @@ fn parent_error(atom: &Atom, parent: &str, reason: &str) -> String {
     format!("Invalid ligand hydrogen parent: {detail}")
 }
 
-fn declared_parents(source: &Source, bridges: &BTreeSet<usize>) -> Result<HashMap<usize, Option<usize>>, String> {
-    let mut result = HashMap::new();
+fn declared_parents(source: &Source, bridges: &BTreeSet<usize>) -> Result<FastMap<usize, Option<usize>>, String> {
+    let mut result = FastMap::default();
     for &(child, parent) in &source.hydrogen_bonds {
         if bridges.contains(&child) { continue; }
         if let Some(previous) = result.insert(child, parent)
@@ -87,7 +81,7 @@ fn add_bridges(source: &Source, sites: &[super::bridges::Site], excluded: &[Stri
     let mut counts = HashMap::new();
     for site in sites {
         let first = &source.atoms[site.metal_rows[0]];
-        if excluded.contains(&first.component) { continue; }
+        if excluded.iter().any(|name| *name == first.component) { continue; }
         let token = tokens.identity.len();
         let mut packed = residue::Packed::empty([-1; 3]);
         if let Some(row) = site.hydrogen_row {
@@ -96,7 +90,7 @@ fn add_bridges(source: &Source, sites: &[super::bridges::Site], excluded: &[Stri
             mapping[row] = token;
         }
         tokens.push(first, 65, &packed, true, [site.formal_charge, 0, 0, 1]);
-        tokens.keys[token][4] = site.hydrogen_name.clone();
+        tokens.keys[token][4] = ShortText::new(&site.hydrogen_name);
         tokens.charge_known[token] = 1;
         tokens.hydrogen_known[token] = 1;
         if site.hydrogen_row.is_none() {
@@ -131,13 +125,13 @@ fn ccd_parent<'a>(
     parents: &'a HashMap<String, String>,
     atom: &Atom,
 ) -> Result<Option<&'a str>, String> {
-    if let Some(parent) = parents.get(&atom.name) {
+    if let Some(parent) = parents.get(atom.name.as_str()) {
         return Ok(Some(parent));
     }
     let name = if matches!(atom.element.as_str(), "D" | "T") {
-        atom.name.replacen(&atom.element, "H", 1)
+        atom.name.replacen(atom.element.as_str(), "H", 1)
     } else {
-        atom.name.clone()
+        atom.name.as_str().to_owned()
     };
     if let Some(parent) = parents.get(&name) {
         return Ok(Some(parent));
@@ -165,25 +159,19 @@ fn ccd_parent<'a>(
 }
 
 fn dictionary_parent(
-    source: &Source,
     atom: &Atom,
     name: &str,
-    rows: &[usize],
+    text: &ShortText,
+    heavy: &[(usize, &ShortText)],
 ) -> Result<usize, String> {
-    let heavy = || {
-        rows.iter()
-            .copied()
-            .filter(|&i| !residue::hydrogen(&source.atoms[i].element))
-    };
-    if let Some(row) = heavy().find(|&i| source.atoms[i].name == name) {
+    if let Some(&(row, _)) = heavy.iter().find(|(_, known)| **known == *text) {
         return Ok(row);
     }
     if let Some(reference) = nucleotide_reference(&atom.component, name) {
-        let mut matching = heavy().filter(|&i| {
-            nucleotide_reference(&atom.component, &source.atoms[i].name).as_ref()
-                == Some(&reference)
+        let mut matching = heavy.iter().filter(|(_, known)| {
+            nucleotide_reference(&atom.component, known).as_ref() == Some(&reference)
         });
-        if let Some(row) = matching.next() {
+        if let Some(&(row, _)) = matching.next() {
             if matching.next().is_some() {
                 return Err(parent_error(
                     atom,
@@ -197,26 +185,88 @@ fn dictionary_parent(
     Err(parent_error(atom, name, "Dictionary parent is absent"))
 }
 
-fn ligand_parent(
-    source: &Source,
-    parents: &HydrogenParents,
-    residue_parents: &ResidueParents,
-    declared: &HashMap<usize, Option<usize>>,
+/// The heavy atoms of one group with their names, in row order, read once per group.
+struct HeavyNames<'a> {
+    group: usize,
+    atoms: Vec<(usize, &'a ShortText)>,
+}
+
+impl<'a> HeavyNames<'a> {
+    fn of(&mut self, source: &'a Source, group: usize, rows: &[usize], hydrogen: &[bool]) -> &[(usize, &'a ShortText)] {
+        if self.group != group {
+            self.group = group;
+            self.atoms.clear();
+            self.atoms.extend(rows.iter().filter(|&&row| !hydrogen[row]).map(|&row| (row, &source.atoms[row].name)));
+        }
+        &self.atoms
+    }
+}
+
+/// Hydrogen names mapped to their dictionary parent names, for one component.
+type ParentNames = HashMap<String, String>;
+
+/// Hydrogen name and element, and the parent name as `str` and as inline text.
+type ParentEntry<'a> = (&'a ShortText, &'a ShortText, Option<(&'a str, ShortText)>);
+
+/// The dictionary parent names of one component's hydrogens, with the names already
+/// looked up. Copies of a residue list their hydrogens in the same order, so a search that
+/// starts after the last match usually succeeds at once and skips hashing the name.
+struct ParentTable<'a> {
+    map: &'a ParentNames,
+    component: &'a ShortText,
+    seen: Vec<ParentEntry<'a>>,
+    cursor: usize,
+}
+
+impl<'a> ParentTable<'a> {
+    /// Names past this count go straight to the hash map, which bounds the search.
+    const LIMIT: usize = 256;
+    /// The number of dictionaries to keep tables for.
+    const TABLES: usize = 64;
+
+    /// The result of `ccd_parent` for `atom`, which must belong to `component`.
+    fn parent(&mut self, atom: &'a Atom) -> Result<Option<(&'a str, ShortText)>, String> {
+        let count = self.seen.len();
+        if let Some(index) = (self.cursor..count).chain(0..self.cursor)
+            .find(|&index| *self.seen[index].0 == atom.name && *self.seen[index].1 == atom.element)
+        {
+            self.cursor = index + 1;
+            return Ok(self.seen[index].2.clone());
+        }
+        let parent = ccd_parent(self.map, atom)?.map(|name| (name, ShortText::new(name)));
+        if count < Self::LIMIT {
+            self.seen.push((&atom.name, &atom.element, parent.clone()));
+            self.cursor = count + 1;
+        }
+        Ok(parent)
+    }
+}
+
+/// The heavy parent of hydrogen `row` in group `group`, whose atoms are `rows`.
+///
+/// `dictionary` gives the dictionary parent name, as `ccd_parent` does. `heavy` caches the
+/// heavy atoms of the group with their positions once the nearest-atom rule needs them.
+#[allow(clippy::too_many_arguments)]
+fn ligand_parent<'a>(
+    source: &'a Source,
+    dictionary: impl FnOnce() -> Result<Option<(&'a str, ShortText)>, String>,
+    declared: &FastMap<usize, Option<usize>>,
     row: usize,
+    group: usize,
     rows: &[usize],
-    heavy: &[(usize, [f32; 3])],
+    hydrogen: &[bool],
+    heavy: &mut Option<Vec<(usize, [f32; 3])>>,
+    names: &mut HeavyNames<'a>,
 ) -> Result<Option<usize>, String> {
     let atom = &source.atoms[row];
     let parent = if let Some(&parent) = declared.get(&row) {
         parent.ok_or_else(|| parent_error(atom, "struct_conn", "bonded parent is absent"))?
-    } else if let Some(name) = residue_parents.get(&atom.group).map(AsRef::as_ref)
-        .or_else(|| parents.get(&atom.component))
-        .map(|map| ccd_parent(map, atom))
-        .transpose()?
-        .flatten()
-    {
-        dictionary_parent(source, atom, name, rows)?
+    } else if let Some((name, text)) = dictionary()? {
+        dictionary_parent(atom, name, &text, names.of(source, group, rows, hydrogen))?
     } else {
+        let heavy = heavy.get_or_insert_with(|| {
+            rows.iter().copied().filter(|&i| !hydrogen[i]).map(|i| (i, source.atoms[i].position)).collect()
+        });
         return Ok(residue::nearest(atom.position, heavy));
     };
     let target = &source.atoms[parent];
@@ -279,6 +329,12 @@ fn add_proteins(
             .collect();
     }
     groups.sort_unstable();
+    tokens.reserve(groups.len());
+    // Slot names as `ShortText`, so that name tests compare fixed-size arrays.
+    let names: Vec<Vec<ShortText>> = schema.residues.iter()
+        .map(|residue| residue.names.iter().map(|name| ShortText::new(name)).collect())
+        .collect();
+    let mut atoms: Vec<&Atom> = Vec::new();
     for (_, group) in groups {
         let rows = &source.groups[group];
         let first = &source.atoms[rows[0]];
@@ -286,10 +342,12 @@ fn add_proteins(
         if protein_only && aa >= 20 {
             continue;
         }
-        let atoms: Vec<_> = rows.iter().map(|&row| &source.atoms[row]).collect();
+        atoms.clear();
+        atoms.extend(rows.iter().map(|&row| &source.atoms[row]));
         let mut packed = if aa < 20 {
             residue::pack(
                 &schema.residues[aa],
+                &names[aa],
                 &atoms,
                 topology[group],
                 (!protein_only && topology[group][2] == 1).then_some(true),
@@ -320,13 +378,44 @@ fn add_proteins(
         let token = tokens.identity.len();
         for &row in rows {
             let atom = &source.atoms[row];
-            if !matches!(atom.element.as_str(), "H" | "D") && residue::finite(atom.position) {
+            if !(atom.element == "H" || atom.element == "D") && residue::finite(atom.position) {
                 mapping[row] = token;
             }
         }
         tokens.push(first, aa, &packed, false, [0; 4]);
     }
     Ok(())
+}
+
+/// The dictionary features of one ligand component, with the atom names already looked up.
+/// Copies of a residue list their atoms in the same order, so a search that starts after
+/// the last match usually succeeds at once and skips hashing the name.
+struct FeatureTable<'a> {
+    component: &'a ShortText,
+    names: Option<&'a HashMap<String, [i16; 4]>>,
+    seen: Vec<(&'a ShortText, [i16; 4])>,
+    cursor: usize,
+}
+
+impl<'a> FeatureTable<'a> {
+    /// Names past this count go straight to the hash map, which bounds the search.
+    const LIMIT: usize = 256;
+    /// The number of components to keep tables for.
+    const TABLES: usize = 64;
+
+    fn feature(&mut self, name: &'a ShortText) -> [i16; 4] {
+        let count = self.seen.len();
+        if let Some(index) = (self.cursor..count).chain(0..self.cursor).find(|&index| *self.seen[index].0 == *name) {
+            self.cursor = index + 1;
+            return self.seen[index].1;
+        }
+        let feature = self.names.and_then(|names| names.get(name.as_str())).copied().unwrap_or([0; 4]);
+        if count < Self::LIMIT {
+            self.seen.push((name, feature));
+            self.cursor = count + 1;
+        }
+        feature
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -347,31 +436,70 @@ fn add_ligands(
     #[cfg(not(feature = "reduce3"))]
     let bridge_rows = BTreeSet::new();
     let declared = declared_parents(source, &bridge_rows)?;
-    let mut assigned: HashMap<usize, Vec<usize>> = HashMap::new();
+    // Atoms of one residue share a component, so test each run of one component once.
+    let mut previous: Option<(&ShortText, bool)> = None;
+    // Per row: whether the atom is a hydrogen, and whether it is a ligand hydrogen that
+    // needs a parent. Per group: whether it holds such a hydrogen.
+    let mut hydrogen: Vec<bool> = Vec::with_capacity(source.atoms.len());
+    let mut orphan: Vec<bool> = Vec::with_capacity(source.atoms.len());
+    let mut pending = vec![false; source.groups.len()];
+    // The loop below pushes each heavy ligand atom as it reads it, so it reads every atom
+    // once. Hydrogens make up about half of a protonated structure, so half the atoms
+    // bounds the new tokens of most inputs; more tokens only grow the arrays.
+    tokens.reserve(source.atoms.len() / 2);
+    // Rows of the heavy ligand atoms, in order, with their dictionary features.
+    let mut ligand_rows: Vec<(usize, [i16; 4])> = Vec::with_capacity(source.atoms.len() / 2);
+    let mut identities: Vec<(&ShortText, usize)> = Vec::new();
+    let mut tables: Vec<FeatureTable> = Vec::new();
+    let mut current = 0;
     for (row, atom) in source.atoms.iter().enumerate() {
-        if atom.protein
-            || residue::hydrogen(&atom.element)
-            || !residue::finite(atom.position)
-            || excluded.contains(&atom.component)
-        {
+        let skipped = match previous {
+            Some((component, flag)) if *component == atom.component => flag,
+            _ => {
+                let flag = excluded.iter().any(|name| *name == atom.component);
+                previous = Some((&atom.component, flag));
+                flag
+            }
+        };
+        let is_hydrogen = residue::hydrogen(&atom.element);
+        hydrogen.push(is_hydrogen);
+        let needs_parent = !atom.protein && is_hydrogen && !skipped && !bridge_rows.contains(&row);
+        orphan.push(needs_parent);
+        pending[atom.group] |= needs_parent;
+        if atom.protein || is_hydrogen || !residue::finite(atom.position) || skipped {
             continue;
         }
         mapping[row] = tokens.identity.len();
-        let identity = elements
-            .iter()
-            .filter(|element| element.as_str() != "H")
-            .position(|element| element == &atom.element)
-            .map_or(64, |index| 21 + index);
-        let mut packed = residue::Packed::empty([-1; 3]);
-        packed.position[0] = atom.position;
-        packed.mask[0] = true;
-        tokens.push(
-            atom,
-            identity,
-            &packed,
-            true,
-            ligand_features(features, atom),
-        );
+        let identity = match identities.iter().find(|(element, _)| **element == atom.element) {
+            Some(&(_, identity)) => identity,
+            None => {
+                let identity = elements
+                    .iter()
+                    .filter(|element| element.as_str() != "H")
+                    .position(|element| element == &atom.element)
+                    .map_or(64, |index| 21 + index);
+                identities.push((&atom.element, identity));
+                identity
+            }
+        };
+        if tables.get(current).is_none_or(|table| *table.component != atom.component) {
+            current = match tables.iter().position(|table| *table.component == atom.component) {
+                Some(index) => index,
+                None => {
+                    let names = features.get(atom.component.as_str());
+                    let table = FeatureTable { component: &atom.component, names, seen: Vec::new(), cursor: 0 };
+                    // Past `TABLES` components, reuse the last place so the search stays short.
+                    if tables.len() == FeatureTable::TABLES {
+                        tables.pop();
+                    }
+                    tables.push(table);
+                    tables.len() - 1
+                }
+            };
+        }
+        let feature = tables[current].feature(&atom.name);
+        ligand_rows.push((row, feature));
+        tokens.push_ligand(atom, identity, feature);
         if complete {
             *tokens
                 .hydrogen_known
@@ -383,29 +511,52 @@ fn add_ligands(
     let bridge_counts = add_bridges(source, bridge_sites, excluded, tokens, mapping)?;
     #[cfg(not(feature = "reduce3"))]
     let bridge_counts: HashMap<usize, usize> = HashMap::new();
-    for rows in &source.groups {
-        let heavy: Vec<_> = rows
-            .iter()
-            .copied()
-            .filter(|&row| !residue::hydrogen(&source.atoms[row].element))
-            .map(|row| (row, source.atoms[row].position))
-            .collect();
-        for &row in rows.iter().filter(|&&row| {
-            !source.atoms[row].protein
-                && residue::hydrogen(&source.atoms[row].element)
-                && !bridge_rows.contains(&row)
-                && !excluded.contains(&source.atoms[row].component)
-        }) {
-            let parent = ligand_parent(source, parents, residue_parents, &declared, row, rows, &heavy)?;
+    // Hydrogen rows given a parent, in order, and each one's parent.
+    let mut assigned: Vec<usize> = Vec::new();
+    let mut parent_of = vec![usize::MAX; source.atoms.len()];
+    let mut names = HeavyNames { group: usize::MAX, atoms: Vec::new() };
+    let mut tables: Vec<ParentTable> = Vec::new();
+    for (group, rows) in source.groups.iter().enumerate() {
+        if !pending[group] {
+            continue;
+        }
+        let mut heavy = None;
+        // Atoms of one group share a component, so this map rarely changes within it.
+        let mut dictionary: Option<(&ShortText, Option<&ParentNames>, usize)> = None;
+        for &row in rows.iter().filter(|&&row| orphan[row]) {
+            let atom = &source.atoms[row];
+            let (map, table) = match dictionary {
+                Some((component, map, table)) if *component == atom.component => (map, table),
+                _ => {
+                    let map = residue_parents.get(&atom.group).map(AsRef::as_ref)
+                        .or_else(|| parents.get(atom.component.as_str()));
+                    let table = map.map_or(usize::MAX, |map| {
+                        let known = tables.iter().position(|table| {
+                            std::ptr::eq(table.map, map) && *table.component == atom.component
+                        });
+                        known.unwrap_or_else(|| {
+                            // Past `TABLES` dictionaries, reuse the last place so the search stays short.
+                            if tables.len() == ParentTable::TABLES {
+                                tables.pop();
+                            }
+                            tables.push(ParentTable { map, component: &atom.component, seen: Vec::new(), cursor: 0 });
+                            tables.len() - 1
+                        })
+                    });
+                    dictionary = Some((&atom.component, map, table));
+                    (map, table)
+                }
+            };
+            let lookup = || match tables.get_mut(table) {
+                Some(table) => table.parent(atom),
+                None => Ok(None),
+            };
+            let parent = ligand_parent(source, lookup, &declared, row, group, rows, &hydrogen, &mut heavy,
+                &mut names)?;
             if let Some(parent) = parent
                 && mapping[parent] == usize::MAX
                 && (declared.contains_key(&row)
-                    || residue_parents.get(&source.atoms[row].group).map(AsRef::as_ref)
-                        .or_else(|| parents.get(&source.atoms[row].component))
-                        .map(|map| ccd_parent(map, &source.atoms[row]))
-                        .transpose()?
-                        .flatten()
-                        .is_some())
+                    || map.map(|map| ccd_parent(map, atom)).transpose()?.flatten().is_some())
             {
                 return Err(parent_error(
                     &source.atoms[row],
@@ -416,21 +567,22 @@ fn add_ligands(
             let parent = parent.filter(|&parent| mapping[parent] != usize::MAX);
             let Some(parent) = parent else {
                 for &other in rows {
-                    if mapping[other] != usize::MAX && !residue::hydrogen(&source.atoms[other].element) {
+                    if mapping[other] != usize::MAX && !hydrogen[other] {
                         tokens.hydrogen_known[mapping[other]] = 0;
                     }
                 }
                 continue;
             };
             let token = mapping[parent];
-            let assigned = assigned.entry(parent).or_default();
+            parent_of[row] = parent;
             assigned.push(row);
             let count = tokens.masks[token * 32 + 15..token * 32 + 18]
                 .iter()
                 .filter(|&&value| value != 0)
                 .count();
             if count >= 3 {
-                return Err(hydrogen_overflow(source, features, parent, assigned));
+                let rows: Vec<usize> = assigned.iter().copied().filter(|&other| parent_of[other] == parent).collect();
+                return Err(hydrogen_overflow(source, features, parent, &rows));
             }
             let slot = 15 + count;
             tokens.masks[token * 32 + slot] = 1;
@@ -438,12 +590,12 @@ fn add_ligands(
                 .copy_from_slice(&source.atoms[row].position);
         }
     }
-    for (row, atom) in source.atoms.iter().enumerate() {
+    // Only heavy ligand atoms map to ligand tokens; bridge tokens map hydrogens.
+    for &(row, feature) in &ligand_rows {
         let token = mapping[row];
-        if token == usize::MAX || tokens.ligand[token] == 0 || residue::hydrogen(&atom.element) {
+        if token == usize::MAX || tokens.ligand[token] == 0 {
             continue;
         }
-        let feature = ligand_features(features, atom);
         let count = tokens.masks[token * 32 + 15..(token + 1) * 32]
             .iter()
             .filter(|&&value| value != 0)
@@ -453,6 +605,54 @@ fn add_ligands(
         );
     }
     Ok(())
+}
+
+/// Whether no two keys are equal.
+///
+/// Keys of one residue are adjacent and share their first four fields. When no such
+/// residue part starts two separate runs, two equal keys must lie in one run, so it is
+/// enough to compare the names within each run. Copies of one residue type list the same
+/// names, so a run whose names equal those of a recent run takes its answer.
+fn distinct_keys(keys: &[[ShortText; 5]]) -> bool {
+    // Find the runs first, so that the set never grows.
+    let mut starts: Vec<usize> = (0..keys.len()).filter(|&row| row == 0 || !same_residue(&keys[row], &keys[row - 1]))
+        .collect();
+    starts.push(keys.len());
+    let mut residues: FastSet<&[ShortText]> = FastSet::with_capacity_and_hasher(starts.len(), Default::default());
+    // Recent runs with distinct names.
+    let mut recent: Vec<&[[ShortText; 5]]> = Vec::new();
+    for range in starts.windows(2) {
+        let run = &keys[range[0]..range[1]];
+        if !residues.insert(&run[0][..4]) {
+            let mut seen = FastSet::with_capacity_and_hasher(keys.len(), Default::default());
+            return keys.iter().all(|key| seen.insert(key));
+        }
+        if run.len() < 2 {
+            continue;
+        }
+        let same = |other: &&[[ShortText; 5]]| {
+            other.len() == run.len() && other.iter().zip(run).all(|(left, right)| left[4] == right[4])
+        };
+        if run.len() >= 8 && recent.iter().any(same) {
+            continue;
+        }
+        let distinct = if run.len() <= 64 {
+            run.iter().enumerate().all(|(index, key)| run[index + 1..].iter().all(|other| other[4] != key[4]))
+        } else {
+            let mut names = FastSet::with_capacity_and_hasher(run.len(), Default::default());
+            run.iter().all(|key| names.insert(&key[4]))
+        };
+        if !distinct {
+            return false;
+        }
+        if run.len() >= 8 {
+            if recent.len() == 16 {
+                recent.pop();
+            }
+            recent.push(run);
+        }
+    }
+    true
 }
 
 pub(super) fn pack(
@@ -501,28 +701,33 @@ pub(super) fn pack(
             complete,
         )?;
     }
-    let chains: Vec<_> = if protein_only {
-        let mut value = Vec::new();
+    // Protein exports number chains by first appearance, others by sorted name.
+    let mut chains: FastMap<&str, i64> = FastMap::default();
+    if protein_only {
         for key in &result.keys {
-            if !value.contains(&key[0]) {
-                value.push(key[0].clone());
+            let next = chains.len() as i64;
+            chains.entry(key[0].as_str()).or_insert(next);
+        }
+    } else {
+        // Chains repeat over long runs of tokens, so skip each repeat before sorting.
+        let mut names: Vec<&ShortText> = Vec::new();
+        for key in &result.keys {
+            if names.last().is_none_or(|last| **last != key[0]) {
+                names.push(&key[0]);
             }
         }
-        value
-    } else {
-        result
-            .keys
-            .iter()
-            .map(|key| key[0].clone())
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect()
-    };
+        names.sort_unstable();
+        names.dedup();
+        chains.extend(names.into_iter().enumerate().map(|(index, name)| (name.as_str(), index as i64)));
+    }
+    let mut previous: Option<(&ShortText, i64)> = None;
     for (row, key) in result.keys.iter().enumerate() {
-        result.chains[row] = chains
-            .iter()
-            .position(|chain| chain == &key[0])
-            .ok_or("Missing token chain")? as i64;
+        let chain = match previous {
+            Some((last, chain)) if *last == key[0] => chain,
+            _ => *chains.get(key[0].as_str()).ok_or("Missing token chain")?,
+        };
+        previous = Some((&key[0], chain));
+        result.chains[row] = chain;
     }
     if !protein_only {
         let mut pairs = BTreeSet::new();
@@ -547,7 +752,7 @@ pub(super) fn pack(
     }
     super::continuity::apply(source, &mapping, &mut result);
     renumber_ligands(&mut result);
-    if result.keys.iter().collect::<BTreeSet<_>>().len() != result.keys.len() {
+    if !distinct_keys(&result.keys) {
         return Err("PDB tokens have duplicate mmCIF identities".into());
     }
     if protein_only && result.identity.is_empty() {

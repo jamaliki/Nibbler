@@ -2,14 +2,13 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::cif::{BlockKind, CategoryView, CifDocument};
+use crate::cif::{BlockKind, CategoryView, CifDocument, FastMap};
 
 use super::component_source::{component_definitions, definitions_conflict};
 use super::error::SemanticError;
 use super::fields::{
-    case_key, category_rows, duplicate, optional_bool, optional_charge, optional_float,
-    optional_integer, optional_text, required_float, required_integer, required_single,
-    required_text, row_context,
+    Table, case_key, category_rows, category_tables, duplicate, optional_bool, optional_integer,
+    optional_text, required_integer, required_single, required_text, row_context,
 };
 use super::model::{
     AsymUnit, AtomSite, BranchSchemeRow, BranchedLink, BranchedNode, ComponentResolution,
@@ -36,6 +35,26 @@ pub fn build_model_with_registry(
     document: &CifDocument,
     registry: Option<&ComponentRegistry>,
 ) -> Result<PdbxModel, SemanticError> {
+    build(document, registry, None)
+}
+
+/// Build the registry-free model of `document` with atom sites the caller already decoded.
+///
+/// `sites` must equal what decoding the document's `_atom_site` rows would give. Every
+/// other category is decoded from `document`.
+#[cfg(feature = "python")]
+pub(crate) fn build_model_with_sites(
+    document: &CifDocument,
+    sites: Vec<AtomSite>,
+) -> Result<PdbxModel, SemanticError> {
+    build(document, None, Some(sites))
+}
+
+fn build(
+    document: &CifDocument,
+    registry: Option<&ComponentRegistry>,
+    sites: Option<Vec<AtomSite>>,
+) -> Result<PdbxModel, SemanticError> {
     let [block] = document.blocks() else {
         return Err(SemanticError::new(
             "PDBX_MODEL_BLOCK_COUNT",
@@ -56,13 +75,16 @@ pub fn build_model_with_registry(
     let mut components = component_definitions(categories, ComponentResolution::Embedded)?;
     let entities = entities(categories)?;
     let asym_units = asym_units(categories)?;
-    let atom_sites = atom_sites(categories)?;
+    let atom_sites = match sites {
+        Some(sites) => sites,
+        None => atom_sites(categories)?,
+    };
 
     for component_id in referenced_components(&entities, &atom_sites) {
-        let key = case_key(&component_id);
+        let key = case_key(component_id);
         if let (Some(embedded), Some(cached)) = (
             components.get(&key),
-            registry.and_then(|value| value.get(&component_id)),
+            registry.and_then(|value| value.get(component_id)),
         ) && definitions_conflict(embedded, cached)
         {
             return Err(SemanticError::new(
@@ -75,10 +97,10 @@ pub fn build_model_with_registry(
         }
         components.entry(key).or_insert_with(|| {
             registry
-                .and_then(|value| value.get(&component_id))
+                .and_then(|value| value.get(component_id))
                 .cloned()
-                .or_else(|| resolve_builtin(&component_id))
-                .unwrap_or_else(|| unresolved(component_id))
+                .or_else(|| resolve_builtin(component_id))
+                .unwrap_or_else(|| unresolved(component_id.to_owned()))
         });
     }
 
@@ -275,61 +297,276 @@ fn asym_units(categories: CategoryView<'_>) -> Result<Vec<AsymUnit>, SemanticErr
         .collect()
 }
 
+/// The `_atom_site` items a model decodes, in [`AtomSite`] field order.
+const ATOM_SITE_ITEMS: [&str; 21] = [
+    "group_pdb",
+    "id",
+    "type_symbol",
+    "label_atom_id",
+    "label_alt_id",
+    "label_comp_id",
+    "label_asym_id",
+    "label_entity_id",
+    "label_seq_id",
+    "pdbx_pdb_ins_code",
+    "cartn_x",
+    "cartn_y",
+    "cartn_z",
+    "occupancy",
+    "b_iso_or_equiv",
+    "pdbx_formal_charge",
+    "auth_seq_id",
+    "auth_comp_id",
+    "auth_asym_id",
+    "auth_atom_id",
+    "pdbx_pdb_model_num",
+];
+
+/// Decoded sites whose values rows of the `_atom_site` table repeat.
+trait RepeatedSites {
+    /// Return the decoded site whose values logical row `row` repeats, and a mask whose
+    /// bit `f` is set when the row holds that site's value of item `f` of
+    /// [`ATOM_SITE_ITEMS`]. Without a site the row decodes every value.
+    fn site(&self, row: usize) -> (Option<&AtomSite>, u32);
+}
+
+/// Rows that repeat no decoded site.
+struct NoRepeats;
+
+impl RepeatedSites for NoRepeats {
+    #[inline(always)]
+    fn site(&self, _row: usize) -> (Option<&AtomSite>, u32) {
+        (None, 0)
+    }
+}
+
 pub(super) fn atom_sites(categories: CategoryView<'_>) -> Result<Vec<AtomSite>, SemanticError> {
+    decode_atom_sites(categories, &NoRepeats)
+}
+
+/// Decode the `_atom_site` rows, copying the values that `repeats` already holds.
+///
+/// A copied value equals the decode of the row's text, and that decode cannot fail, so
+/// the result and the first error match a decode of every value.
+fn decode_atom_sites(
+    categories: CategoryView<'_>,
+    repeats: &impl RepeatedSites,
+) -> Result<Vec<AtomSite>, SemanticError> {
     let category = "atom_site";
-    category_rows(
-        categories,
-        category,
-        [
-            "group_pdb",
-            "id",
-            "type_symbol",
-            "label_atom_id",
-            "label_alt_id",
-            "label_comp_id",
-            "label_asym_id",
-            "label_entity_id",
-            "label_seq_id",
-            "pdbx_pdb_ins_code",
-            "cartn_x",
-            "cartn_y",
-            "cartn_z",
-            "occupancy",
-            "b_iso_or_equiv",
-            "pdbx_formal_charge",
-            "auth_seq_id",
-            "auth_comp_id",
-            "auth_asym_id",
-            "auth_atom_id",
-            "pdbx_pdb_model_num",
-        ],
-    )
-    .map(|row| {
-        Ok(AtomSite {
-            group_pdb: required_text(&row, category, "group_pdb", 0)?,
-            id: required_text(&row, category, "id", 1)?,
-            element: required_text(&row, category, "type_symbol", 2)?,
-            label_atom_id: required_text(&row, category, "label_atom_id", 3)?,
-            label_alt_id: optional_text(&row, 4),
-            label_comp_id: required_text(&row, category, "label_comp_id", 5)?,
-            label_asym_id: required_text(&row, category, "label_asym_id", 6)?,
-            label_entity_id: required_text(&row, category, "label_entity_id", 7)?,
-            label_seq_id: optional_integer(&row, category, "label_seq_id", 8)?,
-            insertion_code: optional_text(&row, 9),
-            x: required_float(&row, category, "cartn_x", 10)?,
-            y: required_float(&row, category, "cartn_y", 11)?,
-            z: required_float(&row, category, "cartn_z", 12)?,
-            occupancy: required_float(&row, category, "occupancy", 13)?,
-            b_iso: optional_float(&row, category, "b_iso_or_equiv", 14)?,
-            formal_charge: optional_charge(&row, category, "pdbx_formal_charge", 15)?,
-            auth_seq_id: required_text(&row, category, "auth_seq_id", 16)?,
-            auth_comp_id: required_text(&row, category, "auth_comp_id", 17)?,
-            auth_asym_id: required_text(&row, category, "auth_asym_id", 18)?,
-            auth_atom_id: required_text(&row, category, "auth_atom_id", 19)?,
-            model_number: required_integer(&row, category, "pdbx_pdb_model_num", 20)?,
-        })
-    })
-    .collect()
+    let tables = category_tables(categories, category, ATOM_SITE_ITEMS);
+    let mut sites = Vec::with_capacity(tables.iter().map(Table::rows).sum());
+    for table in &tables {
+        let mut group_pdb = table.column(0);
+        let mut id = table.column(1);
+        let mut element = table.column(2);
+        let mut label_atom_id = table.column(3);
+        let mut label_alt_id = table.column(4);
+        let mut label_comp_id = table.column(5);
+        let mut label_asym_id = table.column(6);
+        let mut label_entity_id = table.column(7);
+        let mut label_seq_id = table.column(8);
+        let mut insertion_code = table.column(9);
+        let mut x = table.column(10);
+        let mut y = table.column(11);
+        let mut z = table.column(12);
+        let mut occupancy = table.column(13);
+        let mut b_iso = table.column(14);
+        let mut formal_charge = table.column(15);
+        let mut auth_seq_id = table.column(16);
+        let mut auth_comp_id = table.column(17);
+        let mut auth_asym_id = table.column(18);
+        let mut auth_atom_id = table.column(19);
+        let mut model_number = table.column(20);
+        for row in 0..table.rows() {
+            // Errors number rows across every occurrence of the category.
+            let n = sites.len();
+            let (repeated, held) = repeats.site(n);
+            macro_rules! value {
+                ($field:literal, $name:ident, $decode:expr) => {
+                    match repeated {
+                        Some(site) if held >> $field & 1 != 0 => site.$name.clone(),
+                        _ => $decode,
+                    }
+                };
+            }
+            sites.push(AtomSite {
+                group_pdb: value!(
+                    0,
+                    group_pdb,
+                    group_pdb.required_short(row, n, category, "group_pdb")?
+                ),
+                id: value!(1, id, id.required_short(row, n, category, "id")?),
+                element: value!(
+                    2,
+                    element,
+                    element.required_short(row, n, category, "type_symbol")?
+                ),
+                label_atom_id: value!(
+                    3,
+                    label_atom_id,
+                    label_atom_id.required_short(row, n, category, "label_atom_id")?
+                ),
+                label_alt_id: value!(4, label_alt_id, label_alt_id.optional_short(row)),
+                label_comp_id: value!(
+                    5,
+                    label_comp_id,
+                    label_comp_id.required_short(row, n, category, "label_comp_id")?
+                ),
+                label_asym_id: value!(
+                    6,
+                    label_asym_id,
+                    label_asym_id.required_short(row, n, category, "label_asym_id")?
+                ),
+                label_entity_id: value!(
+                    7,
+                    label_entity_id,
+                    label_entity_id.required_short(row, n, category, "label_entity_id")?
+                ),
+                label_seq_id: value!(
+                    8,
+                    label_seq_id,
+                    label_seq_id.optional_integer(row, n, category, "label_seq_id")?
+                ),
+                insertion_code: value!(9, insertion_code, insertion_code.optional_short(row)),
+                x: value!(10, x, x.required_float(row, n, category, "cartn_x")?),
+                y: value!(11, y, y.required_float(row, n, category, "cartn_y")?),
+                z: value!(12, z, z.required_float(row, n, category, "cartn_z")?),
+                occupancy: value!(
+                    13,
+                    occupancy,
+                    occupancy.required_float(row, n, category, "occupancy")?
+                ),
+                b_iso: value!(
+                    14,
+                    b_iso,
+                    b_iso.optional_float(row, n, category, "b_iso_or_equiv")?
+                ),
+                formal_charge: value!(
+                    15,
+                    formal_charge,
+                    formal_charge.optional_charge(row, n, category, "pdbx_formal_charge")?
+                ),
+                auth_seq_id: value!(
+                    16,
+                    auth_seq_id,
+                    auth_seq_id.required_short(row, n, category, "auth_seq_id")?
+                ),
+                auth_comp_id: value!(
+                    17,
+                    auth_comp_id,
+                    auth_comp_id.required_short(row, n, category, "auth_comp_id")?
+                ),
+                auth_asym_id: value!(
+                    18,
+                    auth_asym_id,
+                    auth_asym_id.required_short(row, n, category, "auth_asym_id")?
+                ),
+                auth_atom_id: value!(
+                    19,
+                    auth_atom_id,
+                    auth_atom_id.required_short(row, n, category, "auth_atom_id")?
+                ),
+                model_number: value!(
+                    20,
+                    model_number,
+                    model_number.required_integer(row, n, category, "pdbx_pdb_model_num")?
+                ),
+            });
+        }
+    }
+    Ok(sites)
+}
+
+/// Rows of a Reduce3 output that copy values of the decoded sites of its source.
+#[cfg(feature = "python")]
+struct CopiedSites<'a> {
+    sites: &'a [AtomSite],
+    rows: &'a [u32],
+    made: &'a [u64],
+    // The bit of `made` for the column of each item, or `None` when rows decode the item.
+    bits: [Option<u32>; ATOM_SITE_ITEMS.len()],
+    // The last mask of `made` and the items it leaves copied. Most rows share a mask.
+    last: std::cell::Cell<(u64, u32)>,
+}
+
+#[cfg(feature = "python")]
+impl CopiedSites<'_> {
+    fn held(&self, made: u64) -> u32 {
+        let (last_made, last_held) = self.last.get();
+        if last_made == made {
+            return last_held;
+        }
+        let held = self.bits.iter().rev().fold(0, |held, bit| {
+            held << 1 | u32::from(bit.is_some_and(|bit| made >> bit & 1 == 0))
+        });
+        self.last.set((made, held));
+        held
+    }
+}
+
+#[cfg(feature = "python")]
+impl RepeatedSites for CopiedSites<'_> {
+    #[inline(always)]
+    fn site(&self, row: usize) -> (Option<&AtomSite>, u32) {
+        let site = self
+            .rows
+            .get(row)
+            .and_then(|source| self.sites.get(usize::try_from(*source).ok()?));
+        match (site, self.made.get(row)) {
+            (Some(site), Some(made)) => (Some(site), self.held(*made)),
+            _ => (None, 0),
+        }
+    }
+}
+
+/// Build the registry-free model of `document`, which Reduce3 wrote from the document of
+/// `source`, without decoding again the `_atom_site` values it copied.
+///
+/// Row `i` of the output `_atom_site` loop holds the text of source row `rows[i]` in every
+/// column `c` below 64 whose bit `made[i] >> c & 1` is clear, or copies nothing when
+/// `rows[i]` names no source row. Both loops have the same tags. When `source` or
+/// `document` does not keep one `_atom_site` loop whose sites hold its text, this decodes
+/// every row.
+///
+/// # Errors
+///
+/// Returns the error of [`build_model`].
+#[cfg(feature = "python")]
+pub(crate) fn build_model_with_copies(
+    document: &CifDocument,
+    source: &PdbxModel,
+    rows: &[u32],
+    made: &[u64],
+) -> Result<PdbxModel, SemanticError> {
+    let (Some((_, sites)), [block]) = (source.loop_sites(), document.blocks()) else {
+        return build(document, None, None);
+    };
+    let Some(output) = super::model::only_atom_site_loop(block)
+        .filter(|output| output.row_count() == rows.len() && rows.len() == made.len())
+    else {
+        return build(document, None, None);
+    };
+    let bits = ATOM_SITE_ITEMS.map(|item| {
+        output
+            .tags()
+            .iter()
+            .position(|tag| {
+                crate::cif::split_tag(tag).is_some_and(|(category, name)| {
+                    category.eq_ignore_ascii_case("atom_site") && name.eq_ignore_ascii_case(item)
+                })
+            })
+            .and_then(|column| u32::try_from(column).ok())
+            .filter(|bit| *bit < u64::BITS)
+    });
+    let copies = CopiedSites {
+        sites,
+        rows,
+        made,
+        bits,
+        last: std::cell::Cell::new((u64::MAX, 0)),
+    };
+    let sites = decode_atom_sites(CategoryView::new(block.entries()), &copies)?;
+    build(document, None, Some(sites))
 }
 
 fn poly_scheme(categories: CategoryView<'_>) -> Result<Vec<PolySchemeRow>, SemanticError> {
@@ -436,25 +673,36 @@ pub(super) fn connections(categories: CategoryView<'_>) -> Result<Vec<Connection
     .collect()
 }
 
-fn referenced_components(entities: &[Entity], atoms: &[AtomSite]) -> BTreeSet<String> {
-    let mut output = BTreeSet::new();
+fn referenced_components<'a>(entities: &'a [Entity], atoms: &'a [AtomSite]) -> BTreeSet<&'a str> {
+    // A few identifiers repeat thousands of times. A hash set drops the repeats, so the
+    // ordered set sorts each identifier once.
+    let mut output: FastMap<&str, ()> = FastMap::default();
     for entity in entities {
         output.extend(
             entity
                 .sequence
                 .iter()
-                .map(|monomer| monomer.component_id.clone()),
+                .map(|monomer| (monomer.component_id.as_str(), ())),
         );
-        output.extend(entity.component_id.iter().cloned());
+        output.extend(entity.component_id.as_deref().map(|id| (id, ())));
         output.extend(
             entity
                 .branch_nodes
                 .iter()
-                .map(|node| node.component_id.clone()),
+                .map(|node| (node.component_id.as_str(), ())),
         );
     }
-    output.extend(atoms.iter().map(|atom| atom.label_comp_id.clone()));
-    output
+    // Atoms repeat a few component identifiers, so skip each repeat of the previous one
+    // before the set lookup.
+    let mut previous = None;
+    for atom in atoms {
+        let component = atom.label_comp_id.as_str();
+        if previous != Some(component) {
+            output.insert(component, ());
+            previous = Some(component);
+        }
+    }
+    output.into_keys().collect()
 }
 
 #[cfg(test)]
@@ -517,26 +765,26 @@ mod tests {
         assert_eq!(
             model.atom_sites[2],
             AtomSite {
-                group_pdb: "HETATM".to_owned(),
-                id: "3".to_owned(),
-                element: "P".to_owned(),
-                label_atom_id: "PG".to_owned(),
-                label_alt_id: Some("A".to_owned()),
-                label_comp_id: "ATP".to_owned(),
-                label_asym_id: "B".to_owned(),
-                label_entity_id: "2".to_owned(),
+                group_pdb: "HETATM".into(),
+                id: "3".into(),
+                element: "P".into(),
+                label_atom_id: "PG".into(),
+                label_alt_id: Some("A".into()),
+                label_comp_id: "ATP".into(),
+                label_asym_id: "B".into(),
+                label_entity_id: "2".into(),
                 label_seq_id: None,
-                insertion_code: Some("A".to_owned()),
+                insertion_code: Some("A".into()),
                 x: 7.0,
                 y: 1.0,
                 z: 0.0,
                 occupancy: 0.6,
                 b_iso: Some(20.0),
                 formal_charge: None,
-                auth_seq_id: "-1".to_owned(),
-                auth_comp_id: "ATP".to_owned(),
-                auth_asym_id: "L".to_owned(),
-                auth_atom_id: "PG".to_owned(),
+                auth_seq_id: "-1".into(),
+                auth_comp_id: "ATP".into(),
+                auth_asym_id: "L".into(),
+                auth_atom_id: "PG".into(),
                 model_number: 1,
             }
         );

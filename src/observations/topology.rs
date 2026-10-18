@@ -2,21 +2,30 @@
 
 use super::residue::distance;
 use super::source::Source;
+use crate::hash::FastMap;
+use crate::pdbx::ShortText;
 use std::collections::HashMap;
 
 pub(super) fn pdb(source: &Source) -> Vec<[i64; 3]> {
     let mut result = vec![[-1; 3]; source.groups.len()];
-    let mut backbone = HashMap::new();
+    // Each pair below sets fixed values, so the order of this map never matters. At most one
+    // entry per group, so the map never grows.
+    let mut backbone = FastMap::with_capacity_and_hasher(source.groups.len(), Default::default());
+    // Inline text compares without decoding UTF-8 or calling `memcmp`.
+    let [n, ca, c, oxt, sg] = ["N", "CA", "C", "OXT", "SG"].map(ShortText::new);
     for (group, rows) in source.groups.iter().enumerate() {
         let mut sites = [None; 3];
         for &row in rows {
             let atom = &source.atoms[row];
-            match atom.name.as_str() {
-                "N" => sites[0] = Some(atom.position),
-                "CA" => sites[1] = Some(atom.position),
-                "C" => sites[2] = Some(atom.position),
-                "OXT" => result[group][1] = 1,
-                _ => {}
+            let name = &atom.name;
+            if *name == n {
+                sites[0] = Some(atom.position);
+            } else if *name == ca {
+                sites[1] = Some(atom.position);
+            } else if *name == c {
+                sites[2] = Some(atom.position);
+            } else if *name == oxt {
+                result[group][1] = 1;
             }
         }
         let first = &source.atoms[rows[0]];
@@ -27,13 +36,16 @@ pub(super) fn pdb(source: &Source) -> Vec<[i64; 3]> {
     for &(a, b) in &source.bonds {
         for (here, other) in [(a, b), (b, a)] {
             let atom = &source.atoms[here];
-            match (atom.name.as_str(), source.atoms[other].name.as_str()) {
-                ("SG", _) => result[atom.group][2] = 1,
-                ("N", "C") if !super::continuity::distant(source, atom.group, source.atoms[other].group, true)
-                    => result[atom.group][0] = 0,
-                ("C", "N") if !super::continuity::distant(source, atom.group, source.atoms[other].group, true)
-                    => result[atom.group][1] = 0,
-                _ => {}
+            let partner = &source.atoms[other];
+            if atom.name == sg {
+                result[atom.group][2] = 1;
+            } else if atom.name == n && partner.name == c {
+                if !super::continuity::distant(source, atom.group, partner.group, true) {
+                    result[atom.group][0] = 0;
+                }
+            } else if atom.name == c && partner.name == n
+                && !super::continuity::distant(source, atom.group, partner.group, true) {
+                result[atom.group][1] = 0;
             }
         }
     }
@@ -78,7 +90,7 @@ pub(super) fn protein(source: &Source, policy: &str) -> Result<Vec<[i64; 3]>, St
         backbone.insert((&first.chain, first.sequence), (sites, group));
         if policy == "entity_sequence" {
             result[group][0] = i64::from(first.sequence == 1);
-            if let Some(&length) = source.lengths.get(&first.entity) {
+            if let Some(&length) = source.lengths.get(first.entity.as_str()) {
                 result[group][1] = i64::from(first.sequence == length);
             }
         }

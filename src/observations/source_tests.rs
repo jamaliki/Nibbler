@@ -57,3 +57,67 @@ fn keeps_only_identity_symmetry_covalent_links() {
     let source = read(&parse(input.as_bytes()).expect("fixture"), 1).expect("source");
     assert_eq!(source.bonds, [(0, 1), (0, 2)]);
 }
+
+/// Every value of a source, as text.
+#[cfg(feature = "reduce3")]
+fn describe(source: &super::Source) -> String {
+    use std::collections::BTreeMap;
+    let atoms: Vec<_> = source.atoms.iter().map(|atom| {
+        format!("{} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {} {:?} {} {} {}", atom.source_row, atom.name,
+            atom.element, atom.chain, atom.component, atom.entity, atom.auth_sequence, atom.auth_chain,
+            atom.auth_component, atom.insertion, atom.alternate, atom.sequence, atom.position.map(f32::to_bits),
+            atom.occupancy.to_bits(), atom.protein, atom.group)
+    }).collect();
+    let connections: Vec<_> = source.connections.iter()
+        .map(|link| format!("{} {:?} {} {} {:?}", link.row, link.atoms, link.kind, link.order, link.symmetries))
+        .collect();
+    format!("{atoms:?} {:?} {:?} {:?} {connections:?} {} {:?} {:?}", source.groups, source.bonds, source.hydrogen_bonds,
+        source.has_protein_annotations, source.lengths.iter().collect::<BTreeMap<_, _>>(),
+        source.entity_types.iter().collect::<BTreeMap<_, _>>())
+}
+
+#[cfg(feature = "reduce3")]
+const COPIED: &str = "data_copy\n_entry.id COPY\nloop_\n_entity_poly.entity_id\n_entity_poly.type\n1 'polypeptide(L)'\n\
+loop_\n_entity_poly_seq.entity_id\n_entity_poly_seq.num\n_entity_poly_seq.mon_id\n1 1 GLY\n\
+loop_\n_atom_site.group_PDB\n_atom_site.id\n_atom_site.type_symbol\n_atom_site.label_atom_id\n_atom_site.label_alt_id\n\
+_atom_site.label_comp_id\n_atom_site.label_asym_id\n_atom_site.label_entity_id\n_atom_site.label_seq_id\n\
+_atom_site.pdbx_PDB_ins_code\n_atom_site.Cartn_x\n_atom_site.Cartn_y\n_atom_site.Cartn_z\n_atom_site.occupancy\n\
+_atom_site.B_iso_or_equiv\n_atom_site.pdbx_formal_charge\n_atom_site.auth_seq_id\n_atom_site.auth_comp_id\n\
+_atom_site.auth_asym_id\n_atom_site.auth_atom_id\n_atom_site.pdbx_PDB_model_num\n\
+ATOM 1 N N . GLY A 1 1 ? 0.0 0.0 0.0 1.00 10.0 ? 1 GLY A N 1\n\
+ATOM 2 C CA . GLY A 1 1 ? 1.4 0.0 0.0 1.00 10.0 ? 1 GLY A CA 1\n\
+ROWS\
+HETATM 9 ZN ZN . ZN B 2 . ? ZINC 1.00 20.0 2 2 ZN B ZN 1\n\
+loop_\n_struct_conn.id\n_struct_conn.conn_type_id\n_struct_conn.ptnr1_label_asym_id\n_struct_conn.ptnr1_label_comp_id\n\
+_struct_conn.ptnr1_label_seq_id\n_struct_conn.ptnr1_label_atom_id\n_struct_conn.ptnr2_label_asym_id\n\
+_struct_conn.ptnr2_label_comp_id\n_struct_conn.ptnr2_label_seq_id\n_struct_conn.ptnr2_label_atom_id\n\
+metalc1 metalc A GLY 1 N B ZN . ZN\n";
+
+#[cfg(feature = "reduce3")]
+#[test]
+fn copied_rows_give_the_source_their_own_model_gives() {
+    let original = parse(COPIED.replace("ROWS", "").replace("ZINC", "5.0 5.0 5.0").as_bytes()).expect("fixture");
+    let written = COPIED
+        .replace("ROWS", "ATOM 3 H HA2 . GLY A 1 1 ? 1.8 1.0 0.0 1.00 12.0 ? 1 GLY A HA2 1\n")
+        .replace("ZINC", "6.0 5.0 5.0");
+    let document = parse(written.as_bytes()).expect("fixture");
+    let model = crate::pdbx::build_model(&original).expect("model");
+    let base = super::read_with_sites(&original, 1, model.loop_sites()).expect("source");
+    let rows = [0, 1, 1, 2];
+    let hydrogen = [1, 2, 3, 4, 10, 11, 12, 13, 14, 15, 19].iter().fold(0_u64, |mask, bit| mask | 1 << bit);
+    let made = [1 << 1, 1 << 1, hydrogen, 1 << 1 | 1 << 10 | 1 << 11 | 1 << 12];
+    let copied = super::Copied::new(&document, &model, &rows, &made, 1, &base).expect("copied rows");
+    let own = crate::pdbx::build_model(&document).expect("model");
+    let expected = super::read_with_sites(&document, 1, own.loop_sites()).expect("source");
+    assert_eq!(describe(&copied.source), describe(&expected));
+    assert_eq!((copied.source.atoms.len(), copied.source.connections[0].atoms), (4, [Some(0), Some(3)]));
+    assert_eq!(copied.heavy(), [0, 1, 3]);
+    assert_eq!(copied.position(3), [6.0, 5.0, 5.0]);
+    assert!(copied.copies_name(1, 1) && !copied.copies_name(2, 1));
+    // A row that writes a residue field leaves the document to its own model.
+    let mut changed = made;
+    changed[2] |= 1 << 6;
+    assert!(super::Copied::new(&document, &model, &rows, &changed, 1, &base).is_none());
+    // So does a source site that no row copies.
+    assert!(super::Copied::new(&document, &model, &[0, 1, 1, 1], &made, 1, &base).is_none());
+}

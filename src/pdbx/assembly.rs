@@ -2,16 +2,19 @@
 
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write as _;
 
 use crate::cif::numeric::parse_float;
 use crate::cif::{
-    BlockCategory, BlockKind, CategoryView, CifBlock, CifDocument, CifEntry, CifLoop, CifValueRef,
-    TextCell, TextColumnBuilder, in_category,
+    BlockCategory, BlockKind, CategoryRow, CategoryView, CifBlock, CifDocument, CifEntry, CifLoop,
+    CifValueRef, TextCell, TextColumnBuilder, in_category,
 };
 
 use super::PdbxModel;
 use super::error::SemanticError;
 use super::fields::{category_rows, required_float, required_text, row_context};
+use super::model::AtomSite;
+use super::short_text::ShortText;
 
 /// The most atom sites an assembly may have; a larger one fails with
 /// `PDBX_ASSEMBLY_TOO_LARGE` rather than exhausting memory.
@@ -106,11 +109,13 @@ struct AssemblyCopy {
     number: usize,
     transform: Transform,
     asym_ids: Vec<String>,
+    /// The same identifiers as `asym_ids`, for membership tests.
+    asym_set: HashSet<String>,
 }
 
 impl AssemblyCopy {
     fn has(&self, asym_id: &str) -> bool {
-        self.asym_ids.iter().any(|id| id == asym_id)
+        self.asym_set.contains(asym_id)
     }
 
     /// `source` renamed for this copy: unchanged for copy 1, `source-n` otherwise.
@@ -196,7 +201,7 @@ pub fn assembly_document_with_mapping(
     let copies = copies(model, view, assembly_id)?;
     let mut expansion = Expansion::new(block, &copies)?;
     let mapping = expansion.merge_overlapping_nonpolymers(model)?;
-    let entries = expansion.entries()?;
+    let (entries, _) = expansion.entries(None)?;
     Ok((
         CifDocument::new(vec![CifBlock::data(
             block.code().unwrap_or_default().to_owned(),
@@ -204,6 +209,65 @@ pub fn assembly_document_with_mapping(
         )]),
         mapping,
     ))
+}
+
+/// The expanded document, its overlap merges (see [`assembly_document_with_mapping`]),
+/// and its model when the expansion could copy the source sites.
+#[cfg(feature = "python")]
+type ExpansionWithModel = (CifDocument, Vec<[usize; 3]>, Option<PdbxModel>);
+
+/// The expanded `_atom_site` loop, the new atom ids of each copy when tracked, and the
+/// expanded sites when the caller gave the source sites.
+type AtomSiteCopies = (CifEntry, Vec<Vec<u32>>, Option<Vec<AtomSite>>);
+
+/// Expand an assembly as [`assembly_document_with_mapping`] does, and also return the
+/// registry-free model of the result.
+///
+/// The model takes its atom sites from `model` and the copies, so the written
+/// `_atom_site` table is not decoded again. The model is `None` when that shortcut cannot
+/// promise the sites a decode would give, or when the result does not form a model.
+///
+/// # Errors
+///
+/// Returns the same errors as [`assembly_document`].
+#[cfg(feature = "python")]
+pub(crate) fn assembly_with_model(
+    model: &PdbxModel,
+    assembly_id: Option<&str>,
+) -> Result<ExpansionWithModel, SemanticError> {
+    let block = model
+        .source_document()
+        .blocks()
+        .iter()
+        .find(|block| block.kind() == BlockKind::Data)
+        .ok_or_else(|| assembly_error("PDBX_ASSEMBLY_ABSENT", "the model has no data block"))?;
+    let view = CategoryView::new(block.entries());
+    let copies = copies(model, view, assembly_id)?;
+    let sources = BlockCategory::find(block.entries(), "atom_site")
+        .and_then(|table| source_sites(&table, model));
+    let mut expansion = Expansion::with_sites(block, &copies, sources)?;
+    let mapping = expansion.merge_overlapping_nonpolymers(model)?;
+    let (entries, sites) = expansion.entries(sources)?;
+    let document = CifDocument::new(vec![CifBlock::data(
+        block.code().unwrap_or_default().to_owned(),
+        entries,
+    )]);
+    let expanded =
+        sites.and_then(|sites| super::source::build_model_with_sites(&document, sites).ok());
+    Ok((document, mapping, expanded))
+}
+
+/// The atom sites of `model`, one per row of `table`, when copying them gives what a
+/// decode of the expanded `_atom_site` table would give: `table` is the loop that
+/// [`PdbxModel::loop_sites`] accepts. A copied cell is then written as the text the model
+/// decoded.
+#[cfg(feature = "python")]
+fn source_sites<'m>(table: &BlockCategory<'_>, model: &'m PdbxModel) -> Option<&'m [AtomSite]> {
+    let BlockCategory::Loop(table) = table else {
+        return None;
+    };
+    let (only, sites) = model.loop_sites()?;
+    std::ptr::eq(only, *table).then_some(sites)
 }
 
 #[cfg(feature = "python")]
@@ -321,6 +385,7 @@ fn copies(
                         number: copies.len() + 1,
                         transform,
                         asym_ids: Vec::new(),
+                        asym_set: HashSet::new(),
                     });
                     by_combination.insert(combination, copies.len() - 1);
                     copies.len() - 1
@@ -330,7 +395,7 @@ fn copies(
                 continue;
             };
             for id in &asym_ids {
-                if !copy.has(id) {
+                if copy.asym_set.insert((*id).to_owned()) {
                     copy.asym_ids.push((*id).to_owned());
                 }
             }
@@ -467,6 +532,8 @@ struct Expansion<'a> {
     auth_ids: HashMap<&'a str, Vec<Cow<'a, str>>>,
     /// Source coordinates of each `_atom_site` row.
     positions: Vec<[f64; 3]>,
+    /// Each `_atom_site` row's asymmetric unit and the copies that hold it.
+    units: RowUnits<'a>,
     /// (copy index, `_atom_site` row) of atoms an earlier copy already places.
     merged: HashSet<(usize, usize)>,
     /// (copy index, `label_asym_id`) of asymmetric-unit copies whose every atom an
@@ -512,7 +579,7 @@ impl<'a> Expansion<'a> {
         let mut source_units: HashMap<&str, usize> = HashMap::new();
         let mut sizes: HashMap<&str, usize> = HashMap::new();
         for a in &model.atom_sites {
-            *sizes.entry(&a.label_asym_id).or_default() += 1;
+            *sizes.entry(a.label_asym_id.as_str()).or_default() += 1;
         }
         let sites: Vec<_> = model
             .atom_sites
@@ -564,7 +631,7 @@ impl<'a> Expansion<'a> {
             let (copy, row) = rows[retained];
             self.merged.remove(&(copy, row));
             self.absorbed
-                .remove(&(copy, model.atom_sites[row].label_asym_id.clone()));
+                .remove(&(copy, model.atom_sites[row].label_asym_id.to_string()));
         }
         let mut mapping = Vec::with_capacity(result.duplicate_pairs.len());
         for [removed, target] in result.duplicate_pairs {
@@ -572,13 +639,24 @@ impl<'a> Expansion<'a> {
             let (kept, _) = rows[target];
             mapping.push([row, self.copies[copy].number, self.copies[kept].number]);
             self.merged.insert((copy, row));
-            self.absorbed
-                .insert((copy, model.atom_sites[row].label_asym_id.clone()), kept);
+            self.absorbed.insert(
+                (copy, model.atom_sites[row].label_asym_id.to_string()),
+                kept,
+            );
         }
         Ok(mapping)
     }
 
     fn new(block: &'a CifBlock, copies: &'a [AssemblyCopy]) -> Result<Self, SemanticError> {
+        Self::with_sites(block, copies, None)
+    }
+
+    /// Plan the expansion; `sites`, one per `atom_site` row, give the parsed coordinates.
+    fn with_sites(
+        block: &'a CifBlock,
+        copies: &'a [AssemblyCopy],
+        sites: Option<&[AtomSite]>,
+    ) -> Result<Self, SemanticError> {
         let atom_sites = BlockCategory::find(block.entries(), "atom_site").ok_or_else(|| {
             assembly_error(
                 "PDBX_CATEGORY_REQUIRED",
@@ -590,26 +668,48 @@ impl<'a> Expansion<'a> {
             atom_sites.column("label_asym_id"),
             atom_sites.column("auth_asym_id"),
         ) {
+            // Rows of one chain are adjacent, so a row that repeats the last pair adds nothing.
+            let mut last = None;
             for row in 0..atom_sites.row_count() {
+                let cells = atom_sites.row(row);
                 let (Some(Cow::Borrowed(label)), Some(auth)) =
-                    (atom_sites.text(row, label), atom_sites.text(row, auth))
+                    (cells.text(label), cells.text(auth))
                 else {
                     continue;
                 };
+                if last
+                    .as_ref()
+                    .is_some_and(|(known, author)| *known == label && *author == auth)
+                {
+                    continue;
+                }
                 let known = auth_ids.entry(label).or_default();
                 if !known.contains(&auth) {
-                    known.push(auth);
+                    known.push(auth.clone());
                 }
+                last = Some((label, auth));
             }
         }
-        let positions = source_positions(&atom_sites)?;
-        let (merged, absorbed) = coincident_copies(&atom_sites, &positions, copies)?;
+        // The model parsed the same cells. A coordinate that is not finite is left to
+        // `source_positions`, which reports it.
+        let positions = match sites.filter(|sites| {
+            sites.len() == atom_sites.row_count()
+                && sites
+                    .iter()
+                    .all(|site| [site.x, site.y, site.z].iter().all(|v| v.is_finite()))
+        }) {
+            Some(sites) => sites.iter().map(|site| [site.x, site.y, site.z]).collect(),
+            None => source_positions(&atom_sites)?,
+        };
+        let units = RowUnits::new(&atom_sites, copies);
+        let (merged, absorbed) = coincident_copies(&atom_sites, &positions, copies, &units)?;
         let expansion = Self {
             block,
             copies,
             atom_sites,
             auth_ids,
             positions,
+            units,
             merged,
             absorbed,
         };
@@ -674,7 +774,12 @@ impl<'a> Expansion<'a> {
             .collect()
     }
 
-    fn entries(&self) -> Result<Vec<CifEntry>, SemanticError> {
+    /// Write the assembly's categories. With `sources`, the atom sites of each source row,
+    /// also return the atom sites of the written `_atom_site` rows.
+    fn entries(
+        &self,
+        sources: Option<&[AtomSite]>,
+    ) -> Result<(Vec<CifEntry>, Option<Vec<AtomSite>>), SemanticError> {
         let mut entries = Vec::new();
         for category in UNCHANGED_BEFORE_SCHEMES {
             if *category == "entity_poly" {
@@ -691,7 +796,7 @@ impl<'a> Expansion<'a> {
         entries.extend(self.per_copy("pdbx_branch_scheme", &[("asym_id", branch)], false)?);
         entries.extend(self.unchanged("atom_type"));
         let anisotrop = BlockCategory::find(self.block.entries(), "atom_site_anisotrop");
-        let (atom_site, new_ids) = self.atom_site(anisotrop.is_some())?;
+        let (atom_site, new_ids, sites) = self.atom_site(anisotrop.is_some(), sources)?;
         entries.push(atom_site);
         if let Some(anisotrop) = anisotrop {
             entries.extend(self.anisotrop(&anisotrop, &new_ids)?);
@@ -703,7 +808,7 @@ impl<'a> Expansion<'a> {
             ("pdbx_ptnr3_label_asym_id", &["pdbx_ptnr3_auth_asym_id"]),
         ];
         entries.extend(self.per_copy("struct_conn", partners, true)?);
-        Ok(entries)
+        Ok((entries, sites))
     }
 
     fn unchanged(&self, category: &str) -> Vec<CifEntry> {
@@ -821,21 +926,36 @@ impl<'a> Expansion<'a> {
         };
         let id_column = if connection { table.column("id") } else { None };
         let tags = table.tags();
+        // The label column of the first endpoint each column belongs to.
+        let owners: Vec<Option<usize>> = (0..tags.len())
+            .map(|column_index| {
+                endpoints
+                    .iter()
+                    .find(|(label, auths)| *label == column_index || auths.contains(&column_index))
+                    .map(|(label, _)| *label)
+            })
+            .collect();
         let mut columns = new_columns(tags.len(), table.row_count());
         let mut rows = 0;
+        let mut written_as: Vec<(usize, &AssemblyCopy, bool)> = Vec::new();
         for (copy_index, copy) in self.copies.iter().enumerate() {
             for row in 0..table.row_count() {
+                let cells = table.row(row);
                 // the copy each present endpoint is written as, by label column
-                let mut written_as: Vec<(usize, &AssemblyCopy, bool)> = Vec::new();
+                written_as.clear();
                 for (label, _) in &endpoints {
-                    let Some(asym) = table.text(row, *label) else {
+                    let Some(asym) = cells.text(*label) else {
                         continue;
                     };
                     if !copy.has(&asym) {
                         written_as.clear();
                         break;
                     }
-                    let target = self.absorbed.get(&(copy_index, asym.into_owned())).copied();
+                    let target = if self.absorbed.is_empty() {
+                        None
+                    } else {
+                        self.absorbed.get(&(copy_index, asym.into_owned())).copied()
+                    };
                     let shown = target
                         .and_then(|index| self.copies.get(index))
                         .unwrap_or(copy);
@@ -853,24 +973,20 @@ impl<'a> Expansion<'a> {
                 }
                 if symmetry
                     .iter()
-                    .any(|&column| table.text(row, column).is_some_and(|code| code != "1_555"))
+                    .any(|&column| cells.text(column).is_some_and(|code| code != "1_555"))
                 {
                     continue;
                 }
-                for (column_index, column) in columns.iter_mut().enumerate() {
-                    let shown = endpoints
-                        .iter()
-                        .find(|(label, auths)| {
-                            *label == column_index || auths.contains(&column_index)
-                        })
-                        .and_then(|(label, _)| written_as.iter().find(|(l, _, _)| l == label))
+                for ((column_index, column), owner) in columns.iter_mut().enumerate().zip(&owners) {
+                    let shown = owner
+                        .and_then(|label| written_as.iter().find(|(l, _, _)| *l == label))
                         .map(|(_, shown, _)| *shown)
                         .or((id_column == Some(column_index)).then_some(copy));
-                    let pushed = match (shown, table.text(row, column_index)) {
+                    let pushed = match (shown, cells.text(column_index)) {
                         (Some(shown), Some(source)) => {
                             column.push(TextCell::Text(&shown.rename(&source)))
                         }
-                        _ => push_source(column, &table, row, column_index),
+                        _ => push_cell(column, cells, column_index),
                     };
                     pushed.ok_or_else(too_large)?;
                 }
@@ -880,9 +996,16 @@ impl<'a> Expansion<'a> {
         Ok((rows > 0).then(|| finish_loop(&tags, columns, rows)))
     }
 
-    /// `_atom_site` for every copy, model by model, and (with `track_ids`) each copy's new
-    /// atom id per source row, 0 for rows outside the copy.
-    fn atom_site(&self, track_ids: bool) -> Result<(CifEntry, Vec<Vec<u32>>), SemanticError> {
+    /// Write `_atom_site` for every copy, model by model, and (with `track_ids`) each
+    /// copy's new atom id per source row, 0 for rows outside the copy. With `sources`, the
+    /// atom sites of each source row, also return the atom sites a decode of the written
+    /// rows gives: the source site with the new id, the renamed chains, and the written
+    /// coordinates.
+    fn atom_site(
+        &self,
+        track_ids: bool,
+        sources: Option<&[AtomSite]>,
+    ) -> Result<AtomSiteCopies, SemanticError> {
         let table = &self.atom_sites;
         let required = |item: &str| {
             table.column(item).ok_or_else(|| {
@@ -902,92 +1025,273 @@ impl<'a> Expansion<'a> {
         let id = table.column("id");
         let auth = table.column("auth_asym_id");
         let model = table.column("pdbx_PDB_model_num");
-        let tensors = [
-            Tensor::find(table, "aniso_U"),
-            Tensor::find(table, "aniso_B"),
-        ];
         let row_count = table.row_count();
+        let kept = |copy_index: usize, row: usize| {
+            self.units.holds(copy_index, row)
+                && (merged.is_empty() || !merged.contains(&(copy_index, row)))
+        };
 
-        let total = self
-            .copies
-            .iter()
-            .enumerate()
-            .map(|(copy_index, copy)| {
-                (0..row_count)
-                    .filter(|&row| {
-                        !merged.contains(&(copy_index, row))
-                            && table.text(row, label).is_some_and(|asym| copy.has(&asym))
-                    })
-                    .count()
-            })
+        let total = (0..self.copies.len())
+            .map(|copy_index| (0..row_count).filter(|&row| kept(copy_index, row)).count())
             .try_fold(0usize, usize::checked_add)
             .filter(|total| *total <= MAX_ASSEMBLY_ATOM_SITES)
             .ok_or_else(too_large)?;
 
+        // Group rows by model number, with models in order of first appearance.
         let mut models: Vec<Option<Cow<'_, str>>> = Vec::new();
+        let mut model_rows: Vec<Vec<usize>> = Vec::new();
+        let mut last = 0;
         for row in 0..row_count {
-            let number = model.and_then(|column| table.text(row, column));
-            if !models.contains(&number) {
-                models.push(number);
+            let number = model.and_then(|column| table.row(row).text(column));
+            if models.get(last) != Some(&number) {
+                last = match models.iter().position(|known| *known == number) {
+                    Some(index) => index,
+                    None => {
+                        models.push(number);
+                        model_rows.push(Vec::new());
+                        models.len() - 1
+                    }
+                };
             }
+            model_rows[last].push(row);
         }
         let tags = table.tags();
-        let mut columns = new_columns(tags.len(), total);
-        let mut new_ids = if track_ids {
-            vec![vec![0u32; row_count]; self.copies.len()]
-        } else {
-            Vec::new()
+        let layout = SiteLayout {
+            roles: (0..tags.len())
+                .map(|column_index| {
+                    if let Some(axis) = coordinates.iter().position(|&c| c == column_index) {
+                        AtomColumn::Coordinate(axis)
+                    } else if Some(column_index) == id {
+                        AtomColumn::Id
+                    } else if column_index == label || Some(column_index) == auth {
+                        AtomColumn::Renamed
+                    } else {
+                        AtomColumn::Source
+                    }
+                })
+                .collect(),
+            label,
+            auth,
+            tensors: [
+                Tensor::find(table, "aniso_U"),
+                Tensor::find(table, "aniso_B"),
+            ],
         };
-        let mut next_id = 0usize;
-        for number in &models {
-            for (copy_index, copy) in self.copies.iter().enumerate() {
-                for row in 0..row_count {
-                    if model.and_then(|column| table.text(row, column)) != *number {
+        let sources = sources.filter(|sources| sources.len() == row_count);
+        let mut written = SitesWritten {
+            columns: new_columns(tags.len(), total),
+            new_ids: if track_ids {
+                vec![vec![0u32; row_count]; self.copies.len()]
+            } else {
+                Vec::new()
+            },
+            next_id: 0,
+            sites: sources.map(|_| Vec::with_capacity(total)),
+            ids: String::new(),
+            id_ends: Vec::new(),
+            decoded: Vec::new(),
+        };
+        // Rows go out in blocks of one copy, each written column by column, so the work for
+        // one column runs as a single loop while the block's cells stay in cache.
+        let mut block = Vec::with_capacity(SITE_BLOCK);
+        for rows in &model_rows {
+            for copy_index in 0..self.copies.len() {
+                for &row in rows {
+                    if !kept(copy_index, row) {
                         continue;
                     }
-                    let Some(asym) = table.text(row, label) else {
-                        continue;
-                    };
-                    if !copy.has(&asym) || merged.contains(&(copy_index, row)) {
-                        continue;
+                    block.push(row);
+                    if block.len() == SITE_BLOCK {
+                        self.write_sites(copy_index, &block, &layout, sources, &mut written)?;
+                        block.clear();
                     }
-                    let point = self.positions.get(row).copied().unwrap_or_default();
-                    let moved = copy.transform.apply(point);
-                    next_id += 1;
-                    if let Some(slot) = new_ids.get_mut(copy_index).and_then(|ids| ids.get_mut(row))
-                    {
-                        *slot = u32::try_from(next_id).map_err(|_| too_large())?;
-                    }
-                    let tensor_cells: Vec<(usize, Option<String>)> = tensors
+                }
+                if !block.is_empty() {
+                    self.write_sites(copy_index, &block, &layout, sources, &mut written)?;
+                    block.clear();
+                }
+            }
+        }
+        Ok((
+            finish_loop(&tags, written.columns, total),
+            written.new_ids,
+            written.sites,
+        ))
+    }
+
+    /// Append the `_atom_site` rows of copy `copy_index` for source `rows`.
+    fn write_sites(
+        &self,
+        copy_index: usize,
+        rows: &[usize],
+        layout: &SiteLayout,
+        sources: Option<&[AtomSite]>,
+        written: &mut SitesWritten,
+    ) -> Result<(), SemanticError> {
+        let table = &self.atom_sites;
+        let copy = &self.copies[copy_index];
+        let identity = copy.transform == Transform::IDENTITY;
+        let SitesWritten {
+            columns,
+            new_ids,
+            next_id,
+            sites,
+            ids,
+            id_ends,
+            decoded,
+        } = written;
+        let cells: Vec<CategoryRow<'_, '_>> = rows.iter().map(|&row| table.row(row)).collect();
+        let moved: Vec<[f64; 3]> = rows
+            .iter()
+            .map(|&row| {
+                let point = self.positions.get(row).copied().unwrap_or_default();
+                copy.transform.apply(point)
+            })
+            .collect();
+        ids.clear();
+        id_ends.clear();
+        for &row in rows {
+            *next_id += 1;
+            if let Some(slot) = new_ids.get_mut(copy_index).and_then(|ids| ids.get_mut(row)) {
+                *slot = u32::try_from(*next_id).map_err(|_| too_large())?;
+            }
+            write!(ids, "{next_id}").map_err(|_| too_large())?;
+            id_ends.push(ids.len());
+        }
+        let tensor_cells: Vec<Vec<(usize, Option<String>)>> = if copy.transform.rotates() {
+            rows.iter()
+                .map(|&row| {
+                    layout
+                        .tensors
                         .iter()
                         .flatten()
                         .flat_map(|tensor| tensor.cells(table, row, &copy.transform))
-                        .collect();
-                    for (column_index, column) in columns.iter_mut().enumerate() {
-                        let pushed = if let Some(axis) =
-                            coordinates.iter().position(|&c| c == column_index)
-                        {
-                            column.push(TextCell::Text(&coordinate_text(
-                                moved.get(axis).copied().unwrap_or_default(),
-                            )))
-                        } else if Some(column_index) == id {
-                            column.push(TextCell::Text(&next_id.to_string()))
-                        } else if column_index == label || Some(column_index) == auth {
-                            match table.text(row, column_index) {
-                                Some(source) => column.push(TextCell::Text(&copy.rename(&source))),
-                                None => push_source(column, table, row, column_index),
+                        .collect()
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+        decoded.clear();
+        decoded.resize(rows.len(), [None; 3]);
+        for (column_index, column) in columns.iter_mut().enumerate() {
+            match layout.roles[column_index] {
+                AtomColumn::Coordinate(axis) => {
+                    for (index, (cells, &row)) in cells.iter().zip(rows).enumerate() {
+                        // The identity returns finite coordinates unchanged, apart from the
+                        // sign of zero, which `coordinate_text` drops.
+                        let unchanged = || match cells.plain(column_index) {
+                            Some(TextCell::Text(text)) => canonical_coordinate(text),
+                            Some(TextCell::Unknown | TextCell::NotApplicable) => None,
+                            None => unchanged_coordinate(cells.value(column_index)),
+                        };
+                        let pushed = match identity.then(unchanged).flatten() {
+                            Some(text) => {
+                                // The model parsed this same text.
+                                decoded[index][axis] = sources
+                                    .and_then(|sources| sources.get(row))
+                                    .map(|site| [site.x, site.y, site.z][axis]);
+                                column.push(TextCell::Text(text))
                             }
-                        } else if let Some(cell) = tensor_cell(&tensor_cells, column_index) {
-                            column.push(cell)
-                        } else {
-                            push_source(column, table, row, column_index)
+                            None => {
+                                let text = coordinate_text(moved[index][axis]);
+                                if sites.is_some() {
+                                    decoded[index][axis] = parse_float(&text);
+                                }
+                                column.push(TextCell::Text(&text))
+                            }
+                        };
+                        pushed.ok_or_else(too_large)?;
+                    }
+                }
+                AtomColumn::Id => {
+                    let mut start = 0;
+                    for &end in id_ends.iter() {
+                        let text = ids.get(start..end).unwrap_or_default();
+                        column.push(TextCell::Text(text)).ok_or_else(too_large)?;
+                        start = end;
+                    }
+                }
+                AtomColumn::Renamed if copy.number != 1 => {
+                    for cells in &cells {
+                        let pushed = match cells.text(column_index) {
+                            Some(source) => column.push(TextCell::Text(&copy.rename(&source))),
+                            None => push_value(column, cells.value(column_index)),
+                        };
+                        pushed.ok_or_else(too_large)?;
+                    }
+                }
+                // Copy 1 keeps its chain names, so its renamed columns copy the source.
+                AtomColumn::Renamed | AtomColumn::Source => {
+                    for (index, cells) in cells.iter().enumerate() {
+                        let rotated = tensor_cells
+                            .get(index)
+                            .and_then(|tensor| tensor_cell(tensor, column_index));
+                        let pushed = match rotated {
+                            Some(cell) => column.push(cell),
+                            None => push_cell(column, *cells, column_index),
                         };
                         pushed.ok_or_else(too_large)?;
                     }
                 }
             }
         }
-        Ok((finish_loop(&tags, columns, total), new_ids))
+        let Some(list) = sites.as_mut() else {
+            return Ok(());
+        };
+        let mut start = 0;
+        for ((cells, &row), (decoded, &end)) in cells
+            .iter()
+            .zip(rows)
+            .zip(decoded.iter().zip(id_ends.iter()))
+        {
+            let id_text = ids.get(start..end).unwrap_or_default();
+            start = end;
+            let name = |column: usize| {
+                cells
+                    .text(column)
+                    .map(|source| ShortText::new(&copy.rename(&source)))
+            };
+            let site = sources
+                .and_then(|sources| sources.get(row))
+                .and_then(|site| {
+                    let [Some(x), Some(y), Some(z)] = *decoded else {
+                        return None;
+                    };
+                    Some(AtomSite {
+                        group_pdb: site.group_pdb.clone(),
+                        id: ShortText::new(id_text),
+                        element: site.element.clone(),
+                        label_atom_id: site.label_atom_id.clone(),
+                        label_alt_id: site.label_alt_id.clone(),
+                        label_comp_id: site.label_comp_id.clone(),
+                        label_asym_id: name(layout.label)?,
+                        label_entity_id: site.label_entity_id.clone(),
+                        label_seq_id: site.label_seq_id,
+                        insertion_code: site.insertion_code.clone(),
+                        x,
+                        y,
+                        z,
+                        occupancy: site.occupancy,
+                        b_iso: site.b_iso,
+                        formal_charge: site.formal_charge,
+                        auth_seq_id: site.auth_seq_id.clone(),
+                        auth_comp_id: site.auth_comp_id.clone(),
+                        auth_asym_id: name(layout.auth?)?,
+                        auth_atom_id: site.auth_atom_id.clone(),
+                        model_number: site.model_number,
+                    })
+                });
+            match site {
+                Some(site) => list.push(site),
+                // A row the shortcut cannot describe leaves the model to a decode.
+                None => {
+                    *sites = None;
+                    break;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// `table` (`_atom_site_anisotrop`) for every copy's atoms, with the copies' atom ids.
@@ -1090,24 +1394,29 @@ fn coincident_copies(
     atom_sites: &BlockCategory<'_>,
     positions: &[[f64; 3]],
     copies: &[AssemblyCopy],
+    units: &RowUnits<'_>,
 ) -> Result<(MergedAtoms, AbsorbedCopies), SemanticError> {
-    let label = atom_sites.column("label_asym_id").ok_or_else(|| {
-        assembly_error(
+    if atom_sites.column("label_asym_id").is_none() {
+        return Err(assembly_error(
             "PDBX_ITEM_REQUIRED",
             "required item _atom_site.label_asym_id is absent",
-        )
-    })?;
+        ));
+    }
     let mut merged = MergedAtoms::new();
-    // (copy, asym) -> the one earlier copy holding all its atoms so far, or None
-    let mut fate: HashMap<(usize, String), Option<usize>> = HashMap::new();
+    // Only copies of one row are compared, so a single copy merges nothing.
+    if copies.len() < 2 {
+        return Ok((merged, AbsorbedCopies::new()));
+    }
+    // (copy, asymmetric unit) -> the one earlier copy holding all its atoms so far, or None
+    let mut fate: HashMap<(usize, usize), Option<usize>> = HashMap::new();
     let mut cells: HashMap<[i64; 3], Vec<(usize, [f64; 3])>> = HashMap::new();
     for (row, &point) in positions.iter().enumerate() {
-        let Some(asym) = atom_sites.text(row, label) else {
+        let Some(unit) = units.rows.get(row).copied().flatten() else {
             continue;
         };
         cells.clear();
         for (copy_index, copy) in copies.iter().enumerate() {
-            if !copy.has(&asym) {
+            if !units.copies[copy_index][unit] {
                 continue;
             }
             let moved = copy.transform.apply(point);
@@ -1119,8 +1428,7 @@ fn coincident_copies(
                     distance_squared(moved, *other) <= MERGE_DISTANCE * MERGE_DISTANCE
                 })
                 .map(|(index, _)| *index);
-            let key = (copy_index, asym.clone().into_owned());
-            let state = fate.entry(key).or_insert(earlier);
+            let state = fate.entry((copy_index, unit)).or_insert(earlier);
             if *state != earlier {
                 *state = None;
             }
@@ -1134,9 +1442,131 @@ fn coincident_copies(
     }
     let absorbed = fate
         .into_iter()
-        .filter_map(|(key, state)| state.map(|index| (key, index)))
+        .filter_map(|((copy, unit), state)| {
+            state.map(|index| ((copy, units.names[unit].clone().into_owned()), index))
+        })
         .collect();
     Ok((merged, absorbed))
+}
+
+/// Each `_atom_site` row's `label_asym_id` as an index into `names`, and for each copy
+/// whether it holds each name.
+struct RowUnits<'a> {
+    rows: Vec<Option<usize>>,
+    names: Vec<Cow<'a, str>>,
+    copies: Vec<Vec<bool>>,
+}
+
+impl<'a> RowUnits<'a> {
+    fn new(atom_sites: &BlockCategory<'a>, copies: &[AssemblyCopy]) -> Self {
+        let label = atom_sites.column("label_asym_id");
+        let mut lookup: HashMap<Cow<'a, str>, usize> = HashMap::new();
+        let mut names: Vec<Cow<'a, str>> = Vec::new();
+        let mut rows = Vec::with_capacity(atom_sites.row_count());
+        let mut last: Option<usize> = None;
+        for row in 0..atom_sites.row_count() {
+            let Some(name) = label.and_then(|column| atom_sites.row(row).text(column)) else {
+                rows.push(None);
+                continue;
+            };
+            // Atoms of one unit are usually adjacent, so try the previous row's unit first.
+            let unit = match last.filter(|&unit| names[unit] == name) {
+                Some(unit) => unit,
+                None => *lookup.entry(name.clone()).or_insert_with(|| {
+                    names.push(name);
+                    names.len() - 1
+                }),
+            };
+            last = Some(unit);
+            rows.push(Some(unit));
+        }
+        let copies = copies
+            .iter()
+            .map(|copy| names.iter().map(|name| copy.has(name)).collect())
+            .collect();
+        Self {
+            rows,
+            names,
+            copies,
+        }
+    }
+
+    fn holds(&self, copy: usize, row: usize) -> bool {
+        self.rows
+            .get(row)
+            .copied()
+            .flatten()
+            .is_some_and(|unit| self.copies[copy][unit])
+    }
+}
+
+/// What `Expansion::atom_site` writes in one column.
+#[derive(Clone, Copy)]
+enum AtomColumn {
+    Coordinate(usize),
+    Id,
+    Renamed,
+    Source,
+}
+
+/// The most rows `Expansion::write_sites` writes at once.
+const SITE_BLOCK: usize = 512;
+
+/// The `_atom_site` columns `Expansion::write_sites` reads.
+struct SiteLayout {
+    roles: Vec<AtomColumn>,
+    label: usize,
+    auth: Option<usize>,
+    tensors: [Option<Tensor>; 2],
+}
+
+/// The `_atom_site` rows written so far, and buffers reused from block to block.
+struct SitesWritten {
+    columns: Vec<TextColumnBuilder>,
+    new_ids: Vec<Vec<u32>>,
+    next_id: usize,
+    sites: Option<Vec<AtomSite>>,
+    /// The ids of the current block, one after another, and where each ends.
+    ids: String,
+    id_ends: Vec<usize>,
+    /// The decoded coordinates of each row of the current block.
+    decoded: Vec<[Option<f64>; 3]>,
+}
+
+/// The source spelling of a coordinate when `coordinate_text` would write the parsed value
+/// back unchanged. `source_positions` parses the cell with a correctly rounded parser, and
+/// a spelling with an optional minus sign, one to nine integer digits without a leading
+/// zero and exactly three decimals parses to within 1e-6 of itself, so rounding to three
+/// decimals returns it. `-0.000` is excluded because `coordinate_text` writes `0.000`.
+fn unchanged_coordinate(value: Option<CifValueRef<'_>>) -> Option<&str> {
+    let text = match value? {
+        CifValueRef::Text(text) => text.as_str(),
+        CifValueRef::Float(number, None, Some(original))
+            if parse_float(original.as_str()) == Some(number) =>
+        {
+            original.as_str()
+        }
+        _ => return None,
+    };
+    canonical_coordinate(text)
+}
+
+/// `text` when it has an optional minus sign, one to nine integer digits without a leading
+/// zero and exactly three decimals, and is not `-0.000`.
+fn canonical_coordinate(text: &str) -> Option<&str> {
+    let bytes = text.as_bytes();
+    let digits = bytes.strip_prefix(b"-").unwrap_or(bytes);
+    let [whole @ .., b'.', first, second, third] = digits else {
+        return None;
+    };
+    let canonical = [first, second, third]
+        .iter()
+        .all(|byte| byte.is_ascii_digit())
+        && (1..=9).contains(&whole.len())
+        && whole.iter().all(u8::is_ascii_digit)
+        && (whole == b"0" || whole.first() != Some(&b'0'))
+        && text != "-0.000";
+    canonical.then_some(text)
 }
 
 fn neighbor_cells(cell: [i64; 3]) -> impl Iterator<Item = [i64; 3]> {
@@ -1239,19 +1669,44 @@ fn new_columns(count: usize, rows: usize) -> Vec<TextColumnBuilder> {
         .collect()
 }
 
+/// Copy one source cell: `?`, `.`, text, or a number as its source spelling when it has one.
 fn push_source(
     column: &mut TextColumnBuilder,
     table: &BlockCategory<'_>,
     row: usize,
     index: usize,
 ) -> Option<()> {
-    match table.value(row, index) {
+    push_value(column, table.value(row, index))
+}
+
+/// Copy the value in `column` of `cells`, as [`push_value`] does.
+#[inline]
+fn push_cell(
+    column: &mut TextColumnBuilder,
+    cells: CategoryRow<'_, '_>,
+    index: usize,
+) -> Option<()> {
+    match cells.plain(index) {
+        Some(cell) => column.push(cell),
+        None => push_value(column, cells.value(index)),
+    }
+}
+
+/// Copy one value: `?`, `.`, text, or a number as its source spelling when it has one.
+fn push_value(column: &mut TextColumnBuilder, value: Option<CifValueRef<'_>>) -> Option<()> {
+    match value {
         Some(CifValueRef::NotApplicable) => column.push(TextCell::NotApplicable),
         Some(CifValueRef::Unknown) | None => column.push(TextCell::Unknown),
-        Some(_) => match table.text(row, index) {
-            Some(text) => column.push(TextCell::Text(&text)),
-            None => column.push(TextCell::Unknown),
-        },
+        Some(CifValueRef::Text(text)) => column.push(TextCell::Text(text.as_str())),
+        Some(CifValueRef::Integer(_, Some(text)) | CifValueRef::Float(_, _, Some(text))) => {
+            column.push(TextCell::Text(text.as_str()))
+        }
+        Some(CifValueRef::Integer(number, None)) => {
+            column.push(TextCell::Text(&number.to_string()))
+        }
+        Some(CifValueRef::Float(number, _, None)) => {
+            column.push(TextCell::Text(&number.to_string()))
+        }
     }
 }
 

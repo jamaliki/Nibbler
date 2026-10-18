@@ -122,10 +122,13 @@ def run(
     ignore_missing_restraints: bool = False,
     allow_missing_restraints_for: Sequence[str] = (),
     required_hydrogen_target_keys: str | None = None,
+    ignored_target_key_components: Sequence[str] = (),
     allow_undefined_ligand_targets: bool = False,
     allow_unresolved_bond_targets: bool = False,
     verbosity: int = 2,
+    report: bool = True,
     probe: Mapping[str, float | bool] | None = None,
+    parents_view: object | None = None,
 ) -> Reduction:
     """Add hydrogens and optimize movable groups with Reduce3, in memory.
 
@@ -159,6 +162,8 @@ def run(
     fixed-mode addition may remove and report an unplaced H only when its
     unique parent lies outside those targets. Valid context hydrogens and all
     heavy atoms remain unchanged. This option requires explicit ``model_id``.
+    Keys whose component (the fourth field) is in ``ignored_target_key_components``
+    are dropped before they are resolved.
 
     ``allow_undefined_ligand_targets`` retains incomplete ligand fragments and
     reports only undefined H targets. It also retains validated bridging
@@ -168,6 +173,13 @@ def run(
     fixed-mode addition and retained keys. ``target_uncertainties`` names the
     affected original heavy atoms; pass it to ObservationPacker when packing
     training targets. Ordinary protein H placement remains strict.
+
+    ``report=False`` skips the scores and warning text that only the report shows. The
+    output document and ``target_uncertainties`` are the same, but the report is incomplete.
+
+    ``parents_view`` is an optional molecular view (from ``ObservationPacker.molecular_view``)
+    of this same document and model. Native code then resolves the retained keys among the
+    view's source atoms instead of reading the document again.
     """
     if not available():
         raise RuntimeError(
@@ -192,6 +204,10 @@ def run(
         raise TypeError("allow_missing_restraints_for must be a sequence of component identifiers")
     if required_hydrogen_target_keys is not None and not isinstance(required_hydrogen_target_keys, str):
         raise TypeError("required_hydrogen_target_keys must be a JSON string")
+    if (isinstance(ignored_target_key_components, (str, bytes))
+            or not isinstance(ignored_target_key_components, Sequence)
+            or any(not isinstance(name, str) for name in ignored_target_key_components)):
+        raise TypeError("ignored_target_key_components must be a sequence of component identifiers")
     flags = {
         "add_flip_movers": add_flip_movers,
         "compat": compat,
@@ -203,6 +219,7 @@ def run(
         "ignore_missing_restraints": ignore_missing_restraints,
         "allow_undefined_ligand_targets": allow_undefined_ligand_targets,
         "allow_unresolved_bond_targets": allow_unresolved_bond_targets,
+        "report": report,
     }
     for name, flag in flags.items():
         if not isinstance(flag, bool):
@@ -255,9 +272,10 @@ def run(
         "probe_flags": probe_flags,
         "allow_missing_restraints_for": list(allow_missing_restraints_for),
         "required_hydrogen_target_keys": required_hydrogen_target_keys,
+        "ignored_target_key_components": list(ignored_target_key_components),
     }
     try:
-        output, report, statuses = _core.reduce_document(document, options)
+        output, report, statuses = _core.reduce_document(document, options, parents_view)
     except ValueError as error:
         raise_chemistry_error(error)
     return Reduction(document=output, report=report, target_uncertainties=tuple(json.loads(statuses)))

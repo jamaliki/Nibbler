@@ -1,8 +1,10 @@
-use std::sync::Arc;
+mod objects;
+
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyCapsule, PyModule};
+use pyo3::types::{PyAny, PyBytes, PyCapsule, PyDict, PyModule};
 
 use crate::cif::{
     ArrowMissingPolicy, BinaryCifError, CifDocument, CifTable, InputError, InputLimits,
@@ -18,7 +20,7 @@ use crate::modelcif::{
     validate_document as validate_modelcif,
 };
 use crate::pdbx::{
-    ComponentRegistry, PdbxModel, assembly_document,
+    ComponentRegistry, PdbxModel, SiteArray, assembly_document,
     build_component_registry as load_component_registry, build_model_with_registry,
     canonical_document, validate_document as validate_pdbx,
 };
@@ -55,11 +57,134 @@ enum LoadedSource {
 pub(crate) struct PyCifDocument {
     document: Arc<CifDocument>,
     schema: Option<String>,
+    // The PDBx model of `document` built without a registry. Calls that need it share
+    // one build, so the file's atom sites are decoded once.
+    model: Mutex<ModelSlot>,
+}
+
+/// The registry-free PDBx model of a document, or what builds it.
+enum ModelSlot {
+    Empty,
+    Built(Arc<PdbxModel>),
+    /// The error of the build that failed. The document does not change, so a new build
+    /// would fail the same way.
+    Failed(crate::pdbx::SemanticError),
+    /// The model of the document Reduce3 read, and the `_atom_site` rows of this document
+    /// that copy its rows (see [`crate::pdbx::build_model_with_copies`]).
+    #[cfg_attr(not(feature = "reduce3"), allow(dead_code))]
+    Copied {
+        source: Arc<PdbxModel>,
+        rows: Vec<u32>,
+        made: Vec<u64>,
+    },
 }
 
 impl PyCifDocument {
     pub(crate) const fn new(document: Arc<CifDocument>, schema: Option<String>) -> Self {
-        Self { document, schema }
+        Self {
+            document,
+            schema,
+            model: Mutex::new(ModelSlot::Empty),
+        }
+    }
+
+    /// Wrap a document together with its registry-free PDBx model, if the caller has it.
+    fn with_model(
+        document: Arc<CifDocument>,
+        schema: Option<String>,
+        model: Option<Arc<PdbxModel>>,
+    ) -> Self {
+        Self {
+            document,
+            schema,
+            model: Mutex::new(model.map_or(ModelSlot::Empty, ModelSlot::Built)),
+        }
+    }
+
+    /// Wrap a document that Reduce3 wrote from the document of `source`. Row `i` of its
+    /// `_atom_site` loop copies source row `rows[i]` in the columns that `made[i]` leaves
+    /// clear, so its model copies those values from the sites of `source`.
+    #[cfg_attr(not(feature = "reduce3"), allow(dead_code))]
+    pub(crate) const fn with_copies(
+        document: Arc<CifDocument>,
+        schema: Option<String>,
+        source: Arc<PdbxModel>,
+        rows: Vec<u32>,
+        made: Vec<u64>,
+    ) -> Self {
+        Self {
+            document,
+            schema,
+            model: Mutex::new(ModelSlot::Copied { source, rows, made }),
+        }
+    }
+
+    fn model_slot(&self) -> MutexGuard<'_, ModelSlot> {
+        // A slot holds a whole model or none, so a panic elsewhere cannot leave it partial.
+        self.model.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Return the registry-free PDBx model of this document, building it on first use.
+    pub(crate) fn pdbx_model(&self) -> Result<Arc<PdbxModel>, crate::pdbx::SemanticError> {
+        let mut slot = self.model_slot();
+        if let Some(model) = self.built(&mut slot) {
+            return Ok(model);
+        }
+        if let ModelSlot::Failed(error) = &*slot {
+            return Err(error.clone());
+        }
+        match build_model_with_registry(&self.document, None) {
+            Ok(model) => {
+                let model = Arc::new(model);
+                *slot = ModelSlot::Built(Arc::clone(&model));
+                Ok(model)
+            }
+            Err(error) => {
+                *slot = ModelSlot::Failed(error.clone());
+                Err(error)
+            }
+        }
+    }
+
+    /// Return the registry-free PDBx model if an earlier call built it, or build it from
+    /// the model of the document Reduce3 read. The document keeps the model.
+    #[cfg_attr(not(feature = "reduce3"), allow(dead_code))]
+    pub(crate) fn built_pdbx_model(&self) -> Option<Arc<PdbxModel>> {
+        let mut slot = self.model_slot();
+        self.built(&mut slot)
+    }
+
+    /// Call `read` with the model, rows and masks of the `Copied` slot of a document that
+    /// Reduce3 wrote, while its own model is unbuilt.
+    #[cfg(feature = "reduce3")]
+    pub(crate) fn source_copies<T>(&self, read: impl FnOnce(&Arc<PdbxModel>, &[u32], &[u64]) -> T) -> Option<T> {
+        match &*self.model_slot() {
+            ModelSlot::Copied { source, rows, made } => Some(read(source, rows, made)),
+            _ => None,
+        }
+    }
+
+    /// Remove the registry-free PDBx model, so the document stops holding it.
+    #[cfg_attr(not(feature = "reduce3"), allow(dead_code))]
+    pub(crate) fn release_pdbx_model(&self) {
+        *self.model_slot() = ModelSlot::Empty;
+    }
+
+    fn built(&self, slot: &mut ModelSlot) -> Option<Arc<PdbxModel>> {
+        let model = match std::mem::replace(slot, ModelSlot::Empty) {
+            ModelSlot::Empty => return None,
+            ModelSlot::Failed(error) => {
+                *slot = ModelSlot::Failed(error);
+                return None;
+            }
+            ModelSlot::Built(model) => model,
+            // On an error the slot stays empty, and a full build reports the error.
+            ModelSlot::Copied { source, rows, made } => Arc::new(
+                crate::pdbx::build_model_with_copies(&self.document, &source, &rows, &made).ok()?,
+            ),
+        };
+        *slot = ModelSlot::Built(Arc::clone(&model));
+        Some(model)
     }
 
     pub(crate) const fn document(&self) -> &Arc<CifDocument> {
@@ -83,6 +208,42 @@ impl PyCifDocument {
     /// Return the dictionary selector requested at read time, if any.
     fn schema(&self) -> Option<&str> {
         self.schema.as_deref()
+    }
+
+    /// Return `_atom_site` items of this document's PDBx model laid out for numpy, or
+    /// None when the model cannot be built or does not hold every item.
+    ///
+    /// The document builds the model once and keeps it, so later model reads such as
+    /// conformer selection reuse it. A text item maps to `(width, codes)`, where `codes`
+    /// holds `width` little-endian UCS-4 code points for each row, padded with zeros. Present
+    /// text is the text a projection with the PDBx schema reads, and a missing value reads
+    /// `?` or `.`. `label_seq_id` and `pdbx_PDB_model_num` map to `(values, kinds)`:
+    /// little-endian `int64` values, 0 where missing, and the missing kind of each row, 0
+    /// when present, 1 for `?` and 2 for `.`.
+    fn atom_site_arrays<'py>(
+        &self,
+        py: Python<'py>,
+        items: Vec<String>,
+    ) -> PyResult<Option<Bound<'py, PyDict>>> {
+        let arrays = py.detach(|| {
+            let model = self.pdbx_model().ok()?;
+            crate::pdbx::atom_site_arrays(&self.document, &model, &items)
+        });
+        let Some(arrays) = arrays else {
+            return Ok(None);
+        };
+        let result = PyDict::new(py);
+        for (item, array) in items.iter().zip(arrays) {
+            match array {
+                SiteArray::Text { width, codes } => {
+                    result.set_item(item, (width, PyBytes::new(py, &codes)))?;
+                }
+                SiteArray::Integer { values, kinds } => {
+                    result.set_item(item, (PyBytes::new(py, &values), PyBytes::new(py, &kinds)))?;
+                }
+            }
+        }
+        Ok(Some(result))
     }
 
     /// Project a category from this document without serialization or parsing.
@@ -200,6 +361,8 @@ struct PyPreparedChemistry {
 struct PyConformerSelection {
     selected: crate::pdbx::ConformerSelection,
     source: Option<Arc<CifDocument>>,
+    // The source's registry-free model, passed on when the selection keeps every row.
+    model: Option<Arc<PdbxModel>>,
 }
 
 #[pymethods]
@@ -229,10 +392,17 @@ impl PyConformerSelection {
         let document = py
             .detach(|| crate::pdbx::selected_atom_document(source, &self.selected.atom_rows))
             .map_err(model_error_to_python)?;
-        Ok(PyCifDocument {
-            document: Arc::new(document),
-            schema: Some("pdbx".into()),
-        })
+        // Selecting every row returns the source blocks unchanged, so the source model holds.
+        let model = self
+            .model
+            .as_ref()
+            .filter(|_| std::ptr::eq(document.blocks(), source.blocks()))
+            .map(Arc::clone);
+        Ok(PyCifDocument::with_model(
+            Arc::new(document),
+            Some("pdbx".into()),
+            model,
+        ))
     }
 }
 
@@ -261,6 +431,7 @@ fn select_mmcif_conformer(
         source: Some(Arc::new(
             model.model.coordinates().source_document().clone(),
         )),
+        model: None,
     })
 }
 
@@ -274,19 +445,30 @@ fn select_document_conformer(
     policy: &str,
 ) -> PyResult<PyConformerSelection> {
     let policy = conformer_policy(policy)?;
-    let selected = py
+    let (selected, model) = py
         .detach(|| {
-            crate::pdbx::select_conformer_document_with_policy(
-                &document.document,
-                model_number,
-                seed,
-                policy,
-            )
+            // A built model decodes the same atom sites and links as the document path,
+            // and later calls on this document reuse it. A document that does not form
+            // a model still selects from its atom_site table alone.
+            match document.pdbx_model() {
+                Ok(model) => {
+                    crate::pdbx::select_conformer_with_policy(&model, model_number, seed, policy)
+                        .map(|selected| (selected, Some(model)))
+                }
+                Err(_) => crate::pdbx::select_conformer_document_with_policy(
+                    &document.document,
+                    model_number,
+                    seed,
+                    policy,
+                )
+                .map(|selected| (selected, None)),
+            }
         })
         .map_err(model_error_to_python)?;
     Ok(PyConformerSelection {
         selected,
         source: Some(Arc::clone(&document.document)),
+        model,
     })
 }
 
@@ -364,6 +546,7 @@ fn select_conformer_arrays(
     Ok(PyConformerSelection {
         selected,
         source: None,
+        model: None,
     })
 }
 
@@ -410,9 +593,7 @@ impl PyPreparedChemistry {
     }
 
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyAny>> {
-        let text =
-            serde_json::to_string(&self.graph).map_err(|e| PyValueError::new_err(e.to_string()))?;
-        py.import("json")?.call_method1("loads", (text,))
+        objects::to_python(py, &self.graph)
     }
 }
 
@@ -593,10 +774,10 @@ impl PyMmcifModel {
 
     /// Return the generic document from which this model was built.
     fn source_document(&self) -> PyCifDocument {
-        PyCifDocument {
-            document: Arc::new(self.model.coordinates().source_document().clone()),
-            schema: Some(self.profile().to_owned()),
-        }
+        PyCifDocument::new(
+            Arc::new(self.model.coordinates().source_document().clone()),
+            Some(self.profile().to_owned()),
+        )
     }
 
     fn __repr__(&self) -> String {
@@ -630,10 +811,10 @@ fn _model_document(
         }
         (NativeMmcifModel::ModelCif(model), None) => canonical_modelcif_document(model),
     };
-    Ok(PyCifDocument {
-        document: Arc::new(document),
-        schema: Some(model.profile().to_owned()),
-    })
+    Ok(PyCifDocument::new(
+        Arc::new(document),
+        Some(model.profile().to_owned()),
+    ))
 }
 
 /// Write out every copy of one biological assembly of a model's coordinates.
@@ -647,10 +828,10 @@ fn build_assembly_document(
     let document = py
         .detach(|| assembly_document(model.model.coordinates(), assembly_id.as_deref()))
         .map_err(model_error_to_python)?;
-    Ok(PyCifDocument {
-        document: Arc::new(document),
-        schema: Some("pdbx".to_owned()),
-    })
+    Ok(PyCifDocument::new(
+        Arc::new(document),
+        Some("pdbx".to_owned()),
+    ))
 }
 
 type DiagnosticFields = (String, String, String, Vec<String>);
@@ -664,15 +845,18 @@ fn build_assembly_with_mapping(
     assembly_id: Option<String>,
 ) -> PyResult<AssemblyMappedDocument> {
     let source = model.model.coordinates();
-    let (document, merges) = py
-        .detach(|| crate::pdbx::assembly_document_with_mapping(source, assembly_id.as_deref()))
+    // The expansion also builds its own model from the source sites, so a later
+    // molecular view of the result need not decode the written atom sites again.
+    let (document, merges, expanded) = py
+        .detach(|| crate::pdbx::assembly_with_model(source, assembly_id.as_deref()))
         .map_err(model_error_to_python)?;
     let mapping = crate::pdbx::assembly_mapping_names(source, merges);
     Ok((
-        PyCifDocument {
-            document: Arc::new(document),
-            schema: Some("pdbx".to_owned()),
-        },
+        PyCifDocument::with_model(
+            Arc::new(document),
+            Some("pdbx".to_owned()),
+            expanded.map(Arc::new),
+        ),
         mapping,
     ))
 }
@@ -705,9 +889,16 @@ fn build_mmcif_model(
     let profile = profile
         .parse::<SchemaName>()
         .map_err(|error| PyValueError::new_err((error.code(), error.message().to_owned())))?;
-    let document = Arc::clone(&document.document);
+    let source = document;
+    let document = Arc::clone(&source.document);
     let registry = registry.map(|value| Arc::clone(&value.registry));
     let model = match profile {
+        SchemaName::Pdbx if registry.is_none() => {
+            let model = py
+                .detach(|| source.pdbx_model())
+                .map_err(model_error_to_python)?;
+            NativeMmcifModel::Pdbx(model)
+        }
         SchemaName::Pdbx => {
             let model = py
                 .detach(move || build_model_with_registry(&document, registry.as_deref()))
@@ -1064,10 +1255,7 @@ pub(crate) fn output_to_python(
     match output {
         ReadOutput::Document(document) => Ok(Py::new(
             py,
-            PyCifDocument {
-                document: Arc::new(document),
-                schema,
-            },
+            PyCifDocument::new(Arc::new(document), schema),
         )?
         .into_any()),
         ReadOutput::Table(table) => Ok(Py::new(

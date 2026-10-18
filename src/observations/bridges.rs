@@ -196,15 +196,14 @@ fn site(source: &Source, group: usize, rows: &[usize], name: &str, definition: &
 /// Resolve bridge sites even when the heavy source omits their H coordinate.
 pub(super) fn for_source(library: &MonLib, source: &Source) -> Result<Vec<Site>, String> {
     let mut result = Vec::new();
+    let mut selections = super::parents::Selections::new();
     for (group, rows) in source.groups.iter().enumerate() {
         let Some(&first) = rows.first() else { continue };
         if source.atoms[first].protein { continue; }
-        let names: Vec<_> = rows.iter().filter_map(|&row| {
-            let atom = &source.atoms[row];
-            (!hydrogen(&atom.element)).then(|| atom.name.clone())
-        }).collect();
-        let Some(comp) = reduce3::hplace::hydrogen_dictionary(library, &source.atoms[first].component, &names, false) else { continue };
-        let definitions = dictionary(library, &comp)?;
+        let names = rows.iter().map(|&row| &source.atoms[row]).filter(|atom| !hydrogen(&atom.element))
+            .map(|atom| &atom.name);
+        let Some(definitions) = selections.get(library, source.atoms[first].component.as_str(), names,
+            |comp| dictionary(library, &comp))? else { continue };
         let mut names: Vec<_> = definitions.keys().collect();
         names.sort_unstable();
         for name in names { result.push(site(source, group, rows, name, &definitions[name])?); }

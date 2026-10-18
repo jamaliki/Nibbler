@@ -128,10 +128,10 @@ fn select_sites(
         let residue = *residues.entry(key).or_insert(count);
         atoms.push(ConformerAtom {
             residue,
-            chain: a.label_asym_id.clone(),
+            chain: a.label_asym_id.to_string(),
             sequence: a.label_seq_id,
-            atom_name: a.label_atom_id.clone(),
-            alternate: a.label_alt_id.clone(),
+            atom_name: a.label_atom_id.as_str().to_owned(),
+            alternate: a.label_alt_id.as_deref().map(str::to_owned),
             coordinates: [a.x, a.y, a.z],
             occupancy: a.occupancy,
             clash_eligible: !["H", "D", "T"]

@@ -18,7 +18,7 @@ fn packed(source: &Source) -> observations::Tokens {
     let library = library();
     let sites = super::super::for_source(&library, source).expect("Bridge must resolve");
     let parents = observations::parents::for_source(&library, source).expect("Unique parents must resolve");
-    let features: LigandFeatures = HashMap::from([(source.atoms[0].component.clone(),
+    let features: LigandFeatures = HashMap::from([(source.atoms[0].component.as_str().to_owned(),
         HashMap::from([("FE".into(), [0, 0, 1, 1]), ("NI".into(), [0, 0, 1, 1])]))]);
     observations::tokens::pack(source, &schema(), &features, &HydrogenParents::new(), &parents,
         &sites, &elements(true), &[], &PackOptions { model: 1, complete: true,
@@ -32,7 +32,7 @@ fn product_targets_preserve_the_checked_hydride_charge_and_both_bonds() {
         for observed in [false, true] {
             let mut tokens = packed(&source(component, observed));
             let positions = tokens.positions.clone();
-            observations::product::apply(&mut tokens, &schema(), &[])
+            observations::product::apply::<&str>(&mut tokens, &schema(), &[])
                 .expect("Empty product targets must preserve checked bridge chemistry");
             assert_eq!(tokens.charges[8], -1.);
             assert_eq!(tokens.charge_known[8], 1);
@@ -166,7 +166,9 @@ fn virtual_h_key_needs_both_original_metal_rows_and_old_contract_fails() {
     let keys = r#"[["L","601",".","EJ2","H"]]"#;
     let library = library();
     assert_eq!(observations::required_parent_sources(&document, keys, 1, Some(&library.root)).expect("Both parents must resolve"), [0, 1]);
-    let retained = observations::RetainedParents::read(&document, keys, 1, Some(&library.root))
+    let source = observations::source::read(&document, 1).expect("Bridge fixture must read");
+    let keys = observations::ParentKeys::parse(keys, &[]).expect("Bridge keys must parse");
+    let retained = observations::RetainedParents::new(&source, &keys, Some(&library.root))
         .expect("Bridge parents must resolve");
     assert_eq!(retained.ligand_sources(), [0, 1]);
     assert_eq!(retained.bridge_sources(Some(&library.root)).expect("Bridge declaration must resolve"), [("H".into(), [0, 1])]);
@@ -175,5 +177,20 @@ fn virtual_h_key_needs_both_original_metal_rows_and_old_contract_fails() {
         let error = observations::pack(&document, &schema(), &HashMap::new(), &HashMap::new(), &elements(false), &[], &options)
             .err().expect("Old contract must fail");
         assert!(error.contains("H token 65"), "{error}");
+    }
+}
+
+#[test]
+fn compact_key_scan_matches_serde_or_defers_to_it() {
+    let serde = |text: &str| serde_json::from_str::<Vec<[String; 5]>>(text).ok();
+    for text in ["[]", r#"[["A","1","","ALA","protein"]]"#, r#"[["A","1","","ALA","protein"],["B","2","x","ATP","O5'"]]"#] {
+        let scanned = observations::compact_keys(text).expect("Compact keys must scan");
+        let scanned: Vec<[String; 5]> = scanned.into_iter().map(|key| key.map(String::from)).collect();
+        assert_eq!(Some(scanned), serde(text));
+    }
+    for text in [" []", r#"[["A","1","","ALA"]]"#, r#"[["A","1","","ALA","protein","x"]]"#,
+        r#"[["A\"","1","","ALA","protein"]]"#, r#"[["A","1","","ALA","protein"],]"#, r#"[["A","1","","ALA","protein"] ]"#,
+        "[[\"A\t\",\"1\",\"\",\"ALA\",\"protein\"]]", r#"[["A","1","","ALA","protein"]"#] {
+        assert!(observations::compact_keys(text).is_none(), "{text}");
     }
 }

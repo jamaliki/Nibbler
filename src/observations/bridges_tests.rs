@@ -41,7 +41,7 @@ fn selected_nwn_and_ej2_dictionaries_keep_both_negative_hydride_bonds() {
     let library = library();
     for component in ["NWN", "EJ2"] {
         let input = source(component, false);
-        let names: Vec<_> = input.atoms.iter().map(|atom| atom.name.clone()).collect();
+        let names: Vec<_> = input.atoms.iter().map(|atom| atom.name.as_str().to_owned()).collect();
         let comp = reduce3::hplace::hydrogen_dictionary(&library, component, &names, false).expect("Source dictionary must exist");
         let definitions = dictionary(&library, &comp).expect("Source hydride definition must read");
         assert_eq!(definitions.len(), 1);
@@ -131,7 +131,7 @@ fn ambiguous_or_mistyped_bridge_isotope_aliases_fail() {
             chain: "L".into(), component: "EJ2".into(), entity: ".".into(), auth_sequence: "601".into(),
             auth_chain: "L".into(), auth_component: "EJ2".into(),
             insertion: ".".into(), alternate: ".".into(), sequence: -1,
-            position: input.atoms[8].position, protein: false, group: 0 });
+            position: input.atoms[8].position, occupancy: 1.0, protein: false, group: 0 });
         input.groups[0].push(9);
         assert!(for_source(&library, &input).is_err(), "H+{name}");
     }

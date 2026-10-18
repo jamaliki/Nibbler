@@ -15,13 +15,18 @@ pub(super) fn add(model: &PdbxModel, graph: &mut PreparedChemistry) -> Result<()
     };
     let mut index: EndpointIndex = HashMap::new();
     for (r, residue) in graph.residues.iter().enumerate() {
-        if let Some(&a) = residue.atoms.values().next() {
-            index
-                .entry(graph.atoms[a].asym_id.clone())
-                .or_default()
-                .entry(graph.atoms[a].sequence_id)
-                .or_default()
-                .push(r);
+        if let Some(a) = residue.atoms.first() {
+            let chain = graph.atoms[a].asym_id.as_str();
+            // Copy each chain name once rather than once per residue.
+            if !index.contains_key(chain) {
+                index.insert(chain.to_owned(), BTreeMap::new());
+            }
+            if let Some(residues) = index.get_mut(chain) {
+                residues
+                    .entry(graph.atoms[a].sequence_id)
+                    .or_default()
+                    .push(r);
+            }
         }
     }
     for row in category_rows(
@@ -164,7 +169,7 @@ fn endpoint(
                         .get(name)
                         .or_else(|| graph.residues[r].aliases.get(name))
                 })
-                .map(|&a| (a, &graph.atoms[a]))
+                .map(|a| (a, &graph.atoms[a]))
         })
         .filter(|(_, a)| {
             values[offset + 1]
@@ -276,26 +281,31 @@ fn add_polymer_links(
     graph: &mut PreparedChemistry,
     polymers: &std::collections::HashSet<&str>,
 ) -> Result<(), SemanticError> {
-    let mut sequence = std::collections::BTreeMap::new();
-    for (r, residue) in graph.residues.iter().enumerate() {
-        if !polymers.contains(residue.entity_id.as_str()) {
-            continue;
+    // Consecutive residue pairs in chain and sequence order, as `(left, right, atom of
+    // left, number)`. The loop below changes bonds only, so the pairs can be listed first.
+    let pairs: Vec<(usize, usize, usize, i64)> = {
+        let mut sequence = BTreeMap::new();
+        for (r, residue) in graph.residues.iter().enumerate() {
+            if !polymers.contains(residue.entity_id.as_str()) {
+                continue;
+            }
+            let Some(first) = residue.atoms.first() else {
+                continue;
+            };
+            let a = &graph.atoms[first];
+            if let Some(number) = a.sequence_id {
+                sequence.insert((a.asym_id.as_str(), number), (r, first));
+            }
         }
-        let Some(&first) = residue.atoms.values().next() else {
-            continue;
-        };
-        let a = &graph.atoms[first];
-        if let Some(number) = a.sequence_id {
-            sequence.insert((a.asym_id.clone(), number), r);
-        }
-    }
-    for ((chain, number), &left) in &sequence {
-        let Some(next) = number.checked_add(1) else {
-            continue;
-        };
-        let Some(&right) = sequence.get(&(chain.clone(), next)) else {
-            continue;
-        };
+        sequence
+            .iter()
+            .filter_map(|(&(chain, number), &(left, first))| {
+                let &(right, _) = sequence.get(&(chain, number.checked_add(1)?))?;
+                Some((left, right, first, number))
+            })
+            .collect()
+    };
+    for (left, right, first, number) in pairs {
         if graph.residues[left].entity_id != graph.residues[right].entity_id {
             continue;
         }
@@ -311,7 +321,7 @@ fn add_polymer_links(
         } else {
             continue;
         };
-        let (Some(&a), Some(&b)) = (
+        let (Some(a), Some(b)) = (
             graph.residues[left].atoms.get(out),
             graph.residues[right].atoms.get(incoming),
         ) else {
@@ -319,11 +329,14 @@ fn add_polymer_links(
         };
         if kind.contains("peptide") {
             let ca = |residue: usize| graph.residues[residue].atoms.get("CA")
-                .and_then(|&atom| graph.atoms[atom].coordinates);
+                .and_then(|atom| graph.atoms[atom].coordinates);
             if let (Some(p), Some(q)) = (ca(left), ca(right))
                 && p.iter().zip(q).map(|(x, y)| (x - y).powi(2)).sum::<f64>() > 4_f64.powi(2)
             {
-                graph.diagnostics.push(format!("Excluded distant CA sequence link {chain}:{number}"));
+                graph.diagnostics.push(format!(
+                    "Excluded distant CA sequence link {}:{number}",
+                    graph.atoms[first].asym_id
+                ));
                 continue;
             }
         }
@@ -335,7 +348,7 @@ fn add_polymer_links(
         {
             graph.diagnostics.push(format!(
                 "Excluded distant sequence link {}:{}",
-                chain, number
+                graph.atoms[first].asym_id, number
             ));
             continue;
         }

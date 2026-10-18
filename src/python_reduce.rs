@@ -8,9 +8,12 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
+use crate::observations::{ParentKeys, RetainedParents};
 use crate::python::PyCifDocument;
+use crate::python_observations::molecular::MolecularView;
 use crate::reduce::{
-    Approach, NTermCharge, OptParams, Params, ProbeParams, ReduceError, load_monomer_library, run, source_model_number,
+    Approach, NTermCharge, OptParams, Params, ProbeParams, ReduceError, SourceCopies, load_monomer_library,
+    run_recording, source_loop, source_model_number,
 };
 
 /// Options already validated by `nibbler.reduce.run`.
@@ -38,9 +41,11 @@ struct Options {
     ignore_missing_restraints: bool,
     allow_missing_restraints_for: Vec<String>,
     required_hydrogen_target_keys: Option<String>,
+    ignored_target_key_components: Vec<String>,
     allow_undefined_ligand_targets: bool,
     allow_unresolved_bond_targets: bool,
     verbosity: i32,
+    report: bool,
     probe: HashMap<String, f64>,
     probe_flags: HashMap<String, bool>,
 }
@@ -126,6 +131,7 @@ fn params(options: &Options) -> PyResult<Params> {
             flip_states: options.set_flip_states.clone().unwrap_or_default(),
             verbosity: options.verbosity,
             compat: options.compat,
+            report: options.report,
             ..OptParams::default()
         },
     })
@@ -140,16 +146,22 @@ fn reduce_error_to_python(error: ReduceError) -> PyErr {
 }
 
 /// Run Reduce3 on a document and return the output document and report.
+///
+/// `parents_view` is a molecular view of this same document and model. Its source atoms then
+/// resolve the retained hydrogen-parent keys, so the document is not read a second time.
 #[pyfunction]
+#[pyo3(signature = (document, options, parents_view=None))]
 fn reduce_document(
     py: Python<'_>,
     document: &PyCifDocument,
     options: Options,
+    parents_view: Option<PyRef<'_, MolecularView>>,
 ) -> PyResult<(PyCifDocument, String, String)> {
     let mut params = params(&options)?;
     let source = Arc::clone(document.document());
     let chem_data = options.chem_data;
     let target_keys = options.required_hydrogen_target_keys;
+    let ignored = options.ignored_target_key_components;
     let allow_undefined = options.allow_undefined_ligand_targets;
     if (allow_undefined || params.allow_unresolved_bond_targets) && target_keys.is_none() {
         return Err(invalid("Target masking requires retained hydrogen target keys".into()));
@@ -159,14 +171,41 @@ fn reduce_document(
         return Err(PyValueError::new_err(("REDUCE_INVALID_MODEL",
             "Required hydrogen target keys need an explicit model_id and strict fixed-mode addition", Vec::<String>::new())));
     }
-    let reduction = py
+    let view = parents_view.as_ref().map(|view| &view.view);
+    if let Some(view) = view && !Arc::ptr_eq(&view.document, &source) {
+        return Err(invalid("parents_view must be a molecular view of the document being reduced".into()));
+    }
+    // Reduce3 copies most `_atom_site` values from source rows, so when the source model
+    // holds the decoded rows of the loop Reduce3 rewrites, the output model copies them.
+    let source_model = document.built_pdbx_model().filter(|model| {
+        let rewritten = source.blocks().first().and_then(|block| source_loop(block, "atom_site"));
+        std::ptr::eq(model.source_document().blocks(), source.blocks())
+            && model.loop_sites().zip(rewritten).is_some_and(|((sites, _), rewritten)| std::ptr::eq(sites, rewritten))
+    });
+    let record = source_model.is_some();
+    if record {
+        // The output document holds the source model until it builds its own model, which
+        // then frees the source model.
+        document.release_pdbx_model();
+    }
+    let (reduction, copies) = py
         .detach(move || {
             if let Some(keys) = target_keys {
                 let model = params.model_id.map(source_model_number).transpose()
                     .map_err(reduce_error_to_python)?
                     .ok_or_else(|| invalid("model_id is missing".into()))?;
-                let retained = crate::observations::RetainedParents::read(&source, &keys, model, chem_data.as_deref())
-                    .map_err(|message| PyValueError::new_err(("REDUCE_INVALID_MODEL", message, Vec::<String>::new())))?;
+                let rejected = |message| PyValueError::new_err(("REDUCE_INVALID_MODEL", message, Vec::<String>::new()));
+                let keys = ParentKeys::parse(&keys, &ignored).map_err(rejected)?;
+                let owned;
+                let parents = match view {
+                    Some(view) if view.source.model == model => &view.source.source,
+                    Some(_) => return Err(invalid("parents_view reads a different model".into())),
+                    None => {
+                        owned = crate::observations::source::read(&source, model).map_err(rejected)?;
+                        &owned
+                    }
+                };
+                let retained = RetainedParents::new(parents, &keys, chem_data.as_deref()).map_err(rejected)?;
                 if allow_undefined {
                     params.allowed_unplaced_hydrogen_parent_sources = retained.ligand_sources();
                     params.allowed_unplaced_bridge_hydrogens = retained.bridge_sources(chem_data.as_deref())
@@ -175,15 +214,17 @@ fn reduce_document(
                 params.required_hydrogen_parent_sources = Some(retained.required);
             }
             let monomers = load_monomer_library(chem_data.as_deref()).map_err(reduce_error_to_python)?;
-            run(&source, &monomers, &params).map_err(reduce_error_to_python)
+            run_recording(&source, &monomers, &params, record).map_err(reduce_error_to_python)
         })?;
     let statuses = reduction.target_uncertainties_json.clone();
     let (output, report) = reduction.into_parts();
-    Ok((
-        PyCifDocument::new(Arc::new(output), document.schema_name().map(str::to_owned)),
-        report,
-        statuses,
-    ))
+    let output = Arc::new(output);
+    let schema = document.schema_name().map(str::to_owned);
+    let output = match (source_model, copies) {
+        (Some(model), Some(SourceCopies { rows, made })) => PyCifDocument::with_copies(output, schema, model, rows, made),
+        _ => PyCifDocument::new(output, schema),
+    };
+    Ok((output, report, statuses))
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

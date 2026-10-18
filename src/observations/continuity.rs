@@ -27,7 +27,7 @@ pub(super) fn apply(source: &Source, mapping: &[usize], tokens: &mut Tokens) {
     let mut chains = BTreeMap::<_, BTreeMap<_, usize>>::new();
     for (group, rows) in source.groups.iter().enumerate() {
         let atom = &source.atoms[rows[0]];
-        let kind = source.entity_types.get(&atom.entity).map(|s| s.to_ascii_lowercase());
+        let kind = source.entity_types.get(atom.entity.as_str()).map(|s| s.to_ascii_lowercase());
         let nucleic = kind.is_some_and(|s| s.contains("ribonucleotide"));
         if atom.sequence > 0 && !atom.protein && nucleic {
             chains.entry((&atom.chain, &atom.entity)).or_default().insert(atom.sequence, group);

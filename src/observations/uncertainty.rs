@@ -1,7 +1,7 @@
 //! Apply source-row diagnostics to only the affected training targets.
 
 use super::{Schema, Tokens, record, source};
-use crate::cif::CifDocument;
+use crate::cif::{CifBlock, CifDocument};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 
@@ -20,7 +20,7 @@ pub(crate) struct TargetUncertainty {
 }
 
 #[cfg(feature = "reduce3")]
-pub(crate) fn from_output(document: &CifDocument, model: i64,
+pub(crate) fn from_output(block: &CifBlock, model: i64,
     output: &reduce3::pipeline::Output, required: Option<&[u32]>, allow_bonds: bool) -> Result<Vec<TargetUncertainty>, String> {
     let mut rows = BTreeMap::new();
     for site in &output.hydrogen_uncertainties {
@@ -50,7 +50,7 @@ pub(crate) fn from_output(document: &CifDocument, model: i64,
         rows.retain(|row, _| required.contains(row));
     }
     if rows.is_empty() { return Ok(Vec::new()); }
-    let source = source::read(document, model)?;
+    let source = source::read(&CifDocument::new(vec![block.clone()]), model)?;
     let atoms = source.atoms.iter().map(|atom| (atom.source_row, atom)).collect::<HashMap<_, _>>();
     rows.into_iter().map(|(row, (hydrogens_unknown, reasons))| {
         let atom = atoms.get(&row).ok_or("An uncertain target lacks its original heavy source row")?;
@@ -75,8 +75,8 @@ pub(crate) fn apply(tokens: &mut Tokens, schema: &Schema, values: &[TargetUncert
     if values.is_empty() { return Ok(()); }
     let lookup = tokens.keys.iter().enumerate().map(|(row, key)| (key.clone(), row)).collect::<HashMap<_, _>>();
     for value in values {
-        let mut key = value.parent_key.clone();
-        let parent_name = key[4].clone();
+        let mut key = value.parent_key.each_ref().map(|text| crate::pdbx::ShortText::new(text));
+        let parent_name = value.parent_key[4].as_str();
         let ligand_row = lookup.get(&key).copied();
         key[4] = "protein".into();
         let row = ligand_row.or_else(|| lookup.get(&key).copied())
@@ -85,7 +85,7 @@ pub(crate) fn apply(tokens: &mut Tokens, schema: &Schema, values: &[TargetUncert
             if value.chemical_unknown { tokens.charge_known[row] = 0; }
             if value.hydrogens_unknown { tokens.hydrogen_known[row] = 0; }
         } else {
-            apply_protein(tokens, schema, row, &parent_name, value)?;
+            apply_protein(tokens, schema, row, parent_name, value)?;
         }
     }
     Ok(())
