@@ -53,6 +53,37 @@ def test_native_spatial_plans_match_python(kind, size):
     np.testing.assert_array_equal(actual["crop_offsets"], [0, len(expected["crop_center"])])
 
 
+
+@pytest.mark.parametrize("limits", [(64, 9), (30, 4)])
+@pytest.mark.parametrize("size", [50, 384])
+@pytest.mark.parametrize("kind", ["ligand", "partial", "fallback", "sparse"])
+def test_uncapped_plans_reproduce_capped_plans(kind, size, limits):
+    tokens = fixture(kind)
+    buffers = (np.ascontiguousarray(tokens["pos"][:, 0]).tobytes(), tokens["chain_idx"].tobytes(),
+               tokens["is_ligand"].tobytes(), (tokens["is_ligand"] | tokens["mask"][:, 1]).tobytes())
+    values, mass = packer().crop_plans(*buffers, crop_size=size, ligand_limits=limits)
+    capped = native.arrays(values)
+    uncapped = native.arrays(packer().crop_plans(*buffers, crop_size=size, ligand_limits=None)[0])
+    assert "centre_ligand_tokens" not in capped
+    assert len(uncapped["centre_ligand_tokens"]) == np.count_nonzero(tokens["is_ligand"])
+    over = lambda prefix: ((uncapped[prefix + "_tokens"] > limits[0])
+                           | (uncapped[prefix + "_chains"] > limits[1]))
+    keep = ~over("crop_ligand")
+    words = int(uncapped["crop_chain_words"][0])
+    for name in ("crop_center", "crop_radius", "crop_tie", "crop_ligand_tokens", "crop_ligand_chains"):
+        np.testing.assert_array_equal(capped[name], uncapped[name][keep], err_msg=name)
+    np.testing.assert_array_equal(capped["crop_chain_bits"],
+                                  uncapped["crop_chain_bits"].reshape(-1, words)[keep].reshape(-1))
+    total, ligands = len(tokens["is_ligand"]), np.count_nonzero(tokens["is_ligand"])
+    retry = np.count_nonzero(over("centre_ligand"))
+    weights = ((0.01 + 0.99 * retry / ligands) / total
+               + 0.99 / ligands * tokens["is_ligand"][capped["crop_center"]])
+    assert mass == pytest.approx(weights.sum(), rel=1e-13, abs=1e-15)
+    if len(weights):
+        np.testing.assert_allclose(capped["crop_probability"], weights / weights.sum(), rtol=1e-13, atol=1e-15)
+    assert not (np.any(capped["crop_ligand_tokens"] > limits[0]) or np.any(capped["crop_ligand_chains"] > limits[1]))
+
+
 def test_native_permutation_rejects_heavy_moves_and_cross_chain_swaps():
     before = np.array([[0., 0., 0.], [1., 0., 0.], [2., 0., 0.]], dtype=np.float32)
     after = before[[0, 2, 1]]

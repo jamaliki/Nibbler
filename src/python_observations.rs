@@ -113,7 +113,8 @@ impl ObservationPacker {
     }
 
     #[staticmethod]
-    #[pyo3(signature = (positions, chains, ligand, usable, *, crop_size=384, centre_eligible=None, chain_minimum=None, chain_protein=None))]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (positions, chains, ligand, usable, *, crop_size=384, centre_eligible=None, chain_minimum=None, chain_protein=None, ligand_limits=Some(observations::crops::LIGAND_LIMITS)))]
     fn crop_plans<'py>(
         py: Python<'py>,
         positions: &[u8],
@@ -124,22 +125,33 @@ impl ObservationPacker {
         centre_eligible: Option<&[u8]>,
         chain_minimum: Option<&[u8]>,
         chain_protein: Option<&[u8]>,
+        ligand_limits: Option<(u32, u32)>,
     ) -> PyResult<(Bound<'py, PyDict>, f64)> {
         let value = py
             .detach(|| observations::crops::plan_with_chain_policy(positions, chains, ligand, usable, crop_size,
-                centre_eligible, chain_minimum, chain_protein))
+                centre_eligible, chain_minimum, chain_protein, ligand_limits))
             .map_err(PyValueError::new_err)?;
         let result = PyDict::new(py);
         let count = value.centers.len();
         let put = |name, dtype, shape: Vec<usize>, bytes: Vec<u8>| -> PyResult<()> {
             result.set_item(name, (dtype, shape, PyByteArray::new(py, &bytes)))
         };
+        let counts = |values: Vec<u32>| values.into_iter().map(i64::from).collect::<Vec<_>>();
+        let uncapped = ligand_limits.is_none();
         for (name, values) in [
             ("crop_center", value.centers),
             ("crop_tie", value.ties),
             ("crop_chain_words", vec![value.words as i64]),
             ("crop_offsets", vec![0, count as i64]),
-        ] {
+            ("crop_ligand_tokens", counts(value.ligand_tokens)),
+            ("crop_ligand_chains", counts(value.ligand_chains)),
+        ]
+        .into_iter()
+        .chain(uncapped.then(|| [
+            ("centre_ligand_tokens", counts(value.centre_ligand_tokens)),
+            ("centre_ligand_chains", counts(value.centre_ligand_chains)),
+        ]).into_iter().flatten())
+        {
             put(
                 name,
                 "=i8",

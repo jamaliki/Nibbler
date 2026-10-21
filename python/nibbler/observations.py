@@ -25,6 +25,14 @@ source_atom_row identifies the original atom_site row. crop_plans accepts paired
 chain_minimum and chain_protein byte arrays for typed polymer crops; the default
 keeps the existing protein and small-molecule crop policy.
 
+crop_plans rejects a crop that keeps more ligand tokens or ligand chains than
+ligand_limits, (64, 9) by default, and returns crop_ligand_tokens and
+crop_ligand_chains for each accepted crop. With ligand_limits=None it keeps
+every crop that retains a protein chain and adds centre_ligand_tokens and
+centre_ligand_chains for the crop of every eligible ligand centre, in token
+order. Rejecting those plans over chosen limits and counting the ligand centres
+over them as retries reproduces the plans and weights for those limits.
+
 product_targets accepts a JSON list of occurrence-specific product records with
 parent_key, sequence_id, formal_charge, hybridization, hydrogens, complete, and
 modified fields. The packer applies these before token selection. Ligand H and

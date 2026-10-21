@@ -288,7 +288,7 @@ class ObservationPacker:
     @staticmethod
     def crop_plans(positions: bytes, chains: bytes, ligand: bytes, usable: bytes, *, crop_size: int = 384,
                    centre_eligible: bytes | None = None, chain_minimum: bytes | None = None,
-                   chain_protein: bytes | None = None
+                   chain_protein: bytes | None = None, ligand_limits: tuple[int, int] | None = (64, 9)
                    ) -> tuple[dict[str, tuple[str, list[int], bytearray]], float]: ...
     def ligand_components(self, document: CifDocument, *, model: int = 1) -> list[str]: ...
     def missing_hydrogen_dictionaries(self, document: CifDocument, *, chem_data: str,

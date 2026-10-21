@@ -6,6 +6,14 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
 
 ### Added
 
+- `crop_plans` takes `ligand_limits`, the most ligand tokens and ligand chains a
+  crop may keep, with the former (64, 9) as the default. It also returns the
+  ligand tokens and chains each accepted crop keeps. `ligand_limits=None` plans
+  every crop that keeps a protein chain and also reports the counts of every
+  eligible ligand centre's crop. Rejecting the uncapped plans over chosen limits,
+  and counting the ligand centres over them as retries, gives that limit's plans
+  and weights bit for bit, so callers can choose the limits after planning.
+
 - Seeded `random_clash_aware` conformer selection varies residue alternatives
   even when occupancies differ. It preserves source rows and occupancy values,
   keeps explicitly qualified inter-residue link alternatives together, and

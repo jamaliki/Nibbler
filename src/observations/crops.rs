@@ -11,7 +11,35 @@ pub(crate) struct CropPlans {
     pub probabilities: Vec<f64>,
     pub words: usize,
     pub mass: f64,
+    /// Ligand tokens and ligand chains that each accepted crop keeps.
+    pub ligand_tokens: Vec<u32>,
+    pub ligand_chains: Vec<u32>,
+    /// The same counts for the crop of every eligible ligand centre, in token order, whether
+    /// or not the crop keeps a protein chain. Only uncapped plans fill these.
+    pub centre_ligand_tokens: Vec<u32>,
+    pub centre_ligand_chains: Vec<u32>,
 }
+
+impl CropPlans {
+    fn empty(words: usize) -> Self {
+        Self {
+            centers: Vec::new(),
+            radii: Vec::new(),
+            ties: Vec::new(),
+            bits: Vec::new(),
+            probabilities: Vec::new(),
+            words,
+            mass: 0.,
+            ligand_tokens: Vec::new(),
+            ligand_chains: Vec::new(),
+            centre_ligand_tokens: Vec::new(),
+            centre_ligand_chains: Vec::new(),
+        }
+    }
+}
+
+/// Default ligand limits: a crop that keeps more ligand tokens or ligand chains is rejected.
+pub(crate) const LIGAND_LIMITS: (u32, u32) = (64, 9);
 
 struct View {
     positions: Vec<[f32; 3]>,
@@ -24,6 +52,9 @@ struct View {
     chain_minimum: Vec<usize>,
     chain_protein: Vec<bool>,
     size: usize,
+    /// Most ligand tokens and ligand chains a crop may keep; `u32::MAX` when uncapped.
+    token_limit: u32,
+    chain_limit: u32,
 }
 
 fn centers(bytes: &[u8]) -> Result<Vec<[f32; 3]>, String> {
@@ -96,7 +127,17 @@ impl View {
             chain_protein: chain_ligand.iter().map(|&ligand| !ligand).collect(),
             chain_ligand,
             size,
+            token_limit: LIGAND_LIMITS.0,
+            chain_limit: LIGAND_LIMITS.1,
         })
+    }
+
+    fn capped(&self) -> bool {
+        self.token_limit != u32::MAX || self.chain_limit != u32::MAX
+    }
+
+    fn over(&self, tokens: u32, chains: u32) -> bool {
+        tokens > self.token_limit || chains > self.chain_limit
     }
 
     /// Write the crop size nearest tokens under `compare` into `distances`, with the farthest
@@ -125,11 +166,12 @@ impl View {
         }
     }
 
-    /// Return the retained chain bits, or None, and whether the crop has too many ligands.
+    /// Return the retained chain bits, or None, whether the crop has too many ligands, and the
+    /// ligand tokens and ligand chains it keeps.
     ///
     /// A neighbour stays when its chain does: a ligand chain must be complete and any other
     /// chain needs its minimum count. `tally` must be zero on entry and is zero on return.
-    fn filter(&self, initial: &[(f32, usize)], tally: &mut Tally) -> (Option<Vec<u64>>, bool) {
+    fn filter(&self, initial: &[(f32, usize)], tally: &mut Tally) -> Filtered {
         for &(_, index) in initial {
             let chain = self.chains[index];
             if tally.tokens[chain] == 0 {
@@ -139,7 +181,7 @@ impl View {
             tally.ligands[chain] += usize::from(self.ligand[index]);
             tally.usable[chain] += usize::from(self.usable[index]);
         }
-        let (mut ligand_count, mut ligand_chains, mut protein) = (0, 0, false);
+        let (mut ligand_count, mut ligand_chains, mut protein) = (0_u32, 0_u32, false);
         let mut bits = vec![0; self.chain_sizes.len().div_ceil(64)];
         for &chain in &tally.chains {
             let count = tally.tokens[chain];
@@ -149,8 +191,8 @@ impl View {
                 count >= self.chain_minimum[chain]
             };
             if kept {
-                ligand_count += tally.ligands[chain];
-                ligand_chains += usize::from(tally.ligands[chain] > 0);
+                ligand_count += tally.ligands[chain] as u32;
+                ligand_chains += u32::from(tally.ligands[chain] > 0);
                 let usable = tally.usable[chain];
                 if usable > 0 && usable >= self.chain_minimum[chain] {
                     bits[chain / 64] |= 1_u64 << (chain % 64);
@@ -162,12 +204,16 @@ impl View {
             tally.usable[chain] = 0;
         }
         tally.chains.clear();
-        if ligand_count > 64 || ligand_chains > 9 {
-            return (None, true);
+        let ligands = (ligand_count, ligand_chains);
+        if self.over(ligand_count, ligand_chains) {
+            return (None, true, ligands);
         }
-        (protein.then_some(bits), false)
+        (protein.then_some(bits), false, ligands)
     }
 }
+
+/// Retained chain bits or None, the ligand-limit flag, and the kept ligand tokens and chains.
+type Filtered = (Option<Vec<u64>>, bool, (u32, u32));
 
 /// Per-chain counts reused across crop centres.
 struct Tally {
@@ -188,8 +234,8 @@ impl Tally {
     }
 }
 
-/// Retained chain bits, the ligand-limit flag and the farthest neighbour of one centre.
-type Crop = (Option<Vec<u64>>, bool, Option<(f32, usize)>);
+/// Filter result and the farthest neighbour of one centre.
+type Crop = (Filtered, Option<(f32, usize)>);
 
 /// Coordinates as a hash key; signed zeros give equal distances, so they share a key.
 fn site_key(point: [f32; 3]) -> [u32; 3] {
@@ -219,9 +265,6 @@ const BAND_PASSES: usize = 8;
 const GUESS_SHARE: f32 = 0.9;
 /// Surveys of one block, each with a longer reach, before the block is searched in full.
 const SKIP_TRIES: usize = 3;
-/// A crop over either limit is rejected: ligand tokens and ligand chains it keeps.
-const LIGAND_TOKEN_LIMIT: u32 = 64;
-const LIGAND_CHAIN_LIMIT: u32 = 9;
 
 /// Neighbour tokens sorted by grid cell with z fastest.
 ///
@@ -353,6 +396,8 @@ struct Outcome {
     bits: u32,
     radius: f32,
     tie: u32,
+    /// Ligand tokens and ligand chains the crop keeps, when it was measured.
+    ligands: (u32, u32),
 }
 
 /// Contribution of one chain to the filter of the current crop.
@@ -481,7 +526,7 @@ impl Tallies {
             }
         }
         self.dirty.clear();
-        let over = self.ligand_count > LIGAND_TOKEN_LIMIT || self.ligand_chains > LIGAND_CHAIN_LIMIT;
+        let over = view.over(self.ligand_count, self.ligand_chains);
         (over, !over && self.protein > 0)
     }
 }
@@ -776,11 +821,13 @@ impl<'a> Sweep<'a> {
     /// The caller ensures that fewer tokens than the crop size lie at or under `limit`.
     /// Those tokens are then all in the crop, and each of these chains is complete in it.
     fn over(&self, point: [f32; 3], limit: u32) -> bool {
-        self.singles
-            .iter()
-            .filter(|&&other| distance(other, point).to_bits() <= limit)
-            .count()
-            > LIGAND_CHAIN_LIMIT as usize
+        self.view.chain_limit != u32::MAX
+            && self
+                .singles
+                .iter()
+                .filter(|&&other| distance(other, point).to_bits() <= limit)
+                .count()
+                > self.view.chain_limit as usize
     }
 
     /// Find the crop boundary of the centre at `point`.
@@ -879,7 +926,12 @@ impl<'a> Sweep<'a> {
             bits: u32::MAX,
             radius: 0.,
             tie: 0,
+            ligands: (0, 0),
         };
+        // A block's gathered ligand tokens bound the ligand tokens and chains of its crops, so
+        // few enough of them prove that no crop is over a limit. Uncapped plans measure every
+        // ligand centre to report its counts.
+        let ligand_bound = if view.capped() { view.token_limit.min(view.chain_limit) } else { 0 };
         let mut outcomes = vec![rejected; count];
         let mut store = Vec::new();
         let blocks: [usize; 3] =
@@ -913,7 +965,7 @@ impl<'a> Sweep<'a> {
                 (low[axis] + BLOCK_CELLS - 1).min(self.cells.dims[axis] - 1)
             });
             // Whether every crop in the block is rejected: for any centre when it keeps no
-            // protein chain, and also for ligand centres when it cannot be over the limit.
+            // protein chain, and also for capped ligand centres when it cannot be over a limit.
             let (mut skip, mut skip_ligand) = (false, false);
             for _ in 0..SKIP_TRIES {
                 let (protein, ligands) = self.survey(low, high, reach);
@@ -921,7 +973,7 @@ impl<'a> Sweep<'a> {
                     break;
                 }
                 if self.inner(low, high) >= size {
-                    (skip, skip_ligand) = (true, ligands <= LIGAND_CHAIN_LIMIT);
+                    (skip, skip_ligand) = (true, view.capped() && ligands <= ligand_bound);
                     break;
                 }
                 reach *= 1.5;
@@ -982,6 +1034,7 @@ impl<'a> Sweep<'a> {
                     bits,
                     radius,
                     tie: boundary as u32,
+                    ligands: (self.tallies.ligand_count, self.tallies.ligand_chains),
                 };
                 guess = radius;
                 farthest = farthest.max(radius);
@@ -1008,15 +1061,26 @@ pub(crate) fn plan(
     size: usize,
     center_eligible: Option<&[u8]>,
 ) -> Result<CropPlans, String> {
-    plan_with_chain_policy(positions, chains, ligand, usable, size, center_eligible, None, None)
+    plan_with_chain_policy(positions, chains, ligand, usable, size, center_eligible, None, None, Some(LIGAND_LIMITS))
 }
 
+/// Plan every crop under the ligand limits, or under none with `ligand_limits` None.
+///
+/// Uncapped plans keep each crop that retains a protein chain and report the ligand counts of
+/// every eligible ligand centre's crop. Rejecting the plans over chosen limits then gives
+/// those limits' plans, and those counts give their retry weight.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn plan_with_chain_policy(
     positions: &[u8], chains: &[u8], ligand: &[u8], usable: &[u8], size: usize,
     center_eligible: Option<&[u8]>, chain_minimum: Option<&[u8]>, chain_protein: Option<&[u8]>,
+    ligand_limits: Option<(u32, u32)>,
 ) -> Result<CropPlans, String> {
     let mut view = View::read(positions, chains, ligand, usable, size, center_eligible)?;
+    (view.token_limit, view.chain_limit) = match ligand_limits {
+        Some((tokens, chains)) if tokens < u32::MAX && chains < u32::MAX => (tokens, chains),
+        Some(_) => return Err("Ligand crop limits must be below 2^32 - 1".into()),
+        None => (u32::MAX, u32::MAX),
+    };
     if let (Some(minimum), Some(protein)) = (chain_minimum, chain_protein) {
         if minimum.len() != view.chain_sizes.len() * 8 || protein.len() != view.chain_sizes.len()
             || protein.iter().any(|&value| value > 1) {
@@ -1036,17 +1100,10 @@ pub(crate) fn plan_with_chain_policy(
     }
     let total = view.center_eligible.iter().filter(|&&value| value).count();
     let ligand_count = view.ligand.iter().zip(&view.center_eligible).filter(|&(ligand, eligible)| *ligand && *eligible).count();
-    let mut result = CropPlans {
-        centers: Vec::new(),
-        radii: Vec::new(),
-        ties: Vec::new(),
-        bits: Vec::new(),
-        probabilities: Vec::new(),
-        words: view.chain_sizes.len().div_ceil(64).max(1),
-        mass: 0.,
-    };
+    let mut result = CropPlans::empty(view.chain_sizes.len().div_ceil(64).max(1));
     let mut retry = 0;
-    if total == 0 || view.ligand.iter().all(|&value| value) {
+    // A view of ligands alone keeps no protein chain; uncapped plans still report its counts.
+    if total == 0 || view.capped() && view.ligand.iter().all(|&value| value) {
         return Ok(result);
     }
     let cells = (view.positions.len() >= SWEEP_MIN_TOKENS.max(4 * view.size))
@@ -1060,12 +1117,18 @@ pub(crate) fn plan_with_chain_policy(
                 continue;
             }
             retry += usize::from(outcome.over && view.ligand[center]);
+            if view.ligand[center] && !view.capped() {
+                result.centre_ligand_tokens.push(outcome.ligands.0);
+                result.centre_ligand_chains.push(outcome.ligands.1);
+            }
             if outcome.bits != u32::MAX {
                 let at = outcome.bits as usize;
                 result.centers.push(center as i64);
                 result.radii.push(outcome.radius);
                 result.ties.push(i64::from(outcome.tie));
                 result.bits.extend_from_slice(&store[at..at + words]);
+                result.ligand_tokens.push(outcome.ligands.0);
+                result.ligand_chains.push(outcome.ligands.1);
             }
         }
         return Ok(finish(result, &view, retry, total, ligand_count));
@@ -1084,24 +1147,29 @@ pub(crate) fn plan_with_chain_policy(
     for center in 0..view.positions.len() {
         if !view.center_eligible[center] { continue; }
         let key = site_key(view.positions[center]);
-        let (bits, over, boundary) = if let Some(crop) = shared.get(&key) {
+        let ((bits, over, ligands), boundary) = if let Some(crop) = shared.get(&key) {
             crop.clone()
         } else {
             view.nearest_all(center, &mut nearest);
-            let (bits, over) = view.filter(&nearest, &mut tally);
-            let crop = (bits, over, nearest.last().copied());
+            let crop = (view.filter(&nearest, &mut tally), nearest.last().copied());
             if repeats.contains_key(&key) {
                 shared.insert(key, crop.clone());
             }
             crop
         };
         retry += usize::from(over && view.ligand[center]);
+        if view.ligand[center] && !view.capped() {
+            result.centre_ligand_tokens.push(ligands.0);
+            result.centre_ligand_chains.push(ligands.1);
+        }
         if let Some(bits) = bits {
             let (radius, tie) = boundary.ok_or("An accepted spatial crop has no neighbors")?;
             result.centers.push(center as i64);
             result.radii.push(radius);
             result.ties.push(tie as i64);
             result.bits.extend(bits);
+            result.ligand_tokens.push(ligands.0);
+            result.ligand_chains.push(ligands.1);
         }
     }
     Ok(finish(result, &view, retry, total, ligand_count))
