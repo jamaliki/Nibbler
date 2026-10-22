@@ -151,6 +151,10 @@ def run(
     either score preference to zero does not disable this geometry check.
     Ordinary alcohols, thiols and Reduce2 compatibility mode remain unchanged.
 
+    Fixed mode names NH2 hydrogens as IUPAC does (Asn HD21, Gln HE21 and Arg
+    HH11/HH21 cis to CB, CG and NE) with or without flips, and places HA again
+    after a flip docks an Asn, Gln or His side chain.
+
     ``allow_missing_restraints_for`` keeps named components as contact context
     when they lack a dictionary. It adds no hydrogens to those components and
     records them in the report. Known dictionaries and strict checks for all

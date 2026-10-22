@@ -24,6 +24,14 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
   and a coordinate-array API at `geometry.sasa`. Parsing performs no SASA work
   unless the caller requests this separate operation.
 
+- Reduce3's fixed mode names the hydrogens of Asn, Gln and Arg NH2 groups and of
+  base amino groups as IUPAC does (HD21, HE21, HH11 and HH21 cis to CB, CG and NE;
+  H61, H41 and H21 cis to N1, N3 and N1), whether or not flips are considered.
+  Before, HD21/HD22 and HE21/HE22 swapped between runs with and without flips,
+  and every Arg was named the other way. After an Asn, Gln or His flip docks the
+  side chain, HA is placed again from the final CB, by up to 0.07 A. Scores, flip
+  choices and Reduce2 compatibility mode remain unchanged.
+
 - Reduce3's fixed mode limits conjugated O-H displacement to 0.12 A from both
   local planes and checks the final coordinates independently of contact scores.
   The 6TBR regression retains its Gln contact without a large TYR224 H tilt.
