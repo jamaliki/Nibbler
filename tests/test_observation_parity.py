@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 import nibbler
+from token_tables import token_table
 
 schema = pytest.importorskip("kaveh_data.atom32_schema")
 atom32 = pytest.importorskip("kaveh_data.atom32")
@@ -19,7 +20,7 @@ def packer(catalog=None):
     from kaveh_data.chemistry import AtomFeature
     from kaveh_data.pdb_tokens import LIGAND_ELEMENTS
 
-    result = observations.ObservationPacker(schema.ENCODED, list(LIGAND_ELEMENTS),
+    result = observations.ObservationPacker(schema.ENCODED, token_table(*LIGAND_ELEMENTS),
                                            sorted(EXCLUDED_COMPONENTS))
     if catalog is not None:
         indices = [AtomFeature.FORMAL_CHARGE, AtomFeature.HYBRIDIZATION,

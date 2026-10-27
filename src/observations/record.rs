@@ -1,7 +1,7 @@
 //! Owned dense arrays, complete-residue selection and identity alignment.
 
 use super::source::Atom;
-use super::{Schema, residue};
+use super::{Schema, TokenTable, residue};
 use crate::pdbx::ShortText;
 use std::collections::{BTreeSet, HashMap};
 
@@ -169,7 +169,7 @@ impl Tokens {
         self.hybridization.push(i64::from(features[1]));
         self.covalent.push(0);
         self.keys.push(short_key(atom, ligand));
-        self.crop_center_eligible.push(u8::from(identity != 65));
+        self.crop_center_eligible.push(1);
     }
 
     pub fn select(&mut self, indices: &[usize]) -> Result<(), String> {
@@ -279,11 +279,11 @@ impl Tokens {
         Ok(())
     }
 
-    pub fn validate(&self, schema: &Schema) -> Result<(), String> {
+    pub fn validate(&self, schema: &Schema, table: &TokenTable) -> Result<(), String> {
         let mut bridges: HashMap<usize, BTreeSet<usize>> = HashMap::new();
         for &(hydrogen, metal, kind) in &self.bridge_edges {
             if hydrogen >= self.identity.len() || metal >= self.identity.len()
-                || self.identity[hydrogen] != 65 || self.ligand[hydrogen] == 0
+                || self.identity[hydrogen] != table.hydrogen() || self.ligand[hydrogen] == 0
                 || self.ligand[metal] == 0 || hydrogen == metal || kind != 1 {
                 return Err("Ligand bridge edges have invalid endpoints or type".into());
             }
@@ -292,7 +292,7 @@ impl Tokens {
             }
         }
         for (row, &identity) in self.identity.iter().enumerate() {
-            if identity == 65 && self.ligand[row] != 0
+            if identity == table.hydrogen() && self.ligand[row] != 0
                 && bridges.get(&row).is_none_or(|metals| metals.len() != 2) {
                 return Err("Ligand bridge hydrogen requires exactly two metal edges".into());
             }

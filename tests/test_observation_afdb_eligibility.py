@@ -8,6 +8,7 @@ import struct
 import numpy as np
 import pyarrow as pa
 import pytest
+from token_tables import token_table
 
 observations = pytest.importorskip("nibbler.observations")
 if os.environ.get("KAVEH_ATOM32_SCHEMA"):
@@ -67,7 +68,7 @@ def encode(proteins):
 
 
 def native():
-    return observations.ObservationPacker(ENCODED, [], [])
+    return observations.ObservationPacker(ENCODED, token_table(), [])
 
 
 def scan(raw, **kwargs):

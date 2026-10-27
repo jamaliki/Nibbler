@@ -1,6 +1,12 @@
 """Pack observed coordinates in native code under a caller-owned slot schema.
 
-ObservationPacker accepts a JSON schema and retains its ligand feature tables.
+ObservationPacker accepts a JSON schema, the caller's ligand token table and the
+components to exclude, and retains its ligand feature tables. The token table is
+{"elements": {symbol: token}, "other": token, "hydrogen": token}. A heavy ligand
+atom takes the token of its upper-case element symbol as written, or the other
+token; a bridging metal hydride takes the hydrogen token. Nibbler derives no ligand
+token itself. The constructor refuses a table whose tokens repeat, fall in the
+residue range 0-20, or name hydrogen as an element.
 add_hydrogen_parents stores dictionary hydrogen-to-heavy-atom names per component.
 Ligand packing uses observed covalent bonds first, then dictionary parents, and
 uses distance only when neither source names a parent. Protein packing uses the

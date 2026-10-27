@@ -7,7 +7,7 @@ use super::arrays::{self, Array};
 use super::json;
 use super::snapshot::Snapshot;
 use super::{Failure, MolecularSchema, SLOTS};
-use crate::observations::Tokens;
+use crate::observations::{TokenTable, Tokens};
 use crate::observations::record::same_residue;
 use crate::observations::source::Source;
 use crate::hash::{FastMap, FastSet};
@@ -654,6 +654,7 @@ struct Context<'a> {
     source: &'a Source,
     snapshot: &'a Snapshot,
     molecular: &'a MolecularSchema,
+    table: &'a TokenTable,
     rows: Vec<Row>,
     /// Slot names by token.
     names: Vec<Option<Vec<&'a str>>>,
@@ -872,8 +873,7 @@ impl<'a> Context<'a> {
                 || !self.ownership.target_known[atom] {
                 continue;
             }
-            let aatype = self.molecular.ligand_elements.iter().position(|value| *value == element)
-                .map_or(64, |index| 21 + index as i64);
+            let aatype = self.table.element(&element);
             let token = self.push(Row {
                 aatype,
                 is_ligand: true,
@@ -975,7 +975,7 @@ impl ByGroup {
 /// With `index`, skip the slot names, SASA rows and ligand connectivity, which only
 /// the full output reads; every check that can fail still runs.
 pub(super) fn pack<'a>(legacy: &'a Tokens, source: &'a Source, snapshot: &'a Snapshot,
-    molecular: &'a MolecularSchema, index: bool) -> Result<Packed<'a>, Failure> {
+    molecular: &'a MolecularSchema, table: &'a TokenTable, index: bool) -> Result<Packed<'a>, Failure> {
     let groups = Groups::read(source, snapshot)?;
     let count = legacy.identity.len();
     let bridges = !legacy.bridge_edges.is_empty();
@@ -1032,7 +1032,7 @@ pub(super) fn pack<'a>(legacy: &'a Tokens, source: &'a Source, snapshot: &'a Sna
         }
     }
     let mut context = Context {
-        source, snapshot, molecular, rows: Vec::with_capacity(count + groups.order.len()),
+        source, snapshot, molecular, table, rows: Vec::with_capacity(count + groups.order.len()),
         names: Vec::new(), ownership: Ownership::new(snapshot), canonical: FastMap::default(), elements: Vec::new(),
     };
     let mut keys: Vec<[&'a str; 5]> = Vec::with_capacity(count);

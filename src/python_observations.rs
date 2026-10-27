@@ -1,6 +1,6 @@
 //! Python receives typed buffers after native observation packing.
 
-use crate::observations::{self, HydrogenParents, LigandFeatures, Schema, Tokens};
+use crate::observations::{self, HydrogenParents, LigandFeatures, Schema, TokenTable, Tokens};
 use crate::python::PyCifDocument;
 use pyo3::buffer::{PyBuffer, PyUntypedBuffer};
 use pyo3::exceptions::PyValueError;
@@ -18,7 +18,7 @@ use prepared::PreparedObservationSource;
 #[pyclass(module = "nibbler.observations")]
 struct ObservationPacker {
     schema: Schema,
-    elements: Vec<String>,
+    table: TokenTable,
     excluded: Vec<String>,
     features: LigandFeatures,
     hydrogen_parents: HydrogenParents,
@@ -29,10 +29,10 @@ struct ObservationPacker {
 #[pymethods]
 impl ObservationPacker {
     #[new]
-    fn new(schema: &str, elements: Vec<String>, excluded: Vec<String>) -> PyResult<Self> {
+    fn new(schema: &str, token_table: &Bound<'_, PyDict>, excluded: Vec<String>) -> PyResult<Self> {
         Ok(Self {
             schema: Schema::read(schema).map_err(PyValueError::new_err)?,
-            elements,
+            table: token_table_from(token_table)?,
             excluded,
             features: HashMap::new(),
             hydrogen_parents: HashMap::new(),
@@ -273,7 +273,7 @@ impl ObservationPacker {
             .ok_or_else(|| PyValueError::new_err("The packer has no molecular schema"))?;
         let packer = observations::molecular::Packer {
             schema: &self.schema, features: &self.features, hydrogen_parents: &self.hydrogen_parents,
-            elements: &self.elements, excluded: &self.excluded, molecular: schema,
+            table: &self.table, excluded: &self.excluded, molecular: schema,
         };
         let options = observations::molecular::Options {
             complete, sasa, uncertainties: target_uncertainties, expected: expected_keys, keys_json, index,
@@ -310,7 +310,7 @@ impl ObservationPacker {
         product_targets: Option<&str>,
     ) -> PyResult<(Bound<'py, PyDict>, Vec<[String; 5]>)> {
         self.finish_pack(py, || observations::pack(document.document(), &self.schema, &self.features,
-            &self.hydrogen_parents, &self.elements, &self.excluded, &observations::PackOptions {
+            &self.hydrogen_parents, &self.table, &self.excluded, &observations::PackOptions {
                 model, complete, topology_policy, protein_only, chem_data: chem_data.as_deref(),
             }), protein_only, complete_tokens, expected_keys, validate, with_keys, target_uncertainties, product_targets)
     }
@@ -325,7 +325,7 @@ impl ObservationPacker {
         product_targets: Option<&str>,
     ) -> PyResult<(Bound<'py, PyDict>, Vec<[String; 5]>)> {
         self.finish_pack(py, || source.source.pack(&self.schema, &self.features,
-            &self.hydrogen_parents, &self.elements, &self.excluded, &observations::PackOptions {
+            &self.hydrogen_parents, &self.table, &self.excluded, &observations::PackOptions {
                 model: source.source.model, complete, topology_policy, protein_only,
                 chem_data: chem_data.as_deref(),
             }), protein_only, complete_tokens, expected_keys, validate, with_keys, target_uncertainties, product_targets)
@@ -352,6 +352,22 @@ impl ObservationPacker {
     }
 }
 
+/// Read `{"elements": {symbol: token}, "other": token, "hydrogen": token}`.
+fn token_table_from(value: &Bound<'_, PyDict>) -> PyResult<TokenTable> {
+    let (mut elements, mut other, mut hydrogen) = (None, None, None);
+    for (key, item) in value.iter() {
+        match key.extract::<String>()?.as_str() {
+            "elements" => elements = Some(item.extract::<HashMap<String, i64>>()?),
+            "other" => other = Some(item.extract::<i64>()?),
+            "hydrogen" => hydrogen = Some(item.extract::<i64>()?),
+            name => return Err(PyValueError::new_err(format!("Unknown ligand token table field {name:?}"))),
+        }
+    }
+    let missing = |name: &str| PyValueError::new_err(format!("The ligand token table has no {name}"));
+    TokenTable::new(elements.ok_or_else(|| missing("elements"))?, other.ok_or_else(|| missing("other token"))?,
+        hydrogen.ok_or_else(|| missing("hydrogen token"))?).map_err(PyValueError::new_err)
+}
+
 impl ObservationPacker {
     #[allow(clippy::too_many_arguments)]
     fn finish_pack<'py>(&self, py: Python<'py>, build: impl FnOnce() -> Result<Tokens, String> + Send,
@@ -362,7 +378,7 @@ impl ObservationPacker {
             if let Some(json) = product_targets {
                 let values: Vec<observations::product::ProductTarget> =
                     serde_json::from_str(json).map_err(|error| error.to_string())?;
-                observations::product::apply(&mut result, &self.schema, &values)?;
+                observations::product::apply(&mut result, &self.schema, &self.table, &values)?;
             }
             if let Some(json) = target_uncertainties {
                 let values: Vec<observations::uncertainty::TargetUncertainty> =
@@ -372,7 +388,7 @@ impl ObservationPacker {
             if complete_tokens { result.complete(&self.schema)?; }
             if let Some(keys) = expected_keys { result.align(keys)?; }
             result.protein_gaps();
-            if validate { result.validate(&self.schema)?; }
+            if validate { result.validate(&self.schema, &self.table)?; }
             Ok::<_, String>(result)
         }).map_err(PyValueError::new_err)?;
         let arrays = buffers(py, &result, protein_only)?;

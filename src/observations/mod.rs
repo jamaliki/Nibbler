@@ -12,6 +12,7 @@ mod prepared;
 mod residue;
 mod schema;
 pub(crate) mod source;
+mod token_table;
 mod tokens;
 mod topology;
 mod continuity;
@@ -24,6 +25,7 @@ use crate::cif::CifDocument;
 pub(crate) use record::Tokens;
 pub(crate) use prepared::PreparedSource;
 pub(crate) use schema::Schema;
+pub(crate) use token_table::TokenTable;
 use std::collections::HashMap;
 #[cfg(feature = "reduce3")]
 use crate::hash::{FastMap, FastSet};
@@ -315,17 +317,17 @@ pub(crate) fn pack(
     schema: &Schema,
     features: &LigandFeatures,
     hydrogen_parents: &HydrogenParents,
-    elements: &[String],
+    table: &TokenTable,
     excluded: &[String],
     options: &PackOptions<'_>,
 ) -> Result<Tokens, String> {
     let source = source::read(document, options.model)?;
-    pack_source(&source, schema, features, hydrogen_parents, elements, excluded, options)
+    pack_source(&source, schema, features, hydrogen_parents, table, excluded, options)
 }
 
 fn pack_source(
     source: &source::Source, schema: &Schema, features: &LigandFeatures,
-    hydrogen_parents: &HydrogenParents, elements: &[String], excluded: &[String],
+    hydrogen_parents: &HydrogenParents, table: &TokenTable, excluded: &[String],
     options: &PackOptions<'_>,
 ) -> Result<Tokens, String> {
     #[cfg(feature = "reduce3")]
@@ -336,9 +338,6 @@ fn pack_source(
             let library = crate::reduce::load_monomer_library(options.chem_data).map_err(|error| error.to_string())?;
             if !options.protein_only {
                 bridge_sites = bridges::for_source(&library, source)?;
-                if !bridge_sites.is_empty() && !elements.iter().any(|element| element == "H") {
-                    return Err("Metal hydride packing requires a ligand contract with H token 65".into());
-                }
             }
             parents::for_source(&library, source)?
     } else {
@@ -359,7 +358,7 @@ fn pack_source(
         &residue_parents,
         #[cfg(feature = "reduce3")]
         &bridge_sites,
-        elements,
+        table,
         excluded,
         options,
     )

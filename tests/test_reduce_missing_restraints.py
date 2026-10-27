@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 import nibbler
+from token_tables import token_table
 
 CRAMBIN = Path(__file__).parent / "reduce3/crambin_1-5.cif"
 ADDUCT = Path(__file__).parent / "reduce3/linked_9hj3.cif"
@@ -86,7 +87,7 @@ def test_known_native_labels_match_the_existing_lenient_control():
     source = document()
     allowed = run(source, stop_on_any_missing_hydrogen=True, allow_missing_restraints_for=EXCLUDED)
     control = run(source)
-    packer = ObservationPacker(Path(schema).read_text(), ["C"], EXCLUDED)
+    packer = ObservationPacker(Path(schema).read_text(), token_table("C"), EXCLUDED)
     actual, keys = packer.pack(allowed.document, complete=True, validate=True)
     expected, expected_keys = packer.pack(control.document, complete=True, validate=True)
     assert keys == expected_keys and all(key[3] != "UNL" for key in keys)

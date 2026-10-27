@@ -8,6 +8,7 @@ import nibbler
 import numpy as np
 import pytest
 from nibbler.observations import ObservationPacker
+from token_tables import token_table
 
 
 CYS_7F52 = [
@@ -49,7 +50,7 @@ def packer():
         encoded = Path(file).read_text()
     else:
         encoded = pytest.importorskip("kaveh_data.atom32_schema").ENCODED
-    return ObservationPacker(encoded, ["S"], []), json.loads(encoded)
+    return ObservationPacker(encoded, token_table("S"), []), json.loads(encoded)
 
 
 def document(child="HG", element="H", linked=False):

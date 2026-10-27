@@ -2,7 +2,7 @@
 
 use super::record::{Tokens, renumber_ligands, same_residue};
 use super::source::{Atom, Source};
-use super::{HydrogenParents, ResidueParents, LigandFeatures, Schema, residue, topology};
+use super::{HydrogenParents, ResidueParents, LigandFeatures, Schema, TokenTable, residue, topology};
 use crate::hash::{FastMap, FastSet};
 use crate::pdbx::ShortText;
 use std::collections::{BTreeSet, HashMap};
@@ -76,7 +76,7 @@ fn declared_parents(source: &Source, bridges: &BTreeSet<usize>) -> Result<FastMa
 }
 
 #[cfg(feature = "reduce3")]
-fn add_bridges(source: &Source, sites: &[super::bridges::Site], excluded: &[String],
+fn add_bridges(source: &Source, sites: &[super::bridges::Site], excluded: &[String], hydrogen: usize,
     tokens: &mut Tokens, mapping: &mut [usize]) -> Result<HashMap<usize, usize>, String> {
     let mut counts = HashMap::new();
     for site in sites {
@@ -89,7 +89,9 @@ fn add_bridges(source: &Source, sites: &[super::bridges::Site], excluded: &[Stri
             packed.mask[0] = true;
             mapping[row] = token;
         }
-        tokens.push(first, 65, &packed, true, [site.formal_charge, 0, 0, 1]);
+        tokens.push(first, hydrogen, &packed, true, [site.formal_charge, 0, 0, 1]);
+        // A hydride token is never a crop centre.
+        tokens.crop_center_eligible[token] = 0;
         tokens.keys[token][4] = ShortText::new(&site.hydrogen_name);
         tokens.charge_known[token] = 1;
         tokens.hydrogen_known[token] = 1;
@@ -425,7 +427,7 @@ fn add_ligands(
     parents: &HydrogenParents,
     residue_parents: &ResidueParents,
     #[cfg(feature = "reduce3")] bridge_sites: &[super::bridges::Site],
-    elements: &[String],
+    token_table: &TokenTable,
     excluded: &[String],
     tokens: &mut Tokens,
     mapping: &mut [usize],
@@ -473,11 +475,8 @@ fn add_ligands(
         let identity = match identities.iter().find(|(element, _)| **element == atom.element) {
             Some(&(_, identity)) => identity,
             None => {
-                let identity = elements
-                    .iter()
-                    .filter(|element| element.as_str() != "H")
-                    .position(|element| element == &atom.element)
-                    .map_or(64, |index| 21 + index);
+                // The table checks that every token lies above the residue tokens.
+                let identity = token_table.element(atom.element.as_str()) as usize;
                 identities.push((&atom.element, identity));
                 identity
             }
@@ -508,7 +507,7 @@ fn add_ligands(
         }
     }
     #[cfg(feature = "reduce3")]
-    let bridge_counts = add_bridges(source, bridge_sites, excluded, tokens, mapping)?;
+    let bridge_counts = add_bridges(source, bridge_sites, excluded, token_table.hydrogen() as usize, tokens, mapping)?;
     #[cfg(not(feature = "reduce3"))]
     let bridge_counts: HashMap<usize, usize> = HashMap::new();
     // Hydrogen rows given a parent, in order, and each one's parent.
@@ -662,7 +661,7 @@ pub(super) fn pack(
     parents: &HydrogenParents,
     residue_parents: &ResidueParents,
     #[cfg(feature = "reduce3")] bridge_sites: &[super::bridges::Site],
-    elements: &[String],
+    token_table: &TokenTable,
     excluded: &[String],
     options: &super::PackOptions<'_>,
 ) -> Result<Tokens, String> {
@@ -694,7 +693,7 @@ pub(super) fn pack(
             residue_parents,
             #[cfg(feature = "reduce3")]
             bridge_sites,
-            elements,
+            token_table,
             excluded,
             &mut result,
             &mut mapping,

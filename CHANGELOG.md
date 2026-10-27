@@ -6,6 +6,17 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
 
 ### Added
 
+- `ObservationPacker` takes the caller's ligand token table,
+  `{"elements": {symbol: token}, "other": token, "hydrogen": token}`, in place of
+  an element list. Nibbler derives no ligand token: before, element `i` of the
+  list took `21 + i`, other elements 64, and a bridging metal hydride 65, which
+  only held while the list was 43 elements long. The table also replaces the
+  molecular schema's `ligand_elements`, which is now ignored. The constructor
+  refuses tokens that repeat or fall in the residue range 0-20, hydrogen as an
+  element, and lower-case symbols. The 66-token table reproduces the list's
+  legacy and molecular packs byte for byte on the test fixtures
+  (`tests/test_observation_token_table.py`, recorded at 9b8041e).
+
 - `crop_plans` takes `ligand_limits`, the most ligand tokens and ligand chains a
   crop may keep, with the former (64, 9) as the default. It also returns the
   ligand tokens and chains each accepted crop keeps. `ligand_limits=None` plans

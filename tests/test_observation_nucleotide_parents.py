@@ -7,6 +7,7 @@ import nibbler
 import numpy as np
 import pytest
 from nibbler.observations import ObservationPacker
+from token_tables import token_table
 
 
 HEADER = ("data_nucleotide\nloop_\n_atom_site.group_PDB\n_atom_site.label_atom_id\n"
@@ -19,7 +20,7 @@ HEADER = ("data_nucleotide\nloop_\n_atom_site.group_PDB\n_atom_site.label_atom_i
 def packer(parent="C5M", child="H5M1", component="DT"):
     file = os.environ.get("KAVEH_ATOM32_SCHEMA")
     encoded = Path(file).read_text() if file else pytest.importorskip("kaveh_data.atom32_schema").ENCODED
-    native = ObservationPacker(encoded, ["C", "O"], [])
+    native = ObservationPacker(encoded, token_table("C", "O"), [])
     native.add_component(component, {name: [0, 4, int(name != "C2"), 1]
                                      for name in ("C7", "C5M", "C1*", "C1'", "C2")})
     native.add_hydrogen_parents(component, {child: parent})

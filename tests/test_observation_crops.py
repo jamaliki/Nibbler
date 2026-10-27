@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from nibbler.observations import ObservationPacker
+from token_tables import token_table
 
 tokens_module = pytest.importorskip("kaveh_data.pdb_tokens")
 native = pytest.importorskip("kaveh_data.native_observations")
@@ -11,7 +12,7 @@ schema = pytest.importorskip("kaveh_data.atom32_schema")
 
 
 def packer():
-    return ObservationPacker(schema.ENCODED, list(tokens_module.LIGAND_ELEMENTS), [])
+    return ObservationPacker(schema.ENCODED, token_table(*tokens_module.LIGAND_ELEMENTS), [])
 
 
 def fixture(kind):

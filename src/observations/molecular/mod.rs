@@ -13,7 +13,7 @@ mod snapshot;
 
 use super::product::ProductTarget;
 use super::uncertainty::TargetUncertainty;
-use super::{HydrogenParents, LigandFeatures, PackOptions, PreparedSource, Schema};
+use super::{HydrogenParents, LigandFeatures, PackOptions, PreparedSource, Schema, TokenTable};
 use crate::cif::{BlockCategory, CifDocument};
 use crate::pdbx::{ConformerPolicy, PdbxModel, PreparedChemistry, SemanticError, ShortText};
 use serde::Deserialize;
@@ -72,7 +72,6 @@ pub(crate) struct MolecularSchema {
     pub index: Vec<[usize; 32]>,
     pub defined: Vec<[bool; 32]>,
     pub required_heavy: Vec<[bool; 14]>,
-    pub ligand_elements: Vec<String>,
     pub nucleotides: Vec<String>,
     pub unknown_components: HashSet<String>,
     pub backbone: Vec<String>,
@@ -108,7 +107,7 @@ pub(crate) struct Packer<'a> {
     pub schema: &'a Schema,
     pub features: &'a LigandFeatures,
     pub hydrogen_parents: &'a HydrogenParents,
-    pub elements: &'a [String],
+    pub table: &'a TokenTable,
     pub excluded: &'a [String],
     pub molecular: &'a MolecularSchema,
 }
@@ -465,18 +464,18 @@ pub(crate) fn finish(view: &View, perceived: &[Vec<u8>], packer: &Packer<'_>,
     let (complete, modified) = product::completeness(atoms, bonds, &view.product.residues, &features, columns);
     let targets = view.targets(&features, &complete, &modified, columns);
     let mut legacy = view.source.pack(packer.schema, packer.features, packer.hydrogen_parents,
-        packer.elements, packer.excluded, &PackOptions {
+        packer.table, packer.excluded, &PackOptions {
             model: view.source.model, complete: options.complete, topology_policy: "observed_connectivity",
             protein_only: false, chem_data: Some(&view.chem_data),
         })?;
-    super::product::apply(&mut legacy, packer.schema, &targets)?;
+    super::product::apply(&mut legacy, packer.schema, packer.table, &targets)?;
     let uncertainties: Vec<TargetUncertainty> = match options.uncertainties {
         Some(text) => serde_json::from_str(text).map_err(|error| error.to_string())?,
         None => Vec::new(),
     };
     super::uncertainty::apply(&mut legacy, packer.schema, &uncertainties)?;
     legacy.protein_gaps();
-    legacy.validate(packer.schema)?;
+    legacy.validate(packer.schema, packer.table)?;
     let mut source = snapshot::Snapshot::read(&view.source.source, atoms, bonds, &view.rows, &features,
         &view.product.residues, &complete, columns, provenance, &packer.molecular.unknown_components);
     // Disabled SASA changes only its provenance text, which the index output omits.
@@ -486,7 +485,7 @@ pub(crate) fn finish(view: &View, perceived: &[Vec<u8>], packer: &Packer<'_>,
     }
     source.mask_uncertain_hydrogens(&view.source.source, &uncertainties);
     source.mask_unknown_chemistry();
-    let mut packed = pack::pack(&legacy, &view.source.source, &source, packer.molecular, options.index)?;
+    let mut packed = pack::pack(&legacy, &view.source.source, &source, packer.molecular, packer.table, options.index)?;
     let ordered = match options.expected {
         Some(text) => Some(order::indexed(&mut packed, text)?),
         None => None,

@@ -1,5 +1,5 @@
-use super::{library, source};
-use crate::observations::{self, Schema, PackOptions, HydrogenParents, LigandFeatures};
+use super::{library, source, token_table};
+use crate::observations::{self, Schema, PackOptions, HydrogenParents, LigandFeatures, TokenTable};
 use crate::observations::source::Source;
 use std::collections::HashMap;
 
@@ -7,11 +7,11 @@ fn schema() -> Schema {
     Schema { slots: 32, hydrogen_start: 15, residues: Vec::new() }
 }
 
-fn elements(hydrogen: bool) -> Vec<String> {
-    let mut result: Vec<_> = "C O N P S MG ZN CA FE F CL MN K NI CU BR CO CD HG AS B I PT MO BE AL BA RU V CS XE SE W AU GD YB LI IR RB Y PB OS AG"
-        .split_whitespace().map(str::to_owned).collect();
-    if hydrogen { result.push("H".into()); }
-    result
+/// The 66-token table with hydrogen moved to `hydrogen`, which no element token uses.
+fn hydrogen_at(hydrogen: i64) -> TokenTable {
+    let elements = "C O N P S MG ZN CA FE F CL MN K NI CU BR CO CD HG AS B I PT MO BE AL BA RU V CS XE SE W AU GD YB LI IR RB Y PB OS AG";
+    TokenTable::new(elements.split_whitespace().map(str::to_owned).zip(21..), 64, hydrogen)
+        .expect("The moved hydrogen token must give a valid table")
 }
 
 fn packed(source: &Source) -> observations::Tokens {
@@ -21,7 +21,7 @@ fn packed(source: &Source) -> observations::Tokens {
     let features: LigandFeatures = HashMap::from([(source.atoms[0].component.as_str().to_owned(),
         HashMap::from([("FE".into(), [0, 0, 1, 1]), ("NI".into(), [0, 0, 1, 1])]))]);
     observations::tokens::pack(source, &schema(), &features, &HydrogenParents::new(), &parents,
-        &sites, &elements(true), &[], &PackOptions { model: 1, complete: true,
+        &sites, &token_table(), &[], &PackOptions { model: 1, complete: true,
             topology_policy: "observed_connectivity", protein_only: false, chem_data: None })
         .expect("Bridge tokens must pack")
 }
@@ -32,7 +32,7 @@ fn product_targets_preserve_the_checked_hydride_charge_and_both_bonds() {
         for observed in [false, true] {
             let mut tokens = packed(&source(component, observed));
             let positions = tokens.positions.clone();
-            observations::product::apply::<&str>(&mut tokens, &schema(), &[])
+            observations::product::apply::<&str>(&mut tokens, &schema(), &token_table(), &[])
                 .expect("Empty product targets must preserve checked bridge chemistry");
             assert_eq!(tokens.charges[8], -1.);
             assert_eq!(tokens.charge_known[8], 1);
@@ -40,7 +40,7 @@ fn product_targets_preserve_the_checked_hydride_charge_and_both_bonds() {
             assert_eq!(tokens.bridge_edges, [(8, 0, 1), (8, 1, 1)]);
             assert_eq!(tokens.positions, positions);
             assert_eq!(tokens.charge_known[0..2], [0, 0]);
-            tokens.validate(&schema()).expect("Product targets must retain valid hydride labels");
+            tokens.validate(&schema(), &token_table()).expect("Product targets must retain valid hydride labels");
         }
     }
 }
@@ -70,7 +70,7 @@ fn absent_hydride_has_unknown_coordinates_and_known_charge_with_both_bonds() {
             assert_eq!(tokens.positions[row * 96..][..3].iter().copied().map(f32::to_bits).collect::<Vec<_>>(), atom.position.map(f32::to_bits));
             assert_eq!(tokens.masks[row * 32 + 15..row * 32 + 18], [0; 3]);
         }
-        tokens.validate(&schema()).expect("Bridge labels must validate");
+        tokens.validate(&schema(), &token_table()).expect("Bridge labels must validate");
     }
 }
 
@@ -135,22 +135,22 @@ fn key_alignment_and_selection_keep_both_edges_or_fail_without_mutation() {
     tokens.complete(&schema()).expect("Complete filter must retain ligand cohort");
     tokens.select(&[0, 8, 7]).expect("Both metal dependencies must survive");
     assert_eq!(tokens.bridge_edges, [(0, 1, 1), (0, 2, 1)]);
-    tokens.validate(&schema()).expect("Remapped labels must validate");
+    tokens.validate(&schema(), &token_table()).expect("Remapped labels must validate");
     tokens.select(&[1, 2]).expect("Dropping H must drop both edges");
     assert!(tokens.bridge_edges.is_empty());
 }
 
 #[test]
-fn ordinary_single_parent_hydrogens_keep_their_slots_with_h_enabled() {
+fn ordinary_single_parent_hydrogens_keep_their_slots_whatever_the_hydrogen_token() {
     let raw = b"data_test\nloop_\n_atom_site.type_symbol\n_atom_site.label_atom_id\n_atom_site.Cartn_x\n_atom_site.Cartn_y\n_atom_site.Cartn_z\n_atom_site.label_asym_id\n_atom_site.auth_seq_id\n_atom_site.label_comp_id\n_atom_site.pdbx_PDB_model_num\nC C1 0 0 0 L 1 LIG 1\nH H1 0.9 0 0 L 1 LIG 1\n";
     let document = crate::cif::parse(raw).expect("Ordinary fixture must parse");
     let input = observations::source::read(&document, 1).expect("Ordinary fixture must read");
     let parents = HashMap::from([("LIG".into(), HashMap::from([("H1".into(), "C1".into())]))]);
     let features = HashMap::from([("LIG".into(), HashMap::from([("C1".into(), [0, 0, 1, 1])]))]);
     let options = PackOptions { model: 1, complete: true, topology_policy: "observed_connectivity", protein_only: false, chem_data: None };
-    let pack = |enabled| observations::tokens::pack(&input, &schema(), &features, &parents, &HashMap::new(),
-        &[], &elements(enabled), &[], &options).expect("Ordinary H must pack");
-    let (before, after) = (pack(false), pack(true));
+    let pack = |hydrogen| observations::tokens::pack(&input, &schema(), &features, &parents, &HashMap::new(),
+        &[], &hydrogen_at(hydrogen), &[], &options).expect("Ordinary H must pack");
+    let (before, after) = (pack(65), pack(90));
     assert_eq!(before.positions, after.positions);
     assert_eq!(before.masks, after.masks);
     assert_eq!(before.identity, after.identity);
@@ -160,7 +160,7 @@ fn ordinary_single_parent_hydrogens_keep_their_slots_with_h_enabled() {
 }
 
 #[test]
-fn virtual_h_key_needs_both_original_metal_rows_and_old_contract_fails() {
+fn virtual_h_key_needs_both_original_metal_rows_and_takes_the_table_hydrogen_token() {
     let raw = b"data_test\nloop_\n_atom_site.type_symbol\n_atom_site.label_atom_id\n_atom_site.Cartn_x\n_atom_site.Cartn_y\n_atom_site.Cartn_z\n_atom_site.label_asym_id\n_atom_site.auth_seq_id\n_atom_site.label_comp_id\n_atom_site.pdbx_PDB_model_num\nFE FE 0 0 0 L 601 EJ2 1\nNI NI 2 0 0 L 601 EJ2 1\nC C1 0 0 2 L 601 EJ2 1\nN N1 0 0 3 L 601 EJ2 1\nC C2 0 2 0 L 601 EJ2 1\nN N2 0 3 0 L 601 EJ2 1\nC C3 0 -2 0 L 601 EJ2 1\nO O3 0 -3 0 L 601 EJ2 1\n";
     let document = crate::cif::parse(raw).expect("Bridge fixture must parse");
     let keys = r#"[["L","601",".","EJ2","H"]]"#;
@@ -174,9 +174,13 @@ fn virtual_h_key_needs_both_original_metal_rows_and_old_contract_fails() {
     assert_eq!(retained.bridge_sources(Some(&library.root)).expect("Bridge declaration must resolve"), [("H".into(), [0, 1])]);
     for chem_data in [Some(library.root.as_path()), None] {
         let options = PackOptions { model: 1, complete: false, topology_policy: "observed_connectivity", protein_only: false, chem_data };
-        let error = observations::pack(&document, &schema(), &HashMap::new(), &HashMap::new(), &elements(false), &[], &options)
-            .err().expect("Old contract must fail");
-        assert!(error.contains("H token 65"), "{error}");
+        let tokens = observations::pack(&document, &schema(), &HashMap::new(), &HashMap::new(), &hydrogen_at(90), &[], &options)
+            .expect("A table with any hydrogen token must pack the hydride");
+        assert_eq!(tokens.identity, [29, 34, 21, 23, 21, 23, 21, 22, 90]);
+        assert_eq!(tokens.keys[8][4], "H");
+        tokens.validate(&schema(), &hydrogen_at(90)).expect("The packing table must validate the hydride");
+        let error = tokens.validate(&schema(), &token_table()).expect_err("Another hydrogen token must not validate");
+        assert!(error.contains("invalid endpoints"), "{error}");
     }
 }
 

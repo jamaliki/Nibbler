@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 import nibbler
+from token_tables import token_table
 
 observations = pytest.importorskip("nibbler.observations")
 schema = pytest.importorskip("kaveh_data.atom32_schema")
@@ -40,7 +41,7 @@ def ligand_document(count):
 
 
 def ligand_packer():
-    native = observations.ObservationPacker(schema.ENCODED, ["C"], [])
+    native = observations.ObservationPacker(schema.ENCODED, token_table("C"), [])
     native.add_component("LIG", {"C4": [0, 4, 3, 1], "C3": [0, 4, 0, 1]})
     return native
 
@@ -63,7 +64,7 @@ ULW_PARENTS = {"H1": "C13", "H141": "C14", "H142": "C14", "H143": "C14"}
 
 
 def ulw_packer():
-    native = observations.ObservationPacker(schema.ENCODED, ["C"], [])
+    native = observations.ObservationPacker(schema.ENCODED, token_table("C"), [])
     native.add_component("ULW", {"C13": [0, 4, 1, 1], "C14": [0, 4, 3, 1]})
     return native
 

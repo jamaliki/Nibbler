@@ -4,6 +4,13 @@ use reduce3::monlib::{CompAtom, CompBond};
 #[path = "bridge_token_tests.rs"]
 mod token_tests;
 
+/// kaveh-data's 66-token table: 43 elements from 21, other elements 64 and hydrogen 65.
+fn token_table() -> crate::observations::TokenTable {
+    let elements = "C O N P S MG ZN CA FE F CL MN K NI CU BR CO CD HG AS B I PT MO BE AL BA RU V CS XE SE W AU GD YB LI IR RB Y PB OS AG";
+    crate::observations::TokenTable::new(elements.split_whitespace().map(str::to_owned).zip(21..), 64, 65)
+        .expect("The 66-token table must be valid")
+}
+
 fn library() -> MonLib {
     let root = MonLib::locate(None).expect("Bridge source tests require REDUCE3_CHEM_DATA");
     MonLib::load(&root).expect("Bridge source tests require a readable dictionary")
@@ -98,13 +105,11 @@ fn observed_bridge_isotopes_keep_original_rows_coordinates_and_canonical_key() {
         assert_eq!(sites[0].hydrogen_name, "H");
         assert_eq!(sites[0].metal_rows, [0, 1]);
         let schema = crate::observations::Schema { slots: 32, hydrogen_start: 15, residues: Vec::new() };
-        let elements: Vec<_> = "C O N P S MG ZN CA FE F CL MN K NI CU BR CO CD HG AS B I PT MO BE AL BA RU V CS XE SE W AU GD YB LI IR RB Y PB OS AG H"
-            .split_whitespace().map(str::to_owned).collect();
         let parents = crate::observations::parents::for_source(&library, &input).expect("Ordinary registry must resolve");
         let options = crate::observations::PackOptions { model: 1, complete: true,
             topology_policy: "observed_connectivity", protein_only: false, chem_data: None };
         let tokens = crate::observations::tokens::pack(&input, &schema, &HashMap::new(), &HashMap::new(),
-            &parents, &sites, &elements, &[], &options).expect("Isotope must stay atom-level");
+            &parents, &sites, &token_table(), &[], &options).expect("Isotope must stay atom-level");
         assert_eq!(tokens.keys[8][4], "H");
         assert_eq!(tokens.identity[8], 65);
         assert_eq!(tokens.positions[8 * 96..][..3].iter().copied().map(f32::to_bits).collect::<Vec<_>>(), bits);

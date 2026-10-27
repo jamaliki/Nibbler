@@ -404,8 +404,13 @@ one-based line and display column when available. Code and structured fields are
 machine contract; human-readable messages may add detail.
 # Native coordinate observations
 
-`nibbler.observations.ObservationPacker(schema_json, elements, excluded)` keeps
-the caller's Atom32 slot/state schema and ligand feature tables in Rust.
+`nibbler.observations.ObservationPacker(schema_json, token_table, excluded)` keeps
+the caller's Atom32 slot/state schema, ligand token table and ligand feature tables
+in Rust. The token table, `{"elements": {symbol: token}, "other": token,
+"hydrogen": token}`, is the whole ligand vocabulary: a heavy ligand atom takes the
+token of its element symbol as written, or `other`, and a bridging metal hydride
+takes `hydrogen`. The constructor refuses repeated tokens, tokens in the residue
+range 0-20, hydrogen as an element and lower-case symbols.
 `add_component(name, features)` accepts atom-name keys and four values per atom:
 formal charge, hybridization, total hydrogen count, and charge-known flag.
 The packer does not infer or change these CCD values.

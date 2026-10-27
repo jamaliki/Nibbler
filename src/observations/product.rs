@@ -1,7 +1,7 @@
 //! Apply occurrence-specific product targets before selecting complete tokens.
 
 use super::record::same_residue as same_key_residue;
-use super::{Schema, Tokens};
+use super::{Schema, TokenTable, Tokens};
 use serde::Deserialize;
 use crate::hash::FastMap;
 use crate::pdbx::ShortText;
@@ -146,6 +146,7 @@ impl<'k> Lookup<'k> {
 pub(crate) fn apply<K: AsRef<str>>(
     tokens: &mut Tokens,
     schema: &Schema,
+    table: &TokenTable,
     values: &[ProductTarget<K>],
 ) -> Result<(), String> {
     let mut lookup = Lookup::new(&tokens.keys);
@@ -153,7 +154,7 @@ pub(crate) fn apply<K: AsRef<str>>(
     let mut current: Option<([&str; 4], Option<usize>)> = None;
     let prior = tokens.hydrogen_known.clone();
     for row in 0..tokens.identity.len() {
-        if tokens.ligand[row] != 0 && tokens.identity[row] != 65 {
+        if tokens.ligand[row] != 0 && tokens.identity[row] != table.hydrogen() {
             tokens.hydrogen_known[row] = 0;
             tokens.charge_known[row] = 0;
         }

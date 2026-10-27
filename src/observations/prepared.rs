@@ -1,6 +1,6 @@
 //! One immutable source snapshot for component queries and target packing.
 
-use super::{HydrogenParents, LigandFeatures, PackOptions, Schema, Tokens, source};
+use super::{HydrogenParents, LigandFeatures, PackOptions, Schema, TokenTable, Tokens, source};
 use crate::cif::CifDocument;
 use std::collections::BTreeSet;
 #[cfg(feature = "reduce3")]
@@ -37,8 +37,8 @@ impl PreparedSource {
 
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn pack(&self, schema: &Schema, features: &LigandFeatures,
-        hydrogen_parents: &HydrogenParents, elements: &[String], excluded: &[String],
+        hydrogen_parents: &HydrogenParents, table: &TokenTable, excluded: &[String],
         options: &PackOptions<'_>) -> Result<Tokens, String> {
-        super::pack_source(&self.source, schema, features, hydrogen_parents, elements, excluded, options)
+        super::pack_source(&self.source, schema, features, hydrogen_parents, table, excluded, options)
     }
 }
