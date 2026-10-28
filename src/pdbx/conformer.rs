@@ -119,8 +119,11 @@ pub fn select_atom_conformers_with_policy(
 }
 
 pub(super) fn select_with_links(
-    atoms: &[ConformerAtom], excluded_bonds: &[[usize; 2]], linked_alternatives: &[[usize; 2]],
-    seed: u64, policy: ConformerPolicy,
+    atoms: &[ConformerAtom],
+    excluded_bonds: &[[usize; 2]],
+    linked_alternatives: &[[usize; 2]],
+    seed: u64,
+    policy: ConformerPolicy,
 ) -> Result<ConformerSelection, SemanticError> {
     if atoms.iter().any(|a| {
         !a.occupancy.is_finite()
@@ -154,13 +157,19 @@ pub(super) fn select_with_links(
     let (mut constraints, preferences) = contacts(atoms, &memberships, &exclusions, &mut groups);
     for &[first, second] in linked_alternatives {
         if let (Some((g, v)), Some((h, w))) = (memberships[first], memberships[second]) {
-            if g == h { continue; }
+            if g == h {
+                continue;
+            }
             groups[g].neighbors.insert(h);
             groups[h].neighbors.insert(g);
             for a in 0..groups[g].labels.len() {
                 for b in 0..groups[h].labels.len() {
                     if (a == v) != (b == w) {
-                        let (pair, variants) = if g < h { ((g, h), (a, b)) } else { ((h, g), (b, a)) };
+                        let (pair, variants) = if g < h {
+                            ((g, h), (a, b))
+                        } else {
+                            ((h, g), (b, a))
+                        };
                         constraints.entry(pair).or_default().insert(variants);
                     }
                 }

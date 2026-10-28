@@ -231,23 +231,46 @@ fn run_block_with(
         restore_single_model_id(&mut structure, &source);
     }
     let mut pipeline_params = params.clone();
-    if !params.compat && let Some(model_id) = params.model_id {
+    if !params.compat
+        && let Some(model_id) = params.model_id
+    {
         pipeline_params.model_id = Some(source_model_index(&structure, model_id)? + 1);
     }
     let output = reduce3::pipeline::run(structure, monomers, &pipeline_params)
         .map_err(|message| ReduceError::new(ReduceErrorCode::Failed, message))?;
     #[cfg(feature = "python")]
     let target_uncertainties_json = if !params.allowed_unplaced_hydrogen_parent_sources.is_empty()
-        || !params.allowed_unplaced_bridge_hydrogens.is_empty() || params.allow_unresolved_bond_targets {
-        let model = params.model_id.map(source_model_number).transpose()?
-            .ok_or_else(|| ReduceError::new(ReduceErrorCode::InvalidModel, "Target masking requires an explicit source model ID"))?;
-        let statuses = crate::observations::uncertainty::from_output(block, model, &output,
-            params.required_hydrogen_parent_sources.as_deref(), params.allow_unresolved_bond_targets)
-            .map_err(|message| ReduceError::new(ReduceErrorCode::InvalidModel, message))?;
-        serde_json::to_string(&statuses).map_err(|error| ReduceError::new(ReduceErrorCode::ResultTooLarge, error.to_string()))?
-    } else { "[]".to_owned() };
+        || !params.allowed_unplaced_bridge_hydrogens.is_empty()
+        || params.allow_unresolved_bond_targets
+    {
+        let model = params
+            .model_id
+            .map(source_model_number)
+            .transpose()?
+            .ok_or_else(|| {
+                ReduceError::new(
+                    ReduceErrorCode::InvalidModel,
+                    "Target masking requires an explicit source model ID",
+                )
+            })?;
+        let statuses = crate::observations::uncertainty::from_output(
+            block,
+            model,
+            &output,
+            params.required_hydrogen_parent_sources.as_deref(),
+            params.allow_unresolved_bond_targets,
+        )
+        .map_err(|message| ReduceError::new(ReduceErrorCode::InvalidModel, message))?;
+        serde_json::to_string(&statuses)
+            .map_err(|error| ReduceError::new(ReduceErrorCode::ResultTooLarge, error.to_string()))?
+    } else {
+        "[]".to_owned()
+    };
     let (document, copies) = if params.compat {
-        (structure_document(&output.structure, block.code().unwrap_or("default"))?, None)
+        (
+            structure_document(&output.structure, block.code().unwrap_or("default"))?,
+            None,
+        )
     } else {
         block_document_with(&output.structure, block, Some(&numbers), record)?
     };
@@ -261,29 +284,47 @@ fn run_block_with(
 }
 
 pub(crate) fn source_model_number(model_id: usize) -> Result<i64, ReduceError> {
-    i64::try_from(model_id).ok().filter(|number| *number > 0).ok_or_else(|| {
-        ReduceError::new(ReduceErrorCode::InvalidModel, "Source model ID must be a positive signed 64-bit integer")
-    })
+    i64::try_from(model_id)
+        .ok()
+        .filter(|number| *number > 0)
+        .ok_or_else(|| {
+            ReduceError::new(
+                ReduceErrorCode::InvalidModel,
+                "Source model ID must be a positive signed 64-bit integer",
+            )
+        })
 }
 
 fn restore_single_model_id(structure: &mut Structure, source: &BlockSource<'_>) {
-    if structure.models.len() == 1 && structure.models[0].id.is_empty()
-        && let Some(table) = source.table("atom_site") {
-        structure.models[0].id = table.column("pdbx_PDB_model_num")
-            .map_or_else(|| "1".to_owned(), |column| table.cell(0, column).into_owned());
+    if structure.models.len() == 1
+        && structure.models[0].id.is_empty()
+        && let Some(table) = source.table("atom_site")
+    {
+        structure.models[0].id = table.column("pdbx_PDB_model_num").map_or_else(
+            || "1".to_owned(),
+            |column| table.cell(0, column).into_owned(),
+        );
     }
 }
 
 fn source_model_index(structure: &Structure, model_id: usize) -> Result<usize, ReduceError> {
     let number = source_model_number(model_id)?;
-    let mut matches = structure.models.iter().enumerate()
+    let mut matches = structure
+        .models
+        .iter()
+        .enumerate()
         .filter(|(_, model)| model.id.trim().parse::<i64>() == Ok(number));
     let index = matches.next().map(|(index, _)| index).ok_or_else(|| {
-        ReduceError::new(ReduceErrorCode::InvalidModel, format!("Source model ID {number} is not present"))
+        ReduceError::new(
+            ReduceErrorCode::InvalidModel,
+            format!("Source model ID {number} is not present"),
+        )
     })?;
     if matches.next().is_some() {
-        return Err(ReduceError::new(ReduceErrorCode::InvalidModel,
-            format!("Source model ID {number} is ambiguous")));
+        return Err(ReduceError::new(
+            ReduceErrorCode::InvalidModel,
+            format!("Source model ID {number} is ambiguous"),
+        ));
     }
     Ok(index)
 }
@@ -294,8 +335,16 @@ mod source_model_tests {
     use reduce3::model::{Model, Structure};
 
     fn structure(ids: &[&str]) -> Structure {
-        Structure { models: ids.iter().map(|id| Model { id: (*id).into(), chains: Vec::new() }).collect(),
-                    ..Structure::default() }
+        Structure {
+            models: ids
+                .iter()
+                .map(|id| Model {
+                    id: (*id).into(),
+                    chains: Vec::new(),
+                })
+                .collect(),
+            ..Structure::default()
+        }
     }
 
     #[test]
@@ -309,15 +358,22 @@ mod source_model_tests {
 
     #[test]
     fn missing_source_ids_do_not_fall_back_to_ordinals() {
-        assert_eq!(source_model_index(&structure(&["18"]), 1).err().map(|error| error.code()),
-                   Some(ReduceErrorCode::InvalidModel));
+        assert_eq!(
+            source_model_index(&structure(&["18"]), 1)
+                .err()
+                .map(|error| error.code()),
+            Some(ReduceErrorCode::InvalidModel)
+        );
     }
 
     #[test]
     fn repeated_and_numeric_alias_ids_are_ambiguous() {
         for ids in [["18", "35", "18"], ["18", "018", "35"]] {
-            assert!(source_model_index(&structure(&ids), 18).err()
-                    .is_some_and(|error| error.message().contains("ambiguous")));
+            assert!(
+                source_model_index(&structure(&ids), 18)
+                    .err()
+                    .is_some_and(|error| error.message().contains("ambiguous"))
+            );
         }
     }
 
@@ -330,13 +386,22 @@ mod source_model_tests {
     #[test]
     fn parsed_single_model_ids_match_source_values() {
         use super::{BlockSource, restore_single_model_id};
-        for text in [include_bytes!("../tests/reduce3/linked_8zje.cif").as_slice(),
-                     include_bytes!("../tests/reduce3/linked_9hj3.cif").as_slice()] {
+        for text in [
+            include_bytes!("../tests/reduce3/linked_8zje.cif").as_slice(),
+            include_bytes!("../tests/reduce3/linked_9hj3.cif").as_slice(),
+        ] {
             let document = crate::cif::parse(text).unwrap();
             let source = BlockSource::new(&document.blocks()[0]);
             let mut structure = reduce3::mmcif::structure_from_cif(&source).unwrap();
             restore_single_model_id(&mut structure, &source);
-            assert_eq!(structure.models.iter().map(|model| &model.id).collect::<Vec<_>>(), vec!["1"]);
+            assert_eq!(
+                structure
+                    .models
+                    .iter()
+                    .map(|model| &model.id)
+                    .collect::<Vec<_>>(),
+                vec!["1"]
+            );
             assert_eq!(source_model_index(&structure, 1).ok(), Some(0));
         }
     }
@@ -349,8 +414,10 @@ mod copy_tests {
     #[test]
     fn copied_sites_build_the_model_that_a_full_decode_builds() {
         let monomers = load_monomer_library(None).expect("Reduce tests require REDUCE3_CHEM_DATA");
-        for text in [include_bytes!("../tests/reduce3/1crn.cif").as_slice(),
-                     include_bytes!("../tests/fixtures/chemistry/ligand_ion_water.cif").as_slice()] {
+        for text in [
+            include_bytes!("../tests/reduce3/1crn.cif").as_slice(),
+            include_bytes!("../tests/fixtures/chemistry/ligand_ion_water.cif").as_slice(),
+        ] {
             let source = crate::cif::parse(text).expect("The fixture must parse");
             let model = crate::pdbx::build_model(&source).expect("The fixture must form a model");
             assert!(model.loop_sites().is_some());
@@ -358,10 +425,19 @@ mod copy_tests {
                 .expect("Reduce3 must protonate the fixture");
             let copies = copies.expect("The sink must rewrite the source _atom_site loop");
             assert!(copies.rows.iter().any(|row| *row != SourceCopies::NONE));
-            assert!(copies.rows.iter().any(|row| *row == SourceCopies::NONE) || copies.made.iter().any(|made| *made != 0));
-            let full = crate::pdbx::build_model(reduction.document()).expect("The output must form a model");
-            let copied = crate::pdbx::build_model_with_copies(reduction.document(), &model, &copies.rows, &copies.made)
-                .expect("The copied output must form a model");
+            assert!(
+                copies.rows.iter().any(|row| *row == SourceCopies::NONE)
+                    || copies.made.iter().any(|made| *made != 0)
+            );
+            let full = crate::pdbx::build_model(reduction.document())
+                .expect("The output must form a model");
+            let copied = crate::pdbx::build_model_with_copies(
+                reduction.document(),
+                &model,
+                &copies.rows,
+                &copies.made,
+            )
+            .expect("The copied output must form a model");
             // Debug text also tells apart the signs of zero.
             assert_eq!(format!("{copied:?}"), format!("{full:?}"));
         }
@@ -392,8 +468,14 @@ fn block_document_with(
     let code = block.code().unwrap_or("default");
     let mut sink = DocumentSink::with_source(block);
     sink.record = record;
-    reduce3::mmcif::write_cif_preserving_with(structure, &BlockSource::new(block), numbers, code, &mut sink)
-        .map_err(|message| ReduceError::new(ReduceErrorCode::InvalidModel, message))?;
+    reduce3::mmcif::write_cif_preserving_with(
+        structure,
+        &BlockSource::new(block),
+        numbers,
+        code,
+        &mut sink,
+    )
+    .map_err(|message| ReduceError::new(ReduceErrorCode::InvalidModel, message))?;
     let copies = sink.copies.take();
     sink.finish(code).map(|document| (document, copies))
 }
@@ -518,9 +600,9 @@ pub struct BlockTable<'a> {
 impl<'a> BlockTable<'a> {
     fn new(category: BlockCategory<'a>) -> Self {
         let texts = match &category {
-            BlockCategory::Loop(cif_loop) => {
-                (0..cif_loop.column_count()).map(|column| cif_loop.text_column(column)).collect()
-            }
+            BlockCategory::Loop(cif_loop) => (0..cif_loop.column_count())
+                .map(|column| cif_loop.text_column(column))
+                .collect(),
             BlockCategory::Items(_) => Vec::new(),
         };
         Self { category, texts }
@@ -546,10 +628,14 @@ impl CifTable for BlockTable<'_> {
     fn cell(&self, row: usize, column: usize) -> Cow<'_, str> {
         match self.value(row, column) {
             Some(CifValueRef::Text(text)) => Cow::Borrowed(text.as_str()),
-            Some(CifValueRef::Integer(number, original)) => original
-                .map_or_else(|| Cow::Owned(number.to_string()), |text| Cow::Borrowed(text.as_str())),
-            Some(CifValueRef::Float(number, _, original)) => original
-                .map_or_else(|| Cow::Owned(number.to_string()), |text| Cow::Borrowed(text.as_str())),
+            Some(CifValueRef::Integer(number, original)) => original.map_or_else(
+                || Cow::Owned(number.to_string()),
+                |text| Cow::Borrowed(text.as_str()),
+            ),
+            Some(CifValueRef::Float(number, _, original)) => original.map_or_else(
+                || Cow::Owned(number.to_string()),
+                |text| Cow::Borrowed(text.as_str()),
+            ),
             Some(CifValueRef::NotApplicable) => Cow::Borrowed("."),
             Some(CifValueRef::Unknown) | None => Cow::Borrowed("?"),
         }
@@ -565,7 +651,11 @@ impl CifTable for BlockTable<'_> {
     }
 
     fn tags(&self) -> Vec<Cow<'_, str>> {
-        self.category.tags().into_iter().map(Cow::Borrowed).collect()
+        self.category
+            .tags()
+            .into_iter()
+            .map(Cow::Borrowed)
+            .collect()
     }
 
     fn is_loop(&self) -> bool {
@@ -580,15 +670,27 @@ impl CifTable for BlockTable<'_> {
         }
     }
 
-    fn cell_with_missing(&self, row: usize, column: usize) -> (Option<CifCell<'static>>, Cow<'_, str>) {
+    fn cell_with_missing(
+        &self,
+        row: usize,
+        column: usize,
+    ) -> (Option<CifCell<'static>>, Cow<'_, str>) {
         match self.value(row, column) {
             Some(CifValueRef::Text(text)) => (None, Cow::Borrowed(text.as_str())),
-            Some(CifValueRef::Integer(value, original)) => {
-                (None, original.map_or_else(|| Cow::Owned(value.to_string()), |text| Cow::Borrowed(text.as_str())))
-            }
-            Some(CifValueRef::Float(value, _, original)) => {
-                (None, original.map_or_else(|| Cow::Owned(value.to_string()), |text| Cow::Borrowed(text.as_str())))
-            }
+            Some(CifValueRef::Integer(value, original)) => (
+                None,
+                original.map_or_else(
+                    || Cow::Owned(value.to_string()),
+                    |text| Cow::Borrowed(text.as_str()),
+                ),
+            ),
+            Some(CifValueRef::Float(value, _, original)) => (
+                None,
+                original.map_or_else(
+                    || Cow::Owned(value.to_string()),
+                    |text| Cow::Borrowed(text.as_str()),
+                ),
+            ),
             Some(CifValueRef::NotApplicable) => (Some(CifCell::NotApplicable), Cow::Borrowed(".")),
             Some(CifValueRef::Unknown) | None => (Some(CifCell::Unknown), Cow::Borrowed("?")),
         }
@@ -703,16 +805,23 @@ fn source_column(
             .ok_or("Reduce3 named text outside the text of a loop column")
     };
     // A text column shares its entries; any other column is read value by value.
-    let made_count = values.iter().filter(|value| matches!(value, ColumnValue::Made(..))).count();
+    let made_count = values
+        .iter()
+        .filter(|value| matches!(value, ColumnValue::Made(..)))
+        .count();
     if let Some(mut builder) = source.text_column(column).and_then(|text_column| {
         SourceColumnBuilder::new(text_column, values.len(), made_count, text.len())
     }) {
         for &value in values {
             match value {
                 ColumnValue::Source(row) => builder.push_source(row),
-                ColumnValue::Made(start, end) => builder.push(made(start, end)?).ok_or(TOO_LARGE)?,
+                ColumnValue::Made(start, end) => {
+                    builder.push(made(start, end)?).ok_or(TOO_LARGE)?
+                }
                 ColumnValue::Unknown => builder.push(TextCell::Unknown).ok_or(TOO_LARGE)?,
-                ColumnValue::NotApplicable => builder.push(TextCell::NotApplicable).ok_or(TOO_LARGE)?,
+                ColumnValue::NotApplicable => {
+                    builder.push(TextCell::NotApplicable).ok_or(TOO_LARGE)?
+                }
             }
         }
         return Ok(builder.finish());
@@ -793,7 +902,9 @@ impl<'a> DocumentSink<'a> {
                     self.copies = open.copies;
                 }
                 self.entries.push(CifEntry::Loop(CifLoop::from_columns(
-                    open.tags, open.columns, open.rows,
+                    open.tags,
+                    open.columns,
+                    open.rows,
                 )));
             } else {
                 self.failure = Some("Reduce3 wrote a loop without all of its columns");
@@ -903,7 +1014,11 @@ impl CifSink for DocumentSink<'_> {
             return false;
         };
         if source.tags().len() != tags.len()
-            || source.tags().iter().zip(tags).any(|(source_tag, tag)| source_tag != tag)
+            || source
+                .tags()
+                .iter()
+                .zip(tags)
+                .any(|(source_tag, tag)| source_tag != tag)
         {
             return false;
         }

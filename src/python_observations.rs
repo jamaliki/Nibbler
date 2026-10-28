@@ -128,8 +128,19 @@ impl ObservationPacker {
         ligand_limits: Option<(u32, u32)>,
     ) -> PyResult<(Bound<'py, PyDict>, f64)> {
         let value = py
-            .detach(|| observations::crops::plan_with_chain_policy(positions, chains, ligand, usable, crop_size,
-                centre_eligible, chain_minimum, chain_protein, ligand_limits))
+            .detach(|| {
+                observations::crops::plan_with_chain_policy(
+                    positions,
+                    chains,
+                    ligand,
+                    usable,
+                    crop_size,
+                    centre_eligible,
+                    chain_minimum,
+                    chain_protein,
+                    ligand_limits,
+                )
+            })
             .map_err(PyValueError::new_err)?;
         let result = PyDict::new(py);
         let count = value.centers.len();
@@ -147,11 +158,17 @@ impl ObservationPacker {
             ("crop_ligand_chains", counts(value.ligand_chains)),
         ]
         .into_iter()
-        .chain(uncapped.then(|| [
-            ("centre_ligand_tokens", counts(value.centre_ligand_tokens)),
-            ("centre_ligand_chains", counts(value.centre_ligand_chains)),
-        ]).into_iter().flatten())
-        {
+        .chain(
+            uncapped
+                .then(|| {
+                    [
+                        ("centre_ligand_tokens", counts(value.centre_ligand_tokens)),
+                        ("centre_ligand_chains", counts(value.centre_ligand_chains)),
+                    ]
+                })
+                .into_iter()
+                .flatten(),
+        ) {
             put(
                 name,
                 "=i8",
@@ -208,15 +225,26 @@ impl ObservationPacker {
 
     #[cfg(feature = "reduce3")]
     #[pyo3(signature = (document, *, chem_data, model=1))]
-    fn missing_hydrogen_dictionaries(&self, py: Python<'_>, document: &PyCifDocument, chem_data: PathBuf, model: i64) -> PyResult<Vec<String>> {
-        py.detach(|| observations::missing_hydrogen_dictionaries(document.document(), model, &chem_data))
-            .map_err(PyValueError::new_err)
+    fn missing_hydrogen_dictionaries(
+        &self,
+        py: Python<'_>,
+        document: &PyCifDocument,
+        chem_data: PathBuf,
+        model: i64,
+    ) -> PyResult<Vec<String>> {
+        py.detach(|| {
+            observations::missing_hydrogen_dictionaries(document.document(), model, &chem_data)
+        })
+        .map_err(PyValueError::new_err)
     }
 
     /// Store the Atom84 contract used by the single-read molecular preparation.
     #[cfg(feature = "reduce3")]
     fn set_molecular_schema(&mut self, schema: &str) -> PyResult<()> {
-        self.molecular = Some(observations::molecular::MolecularSchema::read(schema).map_err(PyValueError::new_err)?);
+        self.molecular = Some(
+            observations::molecular::MolecularSchema::read(schema)
+                .map_err(PyValueError::new_err)?,
+        );
         Ok(())
     }
 
@@ -226,9 +254,17 @@ impl ObservationPacker {
     /// its product when this document gives the same one.
     #[cfg(feature = "reduce3")]
     #[pyo3(signature = (document, *, model=1, chem_data, base=None))]
-    fn molecular_view(&self, py: Python<'_>, document: &PyCifDocument, model: i64,
-        chem_data: PathBuf, base: Option<PyRef<'_, molecular::MolecularView>>) -> PyResult<molecular::MolecularView> {
-        let schema = self.molecular.as_ref()
+    fn molecular_view(
+        &self,
+        py: Python<'_>,
+        document: &PyCifDocument,
+        model: i64,
+        chem_data: PathBuf,
+        base: Option<PyRef<'_, molecular::MolecularView>>,
+    ) -> PyResult<molecular::MolecularView> {
+        let schema = self
+            .molecular
+            .as_ref()
             .ok_or_else(|| PyValueError::new_err("The packer has no molecular schema"))?;
         // The document keeps its model, so Reduce3 and the model of its output can reuse
         // the decoded atom sites. A model that fails to build is built again by the read,
@@ -236,23 +272,40 @@ impl ObservationPacker {
         let source = document;
         let document = source.document().clone();
         let base = base.as_ref().map(|base| &base.view);
-        let view = py.detach(|| {
-            // A document that Reduce3 wrote from the document of `base` reads its view from
-            // the model of that document, without a model of its own.
-            #[cfg(feature = "reduce3")]
-            let copied = base.and_then(|base| source.source_copies(|copied, rows, made| {
-                observations::molecular::View::read_copied(document.clone(), copied, rows, made, model, &chem_data,
-                    schema, base)
-            })?);
-            #[cfg(not(feature = "reduce3"))]
-            let copied = None;
-            match copied {
-                Some(view) => Ok(view),
-                None => observations::molecular::View::read_with_model(document, source.pdbx_model().ok(), model,
-                    &chem_data, schema, base),
-            }
-        })
-        .map_err(molecular::raise)?;
+        let view = py
+            .detach(|| {
+                // A document that Reduce3 wrote from the document of `base` reads its view from
+                // the model of that document, without a model of its own.
+                #[cfg(feature = "reduce3")]
+                let copied = base.and_then(|base| {
+                    source.source_copies(|copied, rows, made| {
+                        observations::molecular::View::read_copied(
+                            document.clone(),
+                            copied,
+                            rows,
+                            made,
+                            model,
+                            &chem_data,
+                            schema,
+                            base,
+                        )
+                    })?
+                });
+                #[cfg(not(feature = "reduce3"))]
+                let copied = None;
+                match copied {
+                    Some(view) => Ok(view),
+                    None => observations::molecular::View::read_with_model(
+                        document,
+                        source.pdbx_model().ok(),
+                        model,
+                        &chem_data,
+                        schema,
+                        base,
+                    ),
+                }
+            })
+            .map_err(molecular::raise)?;
         Ok(molecular::MolecularView { view })
     }
 
@@ -266,27 +319,55 @@ impl ObservationPacker {
     #[pyo3(signature = (view, perceived, *, complete=false, sasa=true, target_uncertainties=None, expected_keys=None,
         keys_json=false, index=false, reference_labels=false))]
     #[allow(clippy::too_many_arguments)]
-    fn finish_molecular<'py>(&self, py: Python<'py>, view: &molecular::MolecularView, perceived: Vec<Vec<u8>>,
-        complete: bool, sasa: bool, target_uncertainties: Option<&str>, expected_keys: Option<&str>, keys_json: bool,
-        index: bool, reference_labels: bool) -> PyResult<molecular::FinishedValue<'py>> {
-        let schema = self.molecular.as_ref()
+    fn finish_molecular<'py>(
+        &self,
+        py: Python<'py>,
+        view: &molecular::MolecularView,
+        perceived: Vec<Vec<u8>>,
+        complete: bool,
+        sasa: bool,
+        target_uncertainties: Option<&str>,
+        expected_keys: Option<&str>,
+        keys_json: bool,
+        index: bool,
+        reference_labels: bool,
+    ) -> PyResult<molecular::FinishedValue<'py>> {
+        let schema = self
+            .molecular
+            .as_ref()
             .ok_or_else(|| PyValueError::new_err("The packer has no molecular schema"))?;
         let packer = observations::molecular::Packer {
-            schema: &self.schema, features: &self.features, hydrogen_parents: &self.hydrogen_parents,
-            table: &self.table, excluded: &self.excluded, molecular: schema,
+            schema: &self.schema,
+            features: &self.features,
+            hydrogen_parents: &self.hydrogen_parents,
+            table: &self.table,
+            excluded: &self.excluded,
+            molecular: schema,
         };
         let options = observations::molecular::Options {
-            complete, sasa, uncertainties: target_uncertainties, expected: expected_keys, keys_json, index,
+            complete,
+            sasa,
+            uncertainties: target_uncertainties,
+            expected: expected_keys,
+            keys_json,
+            index,
             reference_labels,
         };
-        let value = py.detach(|| observations::molecular::finish(&view.view, &perceived, &packer, &options))
+        let value = py
+            .detach(|| observations::molecular::finish(&view.view, &perceived, &packer, &options))
             .map_err(molecular::raise)?;
         molecular::finished(py, value)
     }
 
     #[pyo3(signature = (document, *, model=1))]
-    fn prepare_source(&self, py: Python<'_>, document: &PyCifDocument, model: i64) -> PyResult<PreparedObservationSource> {
-        let source = py.detach(|| observations::PreparedSource::read(document.document(), model))
+    fn prepare_source(
+        &self,
+        py: Python<'_>,
+        document: &PyCifDocument,
+        model: i64,
+    ) -> PyResult<PreparedObservationSource> {
+        let source = py
+            .detach(|| observations::PreparedSource::read(document.document(), model))
             .map_err(PyValueError::new_err)?;
         Ok(PreparedObservationSource { source })
     }
@@ -309,26 +390,78 @@ impl ObservationPacker {
         target_uncertainties: Option<&str>,
         product_targets: Option<&str>,
     ) -> PyResult<(Bound<'py, PyDict>, Vec<[String; 5]>)> {
-        self.finish_pack(py, || observations::pack(document.document(), &self.schema, &self.features,
-            &self.hydrogen_parents, &self.table, &self.excluded, &observations::PackOptions {
-                model, complete, topology_policy, protein_only, chem_data: chem_data.as_deref(),
-            }), protein_only, complete_tokens, expected_keys, validate, with_keys, target_uncertainties, product_targets)
+        self.finish_pack(
+            py,
+            || {
+                observations::pack(
+                    document.document(),
+                    &self.schema,
+                    &self.features,
+                    &self.hydrogen_parents,
+                    &self.table,
+                    &self.excluded,
+                    &observations::PackOptions {
+                        model,
+                        complete,
+                        topology_policy,
+                        protein_only,
+                        chem_data: chem_data.as_deref(),
+                    },
+                )
+            },
+            protein_only,
+            complete_tokens,
+            expected_keys,
+            validate,
+            with_keys,
+            target_uncertainties,
+            product_targets,
+        )
     }
 
     #[pyo3(signature = (source, *, complete=false, topology_policy="observed_connectivity", protein_only=false, complete_tokens=false, expected_keys=None, validate=false, with_keys=true, chem_data=None, target_uncertainties=None, product_targets=None))]
     #[allow(clippy::too_many_arguments)]
     fn pack_prepared<'py>(
-        &self, py: Python<'py>, source: &PreparedObservationSource, complete: bool,
-        topology_policy: &str, protein_only: bool, complete_tokens: bool,
-        expected_keys: Option<&str>, validate: bool, with_keys: bool,
-        chem_data: Option<PathBuf>, target_uncertainties: Option<&str>,
+        &self,
+        py: Python<'py>,
+        source: &PreparedObservationSource,
+        complete: bool,
+        topology_policy: &str,
+        protein_only: bool,
+        complete_tokens: bool,
+        expected_keys: Option<&str>,
+        validate: bool,
+        with_keys: bool,
+        chem_data: Option<PathBuf>,
+        target_uncertainties: Option<&str>,
         product_targets: Option<&str>,
     ) -> PyResult<(Bound<'py, PyDict>, Vec<[String; 5]>)> {
-        self.finish_pack(py, || source.source.pack(&self.schema, &self.features,
-            &self.hydrogen_parents, &self.table, &self.excluded, &observations::PackOptions {
-                model: source.source.model, complete, topology_policy, protein_only,
-                chem_data: chem_data.as_deref(),
-            }), protein_only, complete_tokens, expected_keys, validate, with_keys, target_uncertainties, product_targets)
+        self.finish_pack(
+            py,
+            || {
+                source.source.pack(
+                    &self.schema,
+                    &self.features,
+                    &self.hydrogen_parents,
+                    &self.table,
+                    &self.excluded,
+                    &observations::PackOptions {
+                        model: source.source.model,
+                        complete,
+                        topology_policy,
+                        protein_only,
+                        chem_data: chem_data.as_deref(),
+                    },
+                )
+            },
+            protein_only,
+            complete_tokens,
+            expected_keys,
+            validate,
+            with_keys,
+            target_uncertainties,
+            product_targets,
+        )
     }
 
     fn protein_document(
@@ -360,39 +493,73 @@ fn token_table_from(value: &Bound<'_, PyDict>) -> PyResult<TokenTable> {
             "elements" => elements = Some(item.extract::<HashMap<String, i64>>()?),
             "other" => other = Some(item.extract::<i64>()?),
             "hydrogen" => hydrogen = Some(item.extract::<i64>()?),
-            name => return Err(PyValueError::new_err(format!("Unknown ligand token table field {name:?}"))),
+            name => {
+                return Err(PyValueError::new_err(format!(
+                    "Unknown ligand token table field {name:?}"
+                )));
+            }
         }
     }
-    let missing = |name: &str| PyValueError::new_err(format!("The ligand token table has no {name}"));
-    TokenTable::new(elements.ok_or_else(|| missing("elements"))?, other.ok_or_else(|| missing("other token"))?,
-        hydrogen.ok_or_else(|| missing("hydrogen token"))?).map_err(PyValueError::new_err)
+    let missing =
+        |name: &str| PyValueError::new_err(format!("The ligand token table has no {name}"));
+    TokenTable::new(
+        elements.ok_or_else(|| missing("elements"))?,
+        other.ok_or_else(|| missing("other token"))?,
+        hydrogen.ok_or_else(|| missing("hydrogen token"))?,
+    )
+    .map_err(PyValueError::new_err)
 }
 
 impl ObservationPacker {
     #[allow(clippy::too_many_arguments)]
-    fn finish_pack<'py>(&self, py: Python<'py>, build: impl FnOnce() -> Result<Tokens, String> + Send,
-        protein_only: bool, complete_tokens: bool, expected_keys: Option<&str>, validate: bool,
-        with_keys: bool, target_uncertainties: Option<&str>, product_targets: Option<&str>) -> PyResult<(Bound<'py, PyDict>, Vec<[String; 5]>)> {
-        let result = py.detach(|| {
-            let mut result = build()?;
-            if let Some(json) = product_targets {
-                let values: Vec<observations::product::ProductTarget> =
-                    serde_json::from_str(json).map_err(|error| error.to_string())?;
-                observations::product::apply(&mut result, &self.schema, &self.table, &values)?;
-            }
-            if let Some(json) = target_uncertainties {
-                let values: Vec<observations::uncertainty::TargetUncertainty> =
-                    serde_json::from_str(json).map_err(|error| error.to_string())?;
-                observations::uncertainty::apply(&mut result, &self.schema, &values)?;
-            }
-            if complete_tokens { result.complete(&self.schema)?; }
-            if let Some(keys) = expected_keys { result.align(keys)?; }
-            result.protein_gaps();
-            if validate { result.validate(&self.schema, &self.table)?; }
-            Ok::<_, String>(result)
-        }).map_err(PyValueError::new_err)?;
+    fn finish_pack<'py>(
+        &self,
+        py: Python<'py>,
+        build: impl FnOnce() -> Result<Tokens, String> + Send,
+        protein_only: bool,
+        complete_tokens: bool,
+        expected_keys: Option<&str>,
+        validate: bool,
+        with_keys: bool,
+        target_uncertainties: Option<&str>,
+        product_targets: Option<&str>,
+    ) -> PyResult<(Bound<'py, PyDict>, Vec<[String; 5]>)> {
+        let result = py
+            .detach(|| {
+                let mut result = build()?;
+                if let Some(json) = product_targets {
+                    let values: Vec<observations::product::ProductTarget> =
+                        serde_json::from_str(json).map_err(|error| error.to_string())?;
+                    observations::product::apply(&mut result, &self.schema, &self.table, &values)?;
+                }
+                if let Some(json) = target_uncertainties {
+                    let values: Vec<observations::uncertainty::TargetUncertainty> =
+                        serde_json::from_str(json).map_err(|error| error.to_string())?;
+                    observations::uncertainty::apply(&mut result, &self.schema, &values)?;
+                }
+                if complete_tokens {
+                    result.complete(&self.schema)?;
+                }
+                if let Some(keys) = expected_keys {
+                    result.align(keys)?;
+                }
+                result.protein_gaps();
+                if validate {
+                    result.validate(&self.schema, &self.table)?;
+                }
+                Ok::<_, String>(result)
+            })
+            .map_err(PyValueError::new_err)?;
         let arrays = buffers(py, &result, protein_only)?;
-        let keys = if with_keys { result.keys.iter().map(|key| key.each_ref().map(String::from)).collect() } else { Vec::new() };
+        let keys = if with_keys {
+            result
+                .keys
+                .iter()
+                .map(|key| key.each_ref().map(String::from))
+                .collect()
+        } else {
+            Vec::new()
+        };
         Ok((arrays, keys))
     }
 }
@@ -466,13 +633,40 @@ fn buffers<'py>(
             integer(&edges),
         )?;
         if !value.bridge_edges.is_empty() {
-            let edges: Vec<i64> = value.bridge_edges.iter().map(|&(a, _, _)| a as i64)
-                .chain(value.bridge_edges.iter().map(|&(_, b, _)| b as i64)).collect();
-            put("ligand_bridge_index", "=i8", vec![2, value.bridge_edges.len()], integer(&edges))?;
-            put("ligand_bridge_type", "u1", vec![value.bridge_edges.len()],
-                value.bridge_edges.iter().map(|&(_, _, kind)| kind).collect())?;
-            put("crop_positions", "=f4", vec![count, 3], float(&value.crop_positions))?;
-            put("crop_center_eligible", "?", vec![count], value.crop_center_eligible.clone())?;
+            let edges: Vec<i64> = value
+                .bridge_edges
+                .iter()
+                .map(|&(a, _, _)| a as i64)
+                .chain(value.bridge_edges.iter().map(|&(_, b, _)| b as i64))
+                .collect();
+            put(
+                "ligand_bridge_index",
+                "=i8",
+                vec![2, value.bridge_edges.len()],
+                integer(&edges),
+            )?;
+            put(
+                "ligand_bridge_type",
+                "u1",
+                vec![value.bridge_edges.len()],
+                value
+                    .bridge_edges
+                    .iter()
+                    .map(|&(_, _, kind)| kind)
+                    .collect(),
+            )?;
+            put(
+                "crop_positions",
+                "=f4",
+                vec![count, 3],
+                float(&value.crop_positions),
+            )?;
+            put(
+                "crop_center_eligible",
+                "?",
+                vec![count],
+                value.crop_center_eligible.clone(),
+            )?;
         }
     }
     Ok(result)

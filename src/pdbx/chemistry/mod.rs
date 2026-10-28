@@ -321,10 +321,20 @@ pub fn prepare_chemistry(
     prepare_product(model, registry, model_number, alternate_id, true)
 }
 
-pub(crate) fn prepare_product(model: &PdbxModel, registry: Option<&ComponentRegistry>,
-    model_number: i64, alternate_id: Option<&str>, use_observed_hydrogens: bool,
+pub(crate) fn prepare_product(
+    model: &PdbxModel,
+    registry: Option<&ComponentRegistry>,
+    model_number: i64,
+    alternate_id: Option<&str>,
+    use_observed_hydrogens: bool,
 ) -> Result<PreparedChemistry, SemanticError> {
-    let mut graph = input::build(model, registry, model_number, alternate_id, use_observed_hydrogens)?;
+    let mut graph = input::build(
+        model,
+        registry,
+        model_number,
+        alternate_id,
+        use_observed_hydrogens,
+    )?;
     links::add(model, &mut graph)?;
     product::resolve(&mut graph)?;
     Ok(graph)
@@ -341,19 +351,33 @@ pub(crate) fn prepare_product(model: &PdbxModel, registry: Option<&ComponentRegi
 /// Sites of one residue may come in another order when that order cannot change the
 /// product (see [`order_free`]). Returns the row of `other` that holds each product atom,
 /// or `None` when `other` may give another product.
-pub(crate) fn product_rows_in(product: &PreparedChemistry, model: &PdbxModel, other: &PdbxModel,
-    model_number: i64) -> Option<Vec<Option<usize>>> {
-    if model.components != other.components || model.entities != other.entities
-        || connection_entries(model) != connection_entries(other) {
+pub(crate) fn product_rows_in(
+    product: &PreparedChemistry,
+    model: &PdbxModel,
+    other: &PdbxModel,
+    model_number: i64,
+) -> Option<Vec<Option<usize>>> {
+    if model.components != other.components
+        || model.entities != other.entities
+        || connection_entries(model) != connection_entries(other)
+    {
         return None;
     }
     let sites = &other.atom_sites;
-    let theirs: Vec<usize> = sites.iter().enumerate()
+    let theirs: Vec<usize> = sites
+        .iter()
+        .enumerate()
         .filter(|(_, site)| site.model_number == model_number && !hydrogen(&site.element))
         .map(|(row, _)| row)
         .collect();
-    product_rows_with(product, model, model_number, &theirs, |row| &sites[row],
-        |row| [sites[row].x, sites[row].y, sites[row].z])
+    product_rows_with(
+        product,
+        model,
+        model_number,
+        &theirs,
+        |row| &sites[row],
+        |row| [sites[row].x, sites[row].y, sites[row].z],
+    )
 }
 
 /// Map the product as [`product_rows_in`] does, onto a document whose model gives the same
@@ -361,10 +385,18 @@ pub(crate) fn product_rows_in(product: &PreparedChemistry, model: &PdbxModel, ot
 /// of `model_number` in order; `identity` gives a site that holds the values of a row in
 /// every field the product reads apart from coordinates, and `position` gives the row's
 /// coordinates.
-pub(crate) fn product_rows_with<'a>(product: &PreparedChemistry, model: &PdbxModel, model_number: i64,
-    theirs: &[usize], identity: impl Fn(usize) -> &'a super::model::AtomSite, position: impl Fn(usize) -> [f64; 3],
+pub(crate) fn product_rows_with<'a>(
+    product: &PreparedChemistry,
+    model: &PdbxModel,
+    model_number: i64,
+    theirs: &[usize],
+    identity: impl Fn(usize) -> &'a super::model::AtomSite,
+    position: impl Fn(usize) -> [f64; 3],
 ) -> Option<Vec<Option<usize>>> {
-    let own: Vec<usize> = model.atom_sites.iter().enumerate()
+    let own: Vec<usize> = model
+        .atom_sites
+        .iter()
+        .enumerate()
         .filter(|(_, site)| site.model_number == model_number && !hydrogen(&site.element))
         .map(|(row, _)| row)
         .collect();
@@ -373,7 +405,11 @@ pub(crate) fn product_rows_with<'a>(product: &PreparedChemistry, model: &PdbxMod
     }
     let mut rows = vec![usize::MAX; model.atom_sites.len()];
     // Rows whose identities are the sites of `model` themselves need no residue check.
-    if own.iter().zip(theirs).all(|(&row, &their_row)| std::ptr::eq(&model.atom_sites[row], identity(their_row))) {
+    if own
+        .iter()
+        .zip(theirs)
+        .all(|(&row, &their_row)| std::ptr::eq(&model.atom_sites[row], identity(their_row)))
+    {
         for (&row, &their_row) in own.iter().zip(theirs) {
             rows[row] = their_row;
         }
@@ -388,10 +424,16 @@ pub(crate) fn product_rows_with<'a>(product: &PreparedChemistry, model: &PdbxMod
     let mut start = 0;
     while let Some(&first) = own.get(start) {
         let key = residue_key(&model.atom_sites[first]);
-        let end = own[start..].iter().position(|&row| residue_key(&model.atom_sites[row]) != key)
+        let end = own[start..]
+            .iter()
+            .position(|&row| residue_key(&model.atom_sites[row]) != key)
             .map_or(own.len(), |length| start + length);
         let (mine, yours) = (&own[start..end], &theirs[start..end]);
-        if mine.iter().zip(yours).all(|(&row, &their_row)| same_identity(&model.atom_sites[row], identity(their_row))) {
+        if mine
+            .iter()
+            .zip(yours)
+            .all(|(&row, &their_row)| same_identity(&model.atom_sites[row], identity(their_row)))
+        {
             for (&row, &their_row) in mine.iter().zip(yours) {
                 rows[row] = their_row;
             }
@@ -399,13 +441,21 @@ pub(crate) fn product_rows_with<'a>(product: &PreparedChemistry, model: &PdbxMod
             if !order_free(&model.atom_sites, mine, &templated) {
                 return None;
             }
-            fn sorted<'s>(run: &[usize], site: impl Fn(usize) -> &'s super::model::AtomSite) -> Vec<usize> {
+            fn sorted<'s>(
+                run: &[usize],
+                site: impl Fn(usize) -> &'s super::model::AtomSite,
+            ) -> Vec<usize> {
                 let mut run = run.to_vec();
-                run.sort_by(|&left, &right| site(left).label_atom_id.cmp(&site(right).label_atom_id));
+                run.sort_by(|&left, &right| {
+                    site(left).label_atom_id.cmp(&site(right).label_atom_id)
+                });
                 run
             }
             let sites = &model.atom_sites;
-            for (row, their_row) in sorted(mine, |row| &sites[row]).into_iter().zip(sorted(yours, &identity)) {
+            for (row, their_row) in sorted(mine, |row| &sites[row])
+                .into_iter()
+                .zip(sorted(yours, &identity))
+            {
                 if !same_identity(&model.atom_sites[row], identity(their_row)) {
                     return None;
                 }
@@ -419,16 +469,26 @@ pub(crate) fn product_rows_with<'a>(product: &PreparedChemistry, model: &PdbxMod
 
 /// The row of `rows` that holds each product atom, when every source row of the product has
 /// one and the sites of the `CA`, `C`, `N`, `O3'` and `P` atoms keep their coordinates.
-fn mapped_rows(product: &PreparedChemistry, model: &PdbxModel, rows: &[usize],
-    position: impl Fn(usize) -> [f64; 3]) -> Option<Vec<Option<usize>>> {
+fn mapped_rows(
+    product: &PreparedChemistry,
+    model: &PdbxModel,
+    rows: &[usize],
+    position: impl Fn(usize) -> [f64; 3],
+) -> Option<Vec<Option<usize>>> {
     let mut mapped = Vec::with_capacity(product.atoms.len());
     for atom in &product.atoms {
         let row = match atom.source_row {
-            Some(row) => Some(*rows.get(row).filter(|&&their_row| their_row != usize::MAX)?),
+            Some(row) => Some(
+                *rows
+                    .get(row)
+                    .filter(|&&their_row| their_row != usize::MAX)?,
+            ),
             None => None,
         };
         if let (Some(own), Some(their_row)) = (atom.source_row, row)
-            && ["CA", "C", "N", "O3'", "P"].iter().any(|name| atom.atom_id == *name)
+            && ["CA", "C", "N", "O3'", "P"]
+                .iter()
+                .any(|name| atom.atom_id == *name)
         {
             let site = &model.atom_sites[own];
             if [site.x, site.y, site.z].map(f64::to_bits) != position(their_row).map(f64::to_bits) {
@@ -443,12 +503,21 @@ fn mapped_rows(product: &PreparedChemistry, model: &PdbxModel, rows: &[usize],
 /// Whether `element` names hydrogen, as [`input::is_hydrogen_element`] decides, without
 /// checking the text as UTF-8.
 pub(crate) fn hydrogen(element: &ShortText) -> bool {
-    ["H", "D", "T", "h", "d", "t"].iter().any(|name| element == name)
+    ["H", "D", "T", "h", "d", "t"]
+        .iter()
+        .any(|name| element == name)
 }
 
 /// The fields that group atom sites into residues, as [`input::build`] reads them.
-fn residue_key(site: &super::model::AtomSite) -> (&ShortText, Option<i64>, &ShortText, Option<&ShortText>) {
-    (&site.label_asym_id, site.label_seq_id, &site.auth_seq_id, site.insertion_code.as_ref())
+fn residue_key(
+    site: &super::model::AtomSite,
+) -> (&ShortText, Option<i64>, &ShortText, Option<&ShortText>) {
+    (
+        &site.label_asym_id,
+        site.label_seq_id,
+        &site.auth_seq_id,
+        site.insertion_code.as_ref(),
+    )
 }
 
 /// Whether the product reads the sites `run` of one residue the same in any order.
@@ -475,31 +544,43 @@ fn order_free(sites: &[super::model::AtomSite], run: &[usize], templated: &[bool
 /// The block entries that hold `struct_conn` items, and any save frame.
 fn connection_entries(model: &PdbxModel) -> Vec<&crate::cif::CifEntry> {
     use crate::cif::{CifEntry, in_category};
-    model.document.blocks().first().map_or_else(Vec::new, |block| {
-        block.entries().iter().filter(|entry| match entry {
-            CifEntry::Item(item) => in_category(item.tag(), "struct_conn"),
-            CifEntry::Loop(values) => values.tags().iter().any(|tag| in_category(tag, "struct_conn")),
-            CifEntry::Frame(_) => true,
-        }).collect()
-    })
+    model
+        .document
+        .blocks()
+        .first()
+        .map_or_else(Vec::new, |block| {
+            block
+                .entries()
+                .iter()
+                .filter(|entry| match entry {
+                    CifEntry::Item(item) => in_category(item.tag(), "struct_conn"),
+                    CifEntry::Loop(values) => values
+                        .tags()
+                        .iter()
+                        .any(|tag| in_category(tag, "struct_conn")),
+                    CifEntry::Frame(_) => true,
+                })
+                .collect()
+        })
 }
 
 /// Whether two atom sites agree in every field the product reads except coordinates.
 fn same_identity(site: &super::model::AtomSite, other: &super::model::AtomSite) -> bool {
-    std::ptr::eq(site, other) || site.model_number == other.model_number
-        && site.element == other.element
-        && site.label_atom_id == other.label_atom_id
-        && site.label_alt_id == other.label_alt_id
-        && site.label_comp_id == other.label_comp_id
-        && site.label_asym_id == other.label_asym_id
-        && site.label_entity_id == other.label_entity_id
-        && site.label_seq_id == other.label_seq_id
-        && site.insertion_code == other.insertion_code
-        && site.occupancy.to_bits() == other.occupancy.to_bits()
-        && site.formal_charge == other.formal_charge
-        && site.auth_seq_id == other.auth_seq_id
-        && site.auth_comp_id == other.auth_comp_id
-        && site.auth_asym_id == other.auth_asym_id
+    std::ptr::eq(site, other)
+        || site.model_number == other.model_number
+            && site.element == other.element
+            && site.label_atom_id == other.label_atom_id
+            && site.label_alt_id == other.label_alt_id
+            && site.label_comp_id == other.label_comp_id
+            && site.label_asym_id == other.label_asym_id
+            && site.label_entity_id == other.label_entity_id
+            && site.label_seq_id == other.label_seq_id
+            && site.insertion_code == other.insertion_code
+            && site.occupancy.to_bits() == other.occupancy.to_bits()
+            && site.formal_charge == other.formal_charge
+            && site.auth_seq_id == other.auth_seq_id
+            && site.auth_comp_id == other.auth_comp_id
+            && site.auth_asym_id == other.auth_asym_id
 }
 
 #[cfg(test)]
@@ -678,7 +759,14 @@ metalc1 metalc A ASN 2 OD1 B ZN . ZN 2.10
         let base = product(&original);
         let rows = product_rows_in(&base, &original, &edited, 1).expect("the product is shared");
         let mut fresh = product(&edited);
-        assert_eq!(fresh.atoms.iter().map(|atom| atom.source_row).collect::<Vec<_>>(), rows);
+        assert_eq!(
+            fresh
+                .atoms
+                .iter()
+                .map(|atom| atom.source_row)
+                .collect::<Vec<_>>(),
+            rows
+        );
         let mut base = base;
         for atom in base.atoms.iter_mut().chain(fresh.atoms.iter_mut()) {
             atom.coordinates = None;
@@ -708,7 +796,13 @@ metalc1 metalc A ASN 2 OD1 B ZN . ZN 2.10
     fn unchanged_document_shares_every_row() {
         let rows = shared_rows(PEPTIDE);
         let base = product(&model(PEPTIDE));
-        assert_eq!(rows, base.atoms.iter().map(|atom| atom.source_row).collect::<Vec<_>>());
+        assert_eq!(
+            rows,
+            base.atoms
+                .iter()
+                .map(|atom| atom.source_row)
+                .collect::<Vec<_>>()
+        );
     }
 
     #[test]
@@ -722,16 +816,28 @@ metalc1 metalc A ASN 2 OD1 B ZN . ZN 2.10
 
     #[test]
     fn reordered_residue_with_added_hydrogens_shares_the_product() {
-        let site = |line: &str| PEPTIDE.lines().find(|row| row.contains(line)).expect("site").to_owned();
+        let site = |line: &str| {
+            PEPTIDE
+                .lines()
+                .find(|row| row.contains(line))
+                .expect("site")
+                .to_owned()
+        };
         let (od1, nd2) = (site(OD1), site(ND2));
-        let hydrogen = "ATOM 19 H HD21 . ASN A 1 2 ? 6.700 -3.600 0.000 1.00 10.00 ? 2 ASN A HD21 1";
-        let reordered = PEPTIDE
-            .replace(&format!("{od1}\n{nd2}\n"), &format!("{nd2}\n{hydrogen}\n{od1}\n"));
+        let hydrogen =
+            "ATOM 19 H HD21 . ASN A 1 2 ? 6.700 -3.600 0.000 1.00 10.00 ? 2 ASN A HD21 1";
+        let reordered = PEPTIDE.replace(
+            &format!("{od1}\n{nd2}\n"),
+            &format!("{nd2}\n{hydrogen}\n{od1}\n"),
+        );
         assert_ne!(reordered, PEPTIDE);
         let rows = shared_rows(&reordered);
         let base = product(&model(PEPTIDE));
         let row_of = |name: &str| {
-            let atom = base.atoms.iter().position(|atom| atom.component_id == "ASN" && atom.atom_id == name);
+            let atom = base
+                .atoms
+                .iter()
+                .position(|atom| atom.component_id == "ASN" && atom.atom_id == name);
             rows[atom.expect("atom")]
         };
         assert_eq!((row_of("ND2"), row_of("OD1")), (Some(10), Some(12)));

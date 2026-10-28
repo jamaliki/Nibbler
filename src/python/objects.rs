@@ -7,8 +7,8 @@
 
 use std::fmt;
 
-use pyo3::exceptions::PyValueError;
 use pyo3::IntoPyObjectExt;
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyList, PyString};
 use serde::ser::{self, Serialize};
@@ -27,10 +27,12 @@ pub(super) fn to_python<'py, T: Serialize + ?Sized>(
         templates: FastMap::default(),
         fields: Vec::new(),
     };
-    value.serialize(&mut converter).map_err(|error| match error {
-        Error::Python(error) => error,
-        Error::Message(message) => PyValueError::new_err(message),
-    })
+    value
+        .serialize(&mut converter)
+        .map_err(|error| match error {
+            Error::Python(error) => error,
+            Error::Message(message) => PyValueError::new_err(message),
+        })
 }
 
 /// A Python exception, or a message that `serde_json` would also report.
@@ -121,7 +123,10 @@ impl<'py> Converter<'py> {
                 key | u64::from(byte) << (8 * index)
             });
         let py = self.py;
-        self.texts.entry(key).or_insert_with(|| PyString::new(py, text)).clone()
+        self.texts
+            .entry(key)
+            .or_insert_with(|| PyString::new(py, text))
+            .clone()
     }
 
     fn none(&self) -> Bound<'py, PyAny> {
@@ -129,7 +134,11 @@ impl<'py> Converter<'py> {
     }
 
     fn float(&self, value: f64) -> Bound<'py, PyAny> {
-        if value.is_finite() { PyFloat::new(self.py, value).into_any() } else { self.none() }
+        if value.is_finite() {
+            PyFloat::new(self.py, value).into_any()
+        } else {
+            self.none()
+        }
     }
 
     fn integer<T: IntoPyObject<'py>>(&self, value: T) -> Result<Bound<'py, PyAny>, Error> {
@@ -137,7 +146,11 @@ impl<'py> Converter<'py> {
     }
 
     /// Return a dict of the fields from `start` on, and remove them from `fields`.
-    fn finish_struct(&mut self, name: &'static str, start: usize) -> Result<Bound<'py, PyDict>, Error> {
+    fn finish_struct(
+        &mut self,
+        name: &'static str,
+        start: usize,
+    ) -> Result<Bound<'py, PyDict>, Error> {
         let identity = (name.as_ptr() as usize, name.len());
         if let Some(template) = self.templates.get(&identity)
             && template.matches(&self.fields[start..])
@@ -161,7 +174,14 @@ impl<'py> Converter<'py> {
             for key in &keys {
                 template.set_item(key, self.py.None())?;
             }
-            self.templates.insert(identity, Template { names, keys, dict: template });
+            self.templates.insert(
+                identity,
+                Template {
+                    names,
+                    keys,
+                    dict: template,
+                },
+            );
         }
         Ok(dict)
     }
@@ -240,7 +260,9 @@ impl<'a, 'py> ser::Serializer for &'a mut Converter<'py> {
         // `serde_json` writes the shortest decimal that names the `f32`, and
         // `json.loads` reads that decimal as an `f64`; `f64::from` could differ.
         let text = written(value)?;
-        let parsed = text.parse::<f64>().map_err(|error| Error::Message(error.to_string()))?;
+        let parsed = text
+            .parse::<f64>()
+            .map_err(|error| Error::Message(error.to_string()))?;
         Ok(self.float(parsed))
     }
 
@@ -305,7 +327,11 @@ impl<'a, 'py> ser::Serializer for &'a mut Converter<'py> {
     }
 
     fn serialize_seq(self, length: Option<usize>) -> Result<Self::SerializeSeq, Error> {
-        Ok(Sequence { converter: self, items: Vec::with_capacity(length.unwrap_or(0)), variant: None })
+        Ok(Sequence {
+            converter: self,
+            items: Vec::with_capacity(length.unwrap_or(0)),
+            variant: None,
+        })
     }
 
     fn serialize_tuple(self, length: usize) -> Result<Self::SerializeTuple, Error> {
@@ -327,12 +353,20 @@ impl<'a, 'py> ser::Serializer for &'a mut Converter<'py> {
         variant: &'static str,
         length: usize,
     ) -> Result<Self::SerializeTupleVariant, Error> {
-        Ok(Sequence { converter: self, items: Vec::with_capacity(length), variant: Some(variant) })
+        Ok(Sequence {
+            converter: self,
+            items: Vec::with_capacity(length),
+            variant: Some(variant),
+        })
     }
 
     fn serialize_map(self, _length: Option<usize>) -> Result<Self::SerializeMap, Error> {
         let dict = PyDict::new(self.py);
-        Ok(Map { converter: self, dict, key: None })
+        Ok(Map {
+            converter: self,
+            dict,
+            key: None,
+        })
     }
 
     fn serialize_struct(
@@ -341,7 +375,12 @@ impl<'a, 'py> ser::Serializer for &'a mut Converter<'py> {
         _length: usize,
     ) -> Result<Self::SerializeStruct, Error> {
         let start = self.fields.len();
-        Ok(Struct { converter: self, name, start, variant: None })
+        Ok(Struct {
+            converter: self,
+            name,
+            start,
+            variant: None,
+        })
     }
 
     fn serialize_struct_variant(
@@ -352,7 +391,12 @@ impl<'a, 'py> ser::Serializer for &'a mut Converter<'py> {
         _length: usize,
     ) -> Result<Self::SerializeStructVariant, Error> {
         let start = self.fields.len();
-        Ok(Struct { converter: self, name, start, variant: Some(variant) })
+        Ok(Struct {
+            converter: self,
+            name,
+            start,
+            variant: Some(variant),
+        })
     }
 }
 
@@ -443,7 +487,9 @@ impl<'py> ser::SerializeMap for Map<'_, 'py> {
     type Error = Error;
 
     fn serialize_key<T: Serialize + ?Sized>(&mut self, key: &T) -> Result<(), Error> {
-        self.key = Some(key.serialize(MapKey { converter: &mut *self.converter })?);
+        self.key = Some(key.serialize(MapKey {
+            converter: &mut *self.converter,
+        })?);
         Ok(())
     }
 
@@ -480,7 +526,10 @@ impl<'py> Struct<'_, 'py> {
     }
 
     fn finish(self) -> Result<Bound<'py, PyAny>, Error> {
-        let dict = self.converter.finish_struct(self.name, self.start)?.into_any();
+        let dict = self
+            .converter
+            .finish_struct(self.name, self.start)?
+            .into_any();
         match self.variant {
             Some(variant) => self.converter.variant(variant, dict),
             None => Ok(dict),
@@ -590,7 +639,9 @@ impl<'py> ser::Serializer for MapKey<'_, 'py> {
 
     fn serialize_f32(self, value: f32) -> Result<Self::Ok, Error> {
         if !value.is_finite() {
-            return Err(Error::Message("float key must be finite (got NaN or +/-inf)".to_owned()));
+            return Err(Error::Message(
+                "float key must be finite (got NaN or +/-inf)".to_owned(),
+            ));
         }
         let text = written(value)?;
         Ok(self.converter.text(&text))
@@ -598,7 +649,9 @@ impl<'py> ser::Serializer for MapKey<'_, 'py> {
 
     fn serialize_f64(self, value: f64) -> Result<Self::Ok, Error> {
         if !value.is_finite() {
-            return Err(Error::Message("float key must be finite (got NaN or +/-inf)".to_owned()));
+            return Err(Error::Message(
+                "float key must be finite (got NaN or +/-inf)".to_owned(),
+            ));
         }
         let text = written(value)?;
         Ok(self.converter.text(&text))

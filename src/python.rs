@@ -157,7 +157,10 @@ impl PyCifDocument {
     /// Call `read` with the model, rows and masks of the `Copied` slot of a document that
     /// Reduce3 wrote, while its own model is unbuilt.
     #[cfg(feature = "reduce3")]
-    pub(crate) fn source_copies<T>(&self, read: impl FnOnce(&Arc<PdbxModel>, &[u32], &[u64]) -> T) -> Option<T> {
+    pub(crate) fn source_copies<T>(
+        &self,
+        read: impl FnOnce(&Arc<PdbxModel>, &[u32], &[u64]) -> T,
+    ) -> Option<T> {
         match &*self.model_slot() {
             ModelSlot::Copied { source, rows, made } => Some(read(source, rows, made)),
             _ => None,
@@ -611,13 +614,26 @@ fn prepare_mmcif_chemistry(
     let graph = py
         .detach(|| {
             if registry.is_some() && chem_data.is_some() {
-                return Err(crate::pdbx::SemanticError::new("PDBX_LINK_PRODUCT",
-                    "Supply registry or chem_data, not both", Vec::new()));
+                return Err(crate::pdbx::SemanticError::new(
+                    "PDBX_LINK_PRODUCT",
+                    "Supply registry or chem_data, not both",
+                    Vec::new(),
+                ));
             }
-            let library = chem_data.as_deref().map(|root| {
-                crate::pdbx::chemical_library_registry(model.model.coordinates(), root)
-                    .map_err(|message| crate::pdbx::SemanticError::new("PDBX_LINK_PRODUCT", message, Vec::new()))
-            }).transpose()?;
+            let library = chem_data
+                .as_deref()
+                .map(|root| {
+                    crate::pdbx::chemical_library_registry(model.model.coordinates(), root).map_err(
+                        |message| {
+                            crate::pdbx::SemanticError::new(
+                                "PDBX_LINK_PRODUCT",
+                                message,
+                                Vec::new(),
+                            )
+                        },
+                    )
+                })
+                .transpose()?;
             crate::pdbx::prepare_product(
                 model.model.coordinates(),
                 registry.map(|r| r.registry.as_ref()).or(library.as_ref()),
@@ -1274,11 +1290,9 @@ pub(crate) fn output_to_python(
     schema: Option<String>,
 ) -> PyResult<Py<PyAny>> {
     match output {
-        ReadOutput::Document(document) => Ok(Py::new(
-            py,
-            PyCifDocument::new(Arc::new(document), schema),
-        )?
-        .into_any()),
+        ReadOutput::Document(document) => {
+            Ok(Py::new(py, PyCifDocument::new(Arc::new(document), schema))?.into_any())
+        }
         ReadOutput::Table(table) => Ok(Py::new(
             py,
             PyCifTable {

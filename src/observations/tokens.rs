@@ -2,7 +2,9 @@
 
 use super::record::{Tokens, renumber_ligands, same_residue};
 use super::source::{Atom, Source};
-use super::{HydrogenParents, ResidueParents, LigandFeatures, Schema, TokenTable, residue, topology};
+use super::{
+    HydrogenParents, LigandFeatures, ResidueParents, Schema, TokenTable, residue, topology,
+};
 use crate::hash::{FastMap, FastSet};
 use crate::pdbx::ShortText;
 use std::collections::{BTreeSet, HashMap};
@@ -58,10 +60,15 @@ fn parent_error(atom: &Atom, parent: &str, reason: &str) -> String {
     format!("Invalid ligand hydrogen parent: {detail}")
 }
 
-fn declared_parents(source: &Source, bridges: &BTreeSet<usize>) -> Result<FastMap<usize, Option<usize>>, String> {
+fn declared_parents(
+    source: &Source,
+    bridges: &BTreeSet<usize>,
+) -> Result<FastMap<usize, Option<usize>>, String> {
     let mut result = FastMap::default();
     for &(child, parent) in &source.hydrogen_bonds {
-        if bridges.contains(&child) { continue; }
+        if bridges.contains(&child) {
+            continue;
+        }
         if let Some(previous) = result.insert(child, parent)
             && previous != parent
         {
@@ -76,12 +83,20 @@ fn declared_parents(source: &Source, bridges: &BTreeSet<usize>) -> Result<FastMa
 }
 
 #[cfg(feature = "reduce3")]
-fn add_bridges(source: &Source, sites: &[super::bridges::Site], excluded: &[String], hydrogen: usize,
-    tokens: &mut Tokens, mapping: &mut [usize]) -> Result<HashMap<usize, usize>, String> {
+fn add_bridges(
+    source: &Source,
+    sites: &[super::bridges::Site],
+    excluded: &[String],
+    hydrogen: usize,
+    tokens: &mut Tokens,
+    mapping: &mut [usize],
+) -> Result<HashMap<usize, usize>, String> {
     let mut counts = HashMap::new();
     for site in sites {
         let first = &source.atoms[site.metal_rows[0]];
-        if excluded.iter().any(|name| *name == first.component) { continue; }
+        if excluded.iter().any(|name| *name == first.component) {
+            continue;
+        }
         let token = tokens.identity.len();
         let mut packed = residue::Packed::empty([-1; 3]);
         if let Some(row) = site.hydrogen_row {
@@ -89,7 +104,13 @@ fn add_bridges(source: &Source, sites: &[super::bridges::Site], excluded: &[Stri
             packed.mask[0] = true;
             mapping[row] = token;
         }
-        tokens.push(first, hydrogen, &packed, true, [site.formal_charge, 0, 0, 1]);
+        tokens.push(
+            first,
+            hydrogen,
+            &packed,
+            true,
+            [site.formal_charge, 0, 0, 1],
+        );
         // A hydride token is never a crop centre.
         tokens.crop_center_eligible[token] = 0;
         tokens.keys[token][4] = ShortText::new(&site.hydrogen_name);
@@ -102,9 +123,13 @@ fn add_bridges(source: &Source, sites: &[super::bridges::Site], excluded: &[Stri
             }
         }
         for edge in site.edges(token, mapping)? {
-            tokens.bridge_edges.push((edge.hydrogen, edge.metal, edge.kind as u8));
+            tokens
+                .bridge_edges
+                .push((edge.hydrogen, edge.metal, edge.kind as u8));
         }
-        for row in site.metal_rows { *counts.entry(row).or_insert(0) += 1; }
+        for row in site.metal_rows {
+            *counts.entry(row).or_insert(0) += 1;
+        }
     }
     Ok(counts)
 }
@@ -194,11 +219,21 @@ struct HeavyNames<'a> {
 }
 
 impl<'a> HeavyNames<'a> {
-    fn of(&mut self, source: &'a Source, group: usize, rows: &[usize], hydrogen: &[bool]) -> &[(usize, &'a ShortText)] {
+    fn of(
+        &mut self,
+        source: &'a Source,
+        group: usize,
+        rows: &[usize],
+        hydrogen: &[bool],
+    ) -> &[(usize, &'a ShortText)] {
         if self.group != group {
             self.group = group;
             self.atoms.clear();
-            self.atoms.extend(rows.iter().filter(|&&row| !hydrogen[row]).map(|&row| (row, &source.atoms[row].name)));
+            self.atoms.extend(
+                rows.iter()
+                    .filter(|&&row| !hydrogen[row])
+                    .map(|&row| (row, &source.atoms[row].name)),
+            );
         }
         &self.atoms
     }
@@ -229,7 +264,8 @@ impl<'a> ParentTable<'a> {
     /// The result of `ccd_parent` for `atom`, which must belong to `component`.
     fn parent(&mut self, atom: &'a Atom) -> Result<Option<(&'a str, ShortText)>, String> {
         let count = self.seen.len();
-        if let Some(index) = (self.cursor..count).chain(0..self.cursor)
+        if let Some(index) = (self.cursor..count)
+            .chain(0..self.cursor)
             .find(|&index| *self.seen[index].0 == atom.name && *self.seen[index].1 == atom.element)
         {
             self.cursor = index + 1;
@@ -267,7 +303,11 @@ fn ligand_parent<'a>(
         dictionary_parent(atom, name, &text, names.of(source, group, rows, hydrogen))?
     } else {
         let heavy = heavy.get_or_insert_with(|| {
-            rows.iter().copied().filter(|&i| !hydrogen[i]).map(|i| (i, source.atoms[i].position)).collect()
+            rows.iter()
+                .copied()
+                .filter(|&i| !hydrogen[i])
+                .map(|i| (i, source.atoms[i].position))
+                .collect()
         });
         return Ok(residue::nearest(atom.position, heavy));
     };
@@ -333,8 +373,16 @@ fn add_proteins(
     groups.sort_unstable();
     tokens.reserve(groups.len());
     // Slot names as `ShortText`, so that name tests compare fixed-size arrays.
-    let names: Vec<Vec<ShortText>> = schema.residues.iter()
-        .map(|residue| residue.names.iter().map(|name| ShortText::new(name)).collect())
+    let names: Vec<Vec<ShortText>> = schema
+        .residues
+        .iter()
+        .map(|residue| {
+            residue
+                .names
+                .iter()
+                .map(|name| ShortText::new(name))
+                .collect()
+        })
         .collect();
     let mut atoms: Vec<&Atom> = Vec::new();
     for (_, group) in groups {
@@ -407,11 +455,18 @@ impl<'a> FeatureTable<'a> {
 
     fn feature(&mut self, name: &'a ShortText) -> [i16; 4] {
         let count = self.seen.len();
-        if let Some(index) = (self.cursor..count).chain(0..self.cursor).find(|&index| *self.seen[index].0 == *name) {
+        if let Some(index) = (self.cursor..count)
+            .chain(0..self.cursor)
+            .find(|&index| *self.seen[index].0 == *name)
+        {
             self.cursor = index + 1;
             return self.seen[index].1;
         }
-        let feature = self.names.and_then(|names| names.get(name.as_str())).copied().unwrap_or([0; 4]);
+        let feature = self
+            .names
+            .and_then(|names| names.get(name.as_str()))
+            .copied()
+            .unwrap_or([0; 4]);
         if count < Self::LIMIT {
             self.seen.push((name, feature));
             self.cursor = count + 1;
@@ -434,7 +489,10 @@ fn add_ligands(
     complete: bool,
 ) -> Result<(), String> {
     #[cfg(feature = "reduce3")]
-    let bridge_rows = bridge_sites.iter().filter_map(|site| site.hydrogen_row).collect();
+    let bridge_rows = bridge_sites
+        .iter()
+        .filter_map(|site| site.hydrogen_row)
+        .collect();
     #[cfg(not(feature = "reduce3"))]
     let bridge_rows = BTreeSet::new();
     let declared = declared_parents(source, &bridge_rows)?;
@@ -472,7 +530,10 @@ fn add_ligands(
             continue;
         }
         mapping[row] = tokens.identity.len();
-        let identity = match identities.iter().find(|(element, _)| **element == atom.element) {
+        let identity = match identities
+            .iter()
+            .find(|(element, _)| **element == atom.element)
+        {
             Some(&(_, identity)) => identity,
             None => {
                 // The table checks that every token lies above the residue tokens.
@@ -481,12 +542,23 @@ fn add_ligands(
                 identity
             }
         };
-        if tables.get(current).is_none_or(|table| *table.component != atom.component) {
-            current = match tables.iter().position(|table| *table.component == atom.component) {
+        if tables
+            .get(current)
+            .is_none_or(|table| *table.component != atom.component)
+        {
+            current = match tables
+                .iter()
+                .position(|table| *table.component == atom.component)
+            {
                 Some(index) => index,
                 None => {
                     let names = features.get(atom.component.as_str());
-                    let table = FeatureTable { component: &atom.component, names, seen: Vec::new(), cursor: 0 };
+                    let table = FeatureTable {
+                        component: &atom.component,
+                        names,
+                        seen: Vec::new(),
+                        cursor: 0,
+                    };
                     // Past `TABLES` components, reuse the last place so the search stays short.
                     if tables.len() == FeatureTable::TABLES {
                         tables.pop();
@@ -507,13 +579,23 @@ fn add_ligands(
         }
     }
     #[cfg(feature = "reduce3")]
-    let bridge_counts = add_bridges(source, bridge_sites, excluded, token_table.hydrogen() as usize, tokens, mapping)?;
+    let bridge_counts = add_bridges(
+        source,
+        bridge_sites,
+        excluded,
+        token_table.hydrogen() as usize,
+        tokens,
+        mapping,
+    )?;
     #[cfg(not(feature = "reduce3"))]
     let bridge_counts: HashMap<usize, usize> = HashMap::new();
     // Hydrogen rows given a parent, in order, and each one's parent.
     let mut assigned: Vec<usize> = Vec::new();
     let mut parent_of = vec![usize::MAX; source.atoms.len()];
-    let mut names = HeavyNames { group: usize::MAX, atoms: Vec::new() };
+    let mut names = HeavyNames {
+        group: usize::MAX,
+        atoms: Vec::new(),
+    };
     let mut tables: Vec<ParentTable> = Vec::new();
     for (group, rows) in source.groups.iter().enumerate() {
         if !pending[group] {
@@ -527,7 +609,9 @@ fn add_ligands(
             let (map, table) = match dictionary {
                 Some((component, map, table)) if *component == atom.component => (map, table),
                 _ => {
-                    let map = residue_parents.get(&atom.group).map(AsRef::as_ref)
+                    let map = residue_parents
+                        .get(&atom.group)
+                        .map(AsRef::as_ref)
                         .or_else(|| parents.get(atom.component.as_str()));
                     let table = map.map_or(usize::MAX, |map| {
                         let known = tables.iter().position(|table| {
@@ -538,7 +622,12 @@ fn add_ligands(
                             if tables.len() == ParentTable::TABLES {
                                 tables.pop();
                             }
-                            tables.push(ParentTable { map, component: &atom.component, seen: Vec::new(), cursor: 0 });
+                            tables.push(ParentTable {
+                                map,
+                                component: &atom.component,
+                                seen: Vec::new(),
+                                cursor: 0,
+                            });
                             tables.len() - 1
                         })
                     });
@@ -550,12 +639,17 @@ fn add_ligands(
                 Some(table) => table.parent(atom),
                 None => Ok(None),
             };
-            let parent = ligand_parent(source, lookup, &declared, row, group, rows, &hydrogen, &mut heavy,
-                &mut names)?;
+            let parent = ligand_parent(
+                source, lookup, &declared, row, group, rows, &hydrogen, &mut heavy, &mut names,
+            )?;
             if let Some(parent) = parent
                 && mapping[parent] == usize::MAX
                 && (declared.contains_key(&row)
-                    || map.map(|map| ccd_parent(map, atom)).transpose()?.flatten().is_some())
+                    || map
+                        .map(|map| ccd_parent(map, atom))
+                        .transpose()?
+                        .flatten()
+                        .is_some())
             {
                 return Err(parent_error(
                     &source.atoms[row],
@@ -580,7 +674,11 @@ fn add_ligands(
                 .filter(|&&value| value != 0)
                 .count();
             if count >= 3 {
-                let rows: Vec<usize> = assigned.iter().copied().filter(|&other| parent_of[other] == parent).collect();
+                let rows: Vec<usize> = assigned
+                    .iter()
+                    .copied()
+                    .filter(|&other| parent_of[other] == parent)
+                    .collect();
                 return Err(hydrogen_overflow(source, features, parent, &rows));
             }
             let slot = 15 + count;
@@ -598,7 +696,8 @@ fn add_ligands(
         let count = tokens.masks[token * 32 + 15..(token + 1) * 32]
             .iter()
             .filter(|&&value| value != 0)
-            .count() + bridge_counts.get(&row).copied().unwrap_or(0);
+            .count()
+            + bridge_counts.get(&row).copied().unwrap_or(0);
         tokens.charge_known[token] = u8::from(
             tokens.hydrogen_known[token] != 0 && feature[3] != 0 && count == feature[2] as usize,
         );
@@ -614,10 +713,12 @@ fn add_ligands(
 /// names, so a run whose names equal those of a recent run takes its answer.
 fn distinct_keys(keys: &[[ShortText; 5]]) -> bool {
     // Find the runs first, so that the set never grows.
-    let mut starts: Vec<usize> = (0..keys.len()).filter(|&row| row == 0 || !same_residue(&keys[row], &keys[row - 1]))
+    let mut starts: Vec<usize> = (0..keys.len())
+        .filter(|&row| row == 0 || !same_residue(&keys[row], &keys[row - 1]))
         .collect();
     starts.push(keys.len());
-    let mut residues: FastSet<&[ShortText]> = FastSet::with_capacity_and_hasher(starts.len(), Default::default());
+    let mut residues: FastSet<&[ShortText]> =
+        FastSet::with_capacity_and_hasher(starts.len(), Default::default());
     // Recent runs with distinct names.
     let mut recent: Vec<&[[ShortText; 5]]> = Vec::new();
     for range in starts.windows(2) {
@@ -630,13 +731,19 @@ fn distinct_keys(keys: &[[ShortText; 5]]) -> bool {
             continue;
         }
         let same = |other: &&[[ShortText; 5]]| {
-            other.len() == run.len() && other.iter().zip(run).all(|(left, right)| left[4] == right[4])
+            other.len() == run.len()
+                && other
+                    .iter()
+                    .zip(run)
+                    .all(|(left, right)| left[4] == right[4])
         };
         if run.len() >= 8 && recent.iter().any(same) {
             continue;
         }
         let distinct = if run.len() <= 64 {
-            run.iter().enumerate().all(|(index, key)| run[index + 1..].iter().all(|other| other[4] != key[4]))
+            run.iter()
+                .enumerate()
+                .all(|(index, key)| run[index + 1..].iter().all(|other| other[4] != key[4]))
         } else {
             let mut names = FastSet::with_capacity_and_hasher(run.len(), Default::default());
             run.iter().all(|key| names.insert(&key[4]))
@@ -717,7 +824,12 @@ pub(super) fn pack(
         }
         names.sort_unstable();
         names.dedup();
-        chains.extend(names.into_iter().enumerate().map(|(index, name)| (name.as_str(), index as i64)));
+        chains.extend(
+            names
+                .into_iter()
+                .enumerate()
+                .map(|(index, name)| (name.as_str(), index as i64)),
+        );
     }
     let mut previous: Option<(&ShortText, i64)> = None;
     for (row, key) in result.keys.iter().enumerate() {

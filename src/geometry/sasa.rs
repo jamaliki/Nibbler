@@ -118,14 +118,22 @@ struct Block {
 
 impl Block {
     /// Never blocks a point.
-    const EMPTY: Self = Self { x: [0.0; LANES], y: [0.0; LANES], z: [0.0; LANES], threshold: [f64::INFINITY; LANES] };
+    const EMPTY: Self = Self {
+        x: [0.0; LANES],
+        y: [0.0; LANES],
+        z: [0.0; LANES],
+        threshold: [f64::INFINITY; LANES],
+    };
 
     /// Bit `lane` is set when that cap blocks point `p`.
     #[inline(always)]
     fn hits(&self, p: [f64; 3]) -> u32 {
         let mut mask = 0;
         for lane in 0..LANES {
-            mask |= u32::from(p[0] * self.x[lane] + p[1] * self.y[lane] + p[2] * self.z[lane] > self.threshold[lane]) << lane;
+            mask |= u32::from(
+                p[0] * self.x[lane] + p[1] * self.y[lane] + p[2] * self.z[lane]
+                    > self.threshold[lane],
+            ) << lane;
         }
         mask
     }
@@ -198,13 +206,18 @@ impl Grid {
                 order
             }
             None => {
-                let mut order: Vec<usize> =
-                    (0..coordinates.len()).filter(|&i| grid.inside(cells[i])).collect();
+                let mut order: Vec<usize> = (0..coordinates.len())
+                    .filter(|&i| grid.inside(cells[i]))
+                    .collect();
                 order.sort_by_key(|&i| cells[i]);
                 let mut begin = 0;
                 for (index, &i) in order.iter().enumerate() {
-                    if order.get(index + 1).is_none_or(|&next| cells[next] != cells[i]) {
-                        grid.sparse.insert(cells[i], (begin as u32, index as u32 + 1));
+                    if order
+                        .get(index + 1)
+                        .is_none_or(|&next| cells[next] != cells[i])
+                    {
+                        grid.sparse
+                            .insert(cells[i], (begin as u32, index as u32 + 1));
                         begin = index + 1;
                     }
                 }
@@ -233,7 +246,8 @@ impl Grid {
                     }
                 } else {
                     for dz in -2..=2 {
-                        if let Some(&(begin, end)) = self.sparse.get(&[c[0] + dx, c[1] + dy, c[2] + dz])
+                        if let Some(&(begin, end)) =
+                            self.sparse.get(&[c[0] + dx, c[1] + dy, c[2] + dz])
                             && !visit(begin as usize, end as usize)
                         {
                             return;
@@ -256,7 +270,11 @@ impl Grid {
                 caps.near.resize(count + end - begin, 0);
             }
             for j in begin..end {
-                let delta = [self.x[j] - centre[0], self.y[j] - centre[1], self.z[j] - centre[2]];
+                let delta = [
+                    self.x[j] - centre[0],
+                    self.y[j] - centre[1],
+                    self.z[j] - centre[2],
+                ];
                 let d2 = delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2];
                 caps.near[count] = j as u32;
                 count += usize::from(d2 < (r + self.expanded[j]).powi(2));
@@ -273,7 +291,11 @@ impl Grid {
             if j == own {
                 continue;
             }
-            let delta = [self.x[j] - centre[0], self.y[j] - centre[1], self.z[j] - centre[2]];
+            let delta = [
+                self.x[j] - centre[0],
+                self.y[j] - centre[1],
+                self.z[j] - centre[2],
+            ];
             let d2 = delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2];
             let other = self.expanded[j];
             if other >= r && d2 <= (other - r).powi(2) {
@@ -282,7 +304,10 @@ impl Grid {
             if r >= other && d2 <= (r - other).powi(2) {
                 continue;
             }
-            for (column, value) in columns.iter_mut().zip([delta[0], delta[1], delta[2], d2, other]) {
+            for (column, value) in columns
+                .iter_mut()
+                .zip([delta[0], delta[1], delta[2], d2, other])
+            {
                 column.push(value);
             }
         }
@@ -302,9 +327,14 @@ impl Grid {
         // cap index, which only perturbs the order of near-equal thresholds.
         let packed = count <= 0x10000;
         caps.keys.clear();
-        caps.keys.extend(threshold.iter().enumerate().map(|(k, &value)| {
-            if packed { order_key(value) & !0xFFFF | k as u64 } else { k as u64 }
-        }));
+        caps.keys
+            .extend(threshold.iter().enumerate().map(|(k, &value)| {
+                if packed {
+                    order_key(value) & !0xFFFF | k as u64
+                } else {
+                    k as u64
+                }
+            }));
         if packed {
             caps.keys.sort_unstable();
         }
@@ -336,7 +366,11 @@ impl Grid {
 /// Map a float to an integer with the same order as `f64::total_cmp`.
 fn order_key(value: f64) -> u64 {
     let bits = value.to_bits();
-    if bits >> 63 == 1 { !bits } else { bits | 1 << 63 }
+    if bits >> 63 == 1 {
+        !bits
+    } else {
+        bits | 1 << 63
+    }
 }
 
 const LANES: usize = 4;
@@ -399,5 +433,8 @@ pub fn sasa(
         custom = sphere(point_count);
         &custom
     };
-    Ok(atom_indices.iter().map(|&i| grid.area(i, points, &mut caps)).collect())
+    Ok(atom_indices
+        .iter()
+        .map(|&i| grid.area(i, points, &mut caps))
+        .collect())
 }

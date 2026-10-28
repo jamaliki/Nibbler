@@ -1,8 +1,6 @@
 //! Decode source sites and authored bond exclusions without reading CCD metadata.
 
-use super::{
-    ConformerAtom, ConformerPolicy, ConformerSelection, fail, select_with_links,
-};
+use super::{ConformerAtom, ConformerPolicy, ConformerSelection, fail, select_with_links};
 use crate::pdbx::{PdbxModel, SemanticError};
 use crate::pdbx::{fields, model, source};
 use std::collections::{BTreeMap, HashMap};
@@ -227,7 +225,9 @@ fn select_sites(
             for b in matches(&c.second, 1) {
                 excluded.push([a, b]);
                 if q.is_some_and(|values| values[0].is_some() && values[1].is_some())
-                    && atoms[a].alternate.is_some() && atoms[b].alternate.is_some() {
+                    && atoms[a].alternate.is_some()
+                    && atoms[b].alternate.is_some()
+                {
                     linked.push([a, b]);
                 }
             }

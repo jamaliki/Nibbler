@@ -2,9 +2,9 @@
 
 use super::record::same_residue as same_key_residue;
 use super::{Schema, TokenTable, Tokens};
-use serde::Deserialize;
 use crate::hash::FastMap;
 use crate::pdbx::ShortText;
+use serde::Deserialize;
 
 /// One product target; native callers borrow the key text from their view.
 #[derive(Deserialize)]
@@ -21,10 +21,24 @@ pub(crate) struct ProductTarget<K = String> {
 
 impl<K> ProductTarget<K> {
     #[cfg(feature = "reduce3")]
-    pub(crate) fn new(parent_key: [K; 5], sequence_id: Option<i64>, formal_charge: Option<i32>,
-        hybridization: i64, hydrogens: Option<usize>, complete: bool, modified: bool) -> Self {
-        Self { parent_key, sequence_id, formal_charge: formal_charge.and_then(|value| i16::try_from(value).ok()),
-            hybridization, hydrogens, complete, modified }
+    pub(crate) fn new(
+        parent_key: [K; 5],
+        sequence_id: Option<i64>,
+        formal_charge: Option<i32>,
+        hybridization: i64,
+        hydrogens: Option<usize>,
+        complete: bool,
+        modified: bool,
+    ) -> Self {
+        Self {
+            parent_key,
+            sequence_id,
+            formal_charge: formal_charge.and_then(|value| i16::try_from(value).ok()),
+            hybridization,
+            hydrogens,
+            complete,
+            modified,
+        }
     }
 }
 
@@ -42,7 +56,9 @@ fn residue<K: AsRef<str>>(key: &[K; 5]) -> [&str; 4] {
 /// Callers may borrow one residue's fields from one place, and then equal addresses
 /// settle the test without reading the text.
 fn same_residue(left: &[&str; 4], right: &[&str; 4]) -> bool {
-    left.iter().zip(right).all(|(left, right)| std::ptr::eq(*left, *right) || left == right)
+    left.iter()
+        .zip(right)
+        .all(|(left, right)| std::ptr::eq(*left, *right) || left == right)
 }
 
 /// Token rows by key, found through the residue part of the key and then the name.
@@ -65,7 +81,8 @@ struct Lookup<'k> {
 impl<'k> Lookup<'k> {
     fn new(keys: &'k [[ShortText; 5]]) -> Self {
         // Count the runs first, so that the map never grows.
-        let same: Vec<bool> = (0..keys.len()).map(|row| row > 0 && same_key_residue(&keys[row], &keys[row - 1]))
+        let same: Vec<bool> = (0..keys.len())
+            .map(|row| row > 0 && same_key_residue(&keys[row], &keys[row - 1]))
             .collect();
         let runs = same.iter().filter(|&&same| !same).count();
         let mut residues = FastMap::with_capacity_and_hasher(runs, Default::default());
@@ -98,25 +115,40 @@ impl<'k> Lookup<'k> {
         // whose names equal those of a recent residue takes its answer and skips the test
         // of every pair. Short residues take the pair test, which costs little for them.
         let mut recent: Vec<(&[usize], bool)> = Vec::new();
-        let distinct = starts.windows(2).map(|range| {
-            let members = &rows[range[0]..range[1]];
-            let long = members.len() >= 8;
-            if long && let Some(&(_, value)) = recent.iter()
-                .find(|(other, _)| other[1] - other[0] == members.len() && names(other).eq(names(range)))
-            {
-                return value;
-            }
-            let value = members.iter().enumerate()
-                .all(|(index, &row)| members[index + 1..].iter().all(|&other| keys[other][4] != keys[row][4]));
-            if long {
-                if recent.len() == 16 {
-                    recent.pop();
+        let distinct = starts
+            .windows(2)
+            .map(|range| {
+                let members = &rows[range[0]..range[1]];
+                let long = members.len() >= 8;
+                if long
+                    && let Some(&(_, value)) = recent.iter().find(|(other, _)| {
+                        other[1] - other[0] == members.len() && names(other).eq(names(range))
+                    })
+                {
+                    return value;
                 }
-                recent.push((range, value));
-            }
-            value
-        }).collect();
-        Self { keys, residues, starts, rows, distinct, hint: (usize::MAX, 0) }
+                let value = members.iter().enumerate().all(|(index, &row)| {
+                    members[index + 1..]
+                        .iter()
+                        .all(|&other| keys[other][4] != keys[row][4])
+                });
+                if long {
+                    if recent.len() == 16 {
+                        recent.pop();
+                    }
+                    recent.push((range, value));
+                }
+                value
+            })
+            .collect();
+        Self {
+            keys,
+            residues,
+            starts,
+            rows,
+            distinct,
+            hint: (usize::MAX, 0),
+        }
     }
 
     /// The residue whose keys start with `prefix`.
@@ -132,7 +164,9 @@ impl<'k> Lookup<'k> {
         let name = ShortText::new(name);
         let found = if self.distinct[id] {
             let (head, tail) = members.split_at(hint.min(members.len()));
-            tail.iter().chain(head).position(|&row| self.keys[row][4] == name)
+            tail.iter()
+                .chain(head)
+                .position(|&row| self.keys[row][4] == name)
                 .map(|position| (position + hint) % members.len())
         } else {
             members.iter().rposition(|&row| self.keys[row][4] == name)
@@ -185,7 +219,10 @@ pub(crate) fn apply<K: AsRef<str>>(
             if let Some(sequence) = &sequence {
                 key[1] = sequence;
             }
-            if let Some(row) = lookup.residue(key).and_then(|id| lookup.find(id, "protein")) {
+            if let Some(row) = lookup
+                .residue(key)
+                .and_then(|id| lookup.find(id, "protein"))
+            {
                 tokens.state_known[row] = 0;
                 let identity = tokens.identity[row] as usize;
                 if let Some(residue) = schema.residues.get(identity) {

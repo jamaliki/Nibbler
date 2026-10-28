@@ -1,9 +1,9 @@
 //! Python perceives ligand domains between one native read and one native finish.
 
 use crate::observations::molecular::{self, Failure, View};
+use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::IntoPyObjectExt;
 use pyo3::types::{PyByteArray, PyDict, PyList, PyString};
 use std::path::PathBuf;
 
@@ -11,8 +11,11 @@ use std::path::PathBuf;
 pub(super) fn raise(error: Failure) -> PyErr {
     match error {
         Failure::Value(message) => PyValueError::new_err(message),
-        Failure::Chemistry(error) => PyValueError::new_err((error.code().to_owned(), error.message().to_owned(),
-            error.context().to_vec())),
+        Failure::Chemistry(error) => PyValueError::new_err((
+            error.code().to_owned(),
+            error.message().to_owned(),
+            error.context().to_vec(),
+        )),
         Failure::Index(message) => PyIndexError::new_err(message),
     }
 }
@@ -76,13 +79,23 @@ impl MolecularView {
     }
 
     #[pyo3(signature = (*, chem_data))]
-    fn missing_hydrogen_dictionaries(&self, py: Python<'_>, chem_data: PathBuf) -> PyResult<Vec<String>> {
-        py.detach(|| self.view.missing_hydrogen_dictionaries(&chem_data)).map_err(PyValueError::new_err)
+    fn missing_hydrogen_dictionaries(
+        &self,
+        py: Python<'_>,
+        chem_data: PathBuf,
+    ) -> PyResult<Vec<String>> {
+        py.detach(|| self.view.missing_hydrogen_dictionaries(&chem_data))
+            .map_err(PyValueError::new_err)
     }
 }
 
 /// Typed buffers, token keys, retained legacy keys and audit counts.
-pub(super) type FinishedValue<'py> = (Bound<'py, PyDict>, Bound<'py, PyAny>, Bound<'py, PyAny>, Bound<'py, PyDict>);
+pub(super) type FinishedValue<'py> = (
+    Bound<'py, PyDict>,
+    Bound<'py, PyAny>,
+    Bound<'py, PyAny>,
+    Bound<'py, PyDict>,
+);
 
 /// One key list as JSON text or as nested Python lists.
 fn keys<'py>(py: Python<'py>, keys: molecular::Keys) -> PyResult<Bound<'py, PyAny>> {
@@ -93,17 +106,26 @@ fn keys<'py>(py: Python<'py>, keys: molecular::Keys) -> PyResult<Bound<'py, PyAn
 }
 
 /// Convert one finished pack; key lists come back as the finish options chose.
-pub(super) fn finished<'py>(py: Python<'py>, value: molecular::Finished) -> PyResult<FinishedValue<'py>> {
+pub(super) fn finished<'py>(
+    py: Python<'py>,
+    value: molecular::Finished,
+) -> PyResult<FinishedValue<'py>> {
     let (keys, required) = (keys(py, value.keys)?, keys(py, value.required)?);
     let buffers = PyDict::new(py);
     for (name, array) in value.arrays {
-        buffers.set_item(name, (array.dtype, array.shape, PyByteArray::new(py, &array.bytes)))?;
+        buffers.set_item(
+            name,
+            (array.dtype, array.shape, PyByteArray::new(py, &array.bytes)),
+        )?;
     }
     let stats = value.stats;
     let audit = PyDict::new(py);
     audit.set_item("tokens", stats.tokens)?;
     audit.set_item("source_atoms", stats.source_atoms)?;
-    audit.set_item("unsupported_known_charge_targets", stats.unsupported_known_charge_targets)?;
+    audit.set_item(
+        "unsupported_known_charge_targets",
+        stats.unsupported_known_charge_targets,
+    )?;
     audit.set_item("unknown_sequence_tokens", stats.unknown_sequence_tokens)?;
     audit.set_item("represented_atoms", stats.represented_atoms)?;
     let exclusions = PyDict::new(py);
@@ -112,9 +134,18 @@ pub(super) fn finished<'py>(py: Python<'py>, value: molecular::Finished) -> PyRe
     }
     audit.set_item("exclusions", exclusions)?;
     audit.set_item("nucleotide_residues", stats.nucleotide_residues)?;
-    audit.set_item("unknown_source_atom_tokens", stats.unknown_source_atom_tokens)?;
+    audit.set_item(
+        "unknown_source_atom_tokens",
+        stats.unknown_source_atom_tokens,
+    )?;
     audit.set_item("ncaa_sidechain_tokens", stats.ncaa_sidechain_tokens)?;
-    audit.set_item("modified_nucleotide_atom_tokens", stats.modified_nucleotide_atom_tokens)?;
-    audit.set_item("fully_atomized_modified_nucleotides", stats.fully_atomized_modified_nucleotides)?;
+    audit.set_item(
+        "modified_nucleotide_atom_tokens",
+        stats.modified_nucleotide_atom_tokens,
+    )?;
+    audit.set_item(
+        "fully_atomized_modified_nucleotides",
+        stats.fully_atomized_modified_nucleotides,
+    )?;
     Ok((buffers, keys, required, audit))
 }

@@ -234,7 +234,13 @@ mod tests {
 
     #[test]
     fn matches_str_for_inline_and_heap_values() {
-        for text in ["", "C", "HETATM", "1234567890123456789012", "12345678901234567890123"] {
+        for text in [
+            "",
+            "C",
+            "HETATM",
+            "1234567890123456789012",
+            "12345678901234567890123",
+        ] {
             let value = ShortText::new(text);
             assert_eq!(value.as_str(), text);
             assert!(value == text);
@@ -242,7 +248,10 @@ mod tests {
         }
         let alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
         for length in 0..=alphabet.len() {
-            assert_eq!(ShortText::new(&alphabet[..length]).as_str(), &alphabet[..length]);
+            assert_eq!(
+                ShortText::new(&alphabet[..length]).as_str(),
+                &alphabet[..length]
+            );
         }
         assert!(ShortText::ascii_uppercase("ca") == ShortText::new("CA"));
         assert!(ShortText::new("CA") != ShortText::new("C"));

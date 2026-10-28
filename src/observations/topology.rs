@@ -43,8 +43,10 @@ pub(super) fn pdb(source: &Source) -> Vec<[i64; 3]> {
                 if !super::continuity::distant(source, atom.group, partner.group, true) {
                     result[atom.group][0] = 0;
                 }
-            } else if atom.name == c && partner.name == n
-                && !super::continuity::distant(source, atom.group, partner.group, true) {
+            } else if atom.name == c
+                && partner.name == n
+                && !super::continuity::distant(source, atom.group, partner.group, true)
+            {
                 result[atom.group][1] = 0;
             }
         }
@@ -100,12 +102,15 @@ pub(super) fn protein(source: &Source, policy: &str) -> Result<Vec<[i64; 3]>, St
             let first = &source.atoms[rows[0]];
             let (here, _) = backbone[&(&first.chain, first.sequence)];
             for (end, step, a, b) in [(0, -1, 0, 1), (1, 1, 1, 0)] {
-                if let Some((neighbour, other)) = backbone.get(&(&first.chain, first.sequence + step))
+                if let Some((neighbour, other)) =
+                    backbone.get(&(&first.chain, first.sequence + step))
                     && let (Some(left), Some(right)) = (here[a], neighbour[b])
                 {
                     let value = distance(left, right);
-                    if value > 0.8 && value < 1.8
-                        && !super::continuity::distant(source, group, *other, true) {
+                    if value > 0.8
+                        && value < 1.8
+                        && !super::continuity::distant(source, group, *other, true)
+                    {
                         result[group][end] = 0;
                     }
                 }

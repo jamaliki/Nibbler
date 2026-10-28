@@ -167,13 +167,20 @@ pub fn run(document: &CifDocument, library: &MonLib, options: &Options) -> Resul
             .ok_or("Symmetry bonds require a valid crystal cell and space group")?;
         for bond in &graph.symmetry_bonds {
             let first = graph.sites[bond.indices[0] as usize];
-            let second = cell.orthogonalize(bond.image.apply(cell.fractionalize(graph.sites[bond.indices[1] as usize])));
+            let second = cell.orthogonalize(
+                bond.image
+                    .apply(cell.fractionalize(graph.sites[bond.indices[1] as usize])),
+            );
             let delta = bond.ideal - first.dist(second);
             if !delta.is_finite() || !(delta * delta * bond.weight).is_finite() {
                 return Err("Symmetry bond evaluation overflowed".into());
             }
         }
-        if let Some((_, count)) = evaluation.counts.iter_mut().find(|(name, _)| *name == "bonds") {
+        if let Some((_, count)) = evaluation
+            .counts
+            .iter_mut()
+            .find(|(name, _)| *name == "bonds")
+        {
             *count += graph.symmetry_bonds.len();
         }
     }

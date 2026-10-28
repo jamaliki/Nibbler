@@ -15,9 +15,9 @@ pub mod geometry;
 #[allow(dead_code)]
 mod hash;
 pub mod modelcif;
-pub mod pdbx;
 #[cfg(feature = "python")]
 mod observations;
+pub mod pdbx;
 #[cfg(feature = "reduce3")]
 pub mod reduce;
 #[cfg(feature = "reduce3")]

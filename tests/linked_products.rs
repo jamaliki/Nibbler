@@ -142,8 +142,12 @@ fn malformed_leaving_flag_does_not_become_unknown() {
 
 #[test]
 fn ccd_alias_keeps_the_observed_source_row() {
-    let text = sulfur_addition().replace("link covale", "link metalc")
-        .replace("_chem_comp_atom.pdbx_leaving_atom_flag", "_chem_comp_atom.alt_atom_id\n_chem_comp_atom.pdbx_leaving_atom_flag")
+    let text = sulfur_addition()
+        .replace("link covale", "link metalc")
+        .replace(
+            "_chem_comp_atom.pdbx_leaving_atom_flag",
+            "_chem_comp_atom.alt_atom_id\n_chem_comp_atom.pdbx_leaving_atom_flag",
+        )
         .replace(" 0 N", " 0 . N")
         .replace("L C C 0 . N", "L C C 0 CX N")
         .replace("HETATM 1 C C .", "HETATM 1 C CX .")
@@ -156,8 +160,12 @@ fn ccd_alias_keeps_the_observed_source_row() {
 
 #[test]
 fn canonical_names_take_precedence_over_overlapping_aliases() {
-    let text = sulfur_addition().replace("link covale", "link metalc")
-        .replace("_chem_comp_atom.pdbx_leaving_atom_flag", "_chem_comp_atom.alt_atom_id\n_chem_comp_atom.pdbx_leaving_atom_flag")
+    let text = sulfur_addition()
+        .replace("link covale", "link metalc")
+        .replace(
+            "_chem_comp_atom.pdbx_leaving_atom_flag",
+            "_chem_comp_atom.alt_atom_id\n_chem_comp_atom.pdbx_leaving_atom_flag",
+        )
         .replace(" 0 N", " 0 . N")
         .replace("L C C 0 . N", "L C C 0 C2 N");
     let graph = prepare(&text);

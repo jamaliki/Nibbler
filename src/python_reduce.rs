@@ -12,8 +12,8 @@ use crate::observations::{ParentKeys, RetainedParents};
 use crate::python::PyCifDocument;
 use crate::python_observations::molecular::MolecularView;
 use crate::reduce::{
-    Approach, NTermCharge, OptParams, Params, ProbeParams, ReduceError, SourceCopies, load_monomer_library,
-    run_recording, source_loop, source_model_number,
+    Approach, NTermCharge, OptParams, Params, ProbeParams, ReduceError, SourceCopies,
+    load_monomer_library, run_recording, source_loop, source_model_number,
 };
 
 /// Options already validated by `nibbler.reduce.run`.
@@ -164,23 +164,42 @@ fn reduce_document(
     let ignored = options.ignored_target_key_components;
     let allow_undefined = options.allow_undefined_ligand_targets;
     if (allow_undefined || params.allow_unresolved_bond_targets) && target_keys.is_none() {
-        return Err(invalid("Target masking requires retained hydrogen target keys".into()));
+        return Err(invalid(
+            "Target masking requires retained hydrogen target keys".into(),
+        ));
     }
-    if target_keys.is_some() && (params.compat || params.approach != Approach::Add
-        || !params.stop_on_any_missing_hydrogen || params.model_id.is_none()) {
-        return Err(PyValueError::new_err(("REDUCE_INVALID_MODEL",
-            "Required hydrogen target keys need an explicit model_id and strict fixed-mode addition", Vec::<String>::new())));
+    if target_keys.is_some()
+        && (params.compat
+            || params.approach != Approach::Add
+            || !params.stop_on_any_missing_hydrogen
+            || params.model_id.is_none())
+    {
+        return Err(PyValueError::new_err((
+            "REDUCE_INVALID_MODEL",
+            "Required hydrogen target keys need an explicit model_id and strict fixed-mode addition",
+            Vec::<String>::new(),
+        )));
     }
     let view = parents_view.as_ref().map(|view| &view.view);
-    if let Some(view) = view && !Arc::ptr_eq(&view.document, &source) {
-        return Err(invalid("parents_view must be a molecular view of the document being reduced".into()));
+    if let Some(view) = view
+        && !Arc::ptr_eq(&view.document, &source)
+    {
+        return Err(invalid(
+            "parents_view must be a molecular view of the document being reduced".into(),
+        ));
     }
     // Reduce3 copies most `_atom_site` values from source rows, so when the source model
     // holds the decoded rows of the loop Reduce3 rewrites, the output model copies them.
     let source_model = document.built_pdbx_model().filter(|model| {
-        let rewritten = source.blocks().first().and_then(|block| source_loop(block, "atom_site"));
+        let rewritten = source
+            .blocks()
+            .first()
+            .and_then(|block| source_loop(block, "atom_site"));
         std::ptr::eq(model.source_document().blocks(), source.blocks())
-            && model.loop_sites().zip(rewritten).is_some_and(|((sites, _), rewritten)| std::ptr::eq(sites, rewritten))
+            && model
+                .loop_sites()
+                .zip(rewritten)
+                .is_some_and(|((sites, _), rewritten)| std::ptr::eq(sites, rewritten))
     });
     let record = source_model.is_some();
     if record {
@@ -188,40 +207,49 @@ fn reduce_document(
         // then frees the source model.
         document.release_pdbx_model();
     }
-    let (reduction, copies) = py
-        .detach(move || {
-            if let Some(keys) = target_keys {
-                let model = params.model_id.map(source_model_number).transpose()
-                    .map_err(reduce_error_to_python)?
-                    .ok_or_else(|| invalid("model_id is missing".into()))?;
-                let rejected = |message| PyValueError::new_err(("REDUCE_INVALID_MODEL", message, Vec::<String>::new()));
-                let keys = ParentKeys::parse(&keys, &ignored).map_err(rejected)?;
-                let owned;
-                let parents = match view {
-                    Some(view) if view.source.model == model => &view.source.source,
-                    Some(_) => return Err(invalid("parents_view reads a different model".into())),
-                    None => {
-                        owned = crate::observations::source::read(&source, model).map_err(rejected)?;
-                        &owned
-                    }
-                };
-                let retained = RetainedParents::new(parents, &keys, chem_data.as_deref()).map_err(rejected)?;
-                if allow_undefined {
-                    params.allowed_unplaced_hydrogen_parent_sources = retained.ligand_sources();
-                    params.allowed_unplaced_bridge_hydrogens = retained.bridge_sources(chem_data.as_deref())
-                        .map_err(invalid)?;
+    let (reduction, copies) = py.detach(move || {
+        if let Some(keys) = target_keys {
+            let model = params
+                .model_id
+                .map(source_model_number)
+                .transpose()
+                .map_err(reduce_error_to_python)?
+                .ok_or_else(|| invalid("model_id is missing".into()))?;
+            let rejected = |message| {
+                PyValueError::new_err(("REDUCE_INVALID_MODEL", message, Vec::<String>::new()))
+            };
+            let keys = ParentKeys::parse(&keys, &ignored).map_err(rejected)?;
+            let owned;
+            let parents = match view {
+                Some(view) if view.source.model == model => &view.source.source,
+                Some(_) => return Err(invalid("parents_view reads a different model".into())),
+                None => {
+                    owned = crate::observations::source::read(&source, model).map_err(rejected)?;
+                    &owned
                 }
-                params.required_hydrogen_parent_sources = Some(retained.required);
+            };
+            let retained =
+                RetainedParents::new(parents, &keys, chem_data.as_deref()).map_err(rejected)?;
+            if allow_undefined {
+                params.allowed_unplaced_hydrogen_parent_sources = retained.ligand_sources();
+                params.allowed_unplaced_bridge_hydrogens = retained
+                    .bridge_sources(chem_data.as_deref())
+                    .map_err(invalid)?;
             }
-            let monomers = load_monomer_library(chem_data.as_deref()).map_err(reduce_error_to_python)?;
-            run_recording(&source, &monomers, &params, record).map_err(reduce_error_to_python)
-        })?;
+            params.required_hydrogen_parent_sources = Some(retained.required);
+        }
+        let monomers =
+            load_monomer_library(chem_data.as_deref()).map_err(reduce_error_to_python)?;
+        run_recording(&source, &monomers, &params, record).map_err(reduce_error_to_python)
+    })?;
     let statuses = reduction.target_uncertainties_json.clone();
     let (output, report) = reduction.into_parts();
     let output = Arc::new(output);
     let schema = document.schema_name().map(str::to_owned);
     let output = match (source_model, copies) {
-        (Some(model), Some(SourceCopies { rows, made })) => PyCifDocument::with_copies(output, schema, model, rows, made),
+        (Some(model), Some(SourceCopies { rows, made })) => {
+            PyCifDocument::with_copies(output, schema, model, rows, made)
+        }
         _ => PyCifDocument::new(output, schema),
     };
     Ok((output, report, statuses))

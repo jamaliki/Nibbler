@@ -1,5 +1,5 @@
-use super::super::{ComponentRegistry, ShortText};
 use super::super::model::{AtomSite, ComponentDefinition, PdbxModel};
+use super::super::{ComponentRegistry, ShortText};
 use super::{PreparedChemistry, ProductAtom, SemanticError};
 use crate::cif::FastMap;
 use std::collections::{BTreeMap, BTreeSet};
@@ -225,7 +225,8 @@ pub(super) fn build(
     let mut groups: Vec<(ResidueKey<'_>, Vec<(usize, &AtomSite)>)> = Vec::new();
     let mut previous: Option<(ResidueKey<'_>, usize)> = None;
     for (row, atom) in model.atom_sites.iter().enumerate().filter(|(_, a)| {
-        a.model_number == model_number && (use_observed_hydrogens || !is_hydrogen_element(&a.element))
+        a.model_number == model_number
+            && (use_observed_hydrogens || !is_hydrogen_element(&a.element))
     }) {
         let key = (
             atom.label_asym_id.as_str(),
@@ -307,7 +308,14 @@ pub(super) fn build(
         let component = first.label_comp_id.as_str();
         let definition = prepared_definitions.get(component);
         let template = templates.get(component);
-        add_residue(&mut graph, &selected, definition, template, selected_alt, &mut scratch)?;
+        add_residue(
+            &mut graph,
+            &selected,
+            definition,
+            template,
+            selected_alt,
+            &mut scratch,
+        )?;
         scratch.selected = selected;
     }
     Ok(graph)
@@ -390,14 +398,16 @@ fn add_residue<'a>(
     let residue = graph.residues.len();
     let observed = &mut scratch.observed;
     observed.clear();
-    observed.extend(rows.iter().map(|&(r, a)| (a.label_atom_id.as_str(), (r, a))));
+    observed.extend(
+        rows.iter()
+            .map(|&(r, a)| (a.label_atom_id.as_str(), (r, a))),
+    );
     observed.sort_by(|left, right| left.0.cmp(right.0));
     if observed.windows(2).any(|pair| pair[0].0 == pair[1].0) {
         return Err(fail("Duplicate atom identity in the selected conformer"));
     }
-    let find = |observed: &Observed<'a>, name: &str| {
-        observed.binary_search_by(|&(key, _)| key.cmp(name))
-    };
+    let find =
+        |observed: &Observed<'a>, name: &str| observed.binary_search_by(|&(key, _)| key.cmp(name));
     let mut indices;
     let mut aliases = NameMap::default();
     if let (Some(comp), Some(template)) = (definition, template) {

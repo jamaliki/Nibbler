@@ -5,8 +5,8 @@ use super::json;
 use super::product::{Columns, Residues};
 use crate::cif::CifDocument;
 use crate::observations::source::{Connection, Source};
-use crate::pdbx::ShortText;
 use crate::observations::uncertainty::TargetUncertainty;
+use crate::pdbx::ShortText;
 use crate::pdbx::{ProductAtom, ProductBond};
 use std::collections::{HashMap, HashSet};
 
@@ -48,7 +48,9 @@ pub(super) struct Snapshot {
 /// them, and no longer text upper-cases to one character. A test against `&str` reads the
 /// bytes and skips the UTF-8 check of `as_str`.
 fn is_hydrogen(element: &ShortText) -> bool {
-    ["H", "D", "T", "h", "d", "t"].iter().any(|value| element == value)
+    ["H", "D", "T", "h", "d", "t"]
+        .iter()
+        .any(|value| element == value)
 }
 
 /// Reads one text field of a source connection.
@@ -68,7 +70,12 @@ struct Column<'a, T: ?Sized> {
 
 impl<'a, T: PartialEq + ?Sized> Column<'a, T> {
     fn new(capacity: usize) -> Self {
-        Self { out: Vec::with_capacity(capacity), previous: None, piece: [0; PIECE], length: 0 }
+        Self {
+            out: Vec::with_capacity(capacity),
+            previous: None,
+            piece: [0; PIECE],
+            length: 0,
+        }
     }
 
     /// Append one value. Labels often repeat from one atom to the next. A value equal to
@@ -84,8 +91,12 @@ impl<'a, T: PartialEq + ?Sized> Column<'a, T> {
         let text = text(value);
         let bytes = text.as_bytes();
         // Short text that needs no escapes goes into the block with fixed-size copies.
-        if self.previous.is_some() && bytes.len() <= PIECE - 3
-            && bytes.iter().all(|&byte| matches!(byte, b' '..=b'~') && byte != b'"' && byte != b'\\') {
+        if self.previous.is_some()
+            && bytes.len() <= PIECE - 3
+            && bytes
+                .iter()
+                .all(|&byte| matches!(byte, b' '..=b'~') && byte != b'"' && byte != b'\\')
+        {
             self.piece[0] = b',';
             self.piece[1] = b'"';
             copy_short(&mut self.piece, bytes);
@@ -101,7 +112,11 @@ impl<'a, T: PartialEq + ?Sized> Column<'a, T> {
         scratch.push(',');
         json::string(scratch, text);
         let bytes = scratch.as_bytes();
-        self.out.extend_from_slice(if self.previous.is_some() { bytes } else { &bytes[1..] });
+        self.out.extend_from_slice(if self.previous.is_some() {
+            bytes
+        } else {
+            &bytes[1..]
+        });
         self.length = if bytes.len() <= PIECE {
             self.piece[..bytes.len()].copy_from_slice(bytes);
             bytes.len()
@@ -156,7 +171,10 @@ struct Fixed {
 
 impl Fixed {
     fn new(count: usize) -> Self {
-        Self { values: Vec::with_capacity(count), exact: true }
+        Self {
+            values: Vec::with_capacity(count),
+            exact: true,
+        }
     }
 
     fn push(&mut self, text: &ShortText) {
@@ -164,14 +182,21 @@ impl Fixed {
         self.exact &= bytes.len() <= 8 && bytes.last() != Some(&0);
         // Folding from the last byte puts the first byte lowest, so the little-endian
         // bytes of the value are the text followed by zeros.
-        let value = bytes.iter().rev().fold(0_u64, |value, &byte| value << 8 | u64::from(byte));
+        let value = bytes
+            .iter()
+            .rev()
+            .fold(0_u64, |value, &byte| value << 8 | u64::from(byte));
         self.values.push(value.to_le_bytes());
     }
 
     /// The values as an `S8` array, or `None` when one does not survive the padding.
     fn array(self) -> Option<Array> {
         let count = self.values.len();
-        self.exact.then(|| Array { dtype: "S8", shape: vec![count], bytes: self.values.into_flattened() })
+        self.exact.then(|| Array {
+            dtype: "S8",
+            shape: vec![count],
+            bytes: self.values.into_flattened(),
+        })
     }
 }
 
@@ -188,24 +213,38 @@ fn member<T: ?Sized>(out: &mut Vec<u8>, scratch: &mut String, name: &str, column
 }
 
 fn normal(value: &str) -> &str {
-    if matches!(value, "." | "?") { "" } else { value }
+    if matches!(value, "." | "?") {
+        ""
+    } else {
+        value
+    }
 }
 
 impl Snapshot {
     /// `unknown` names the components without dictionary chemistry.
     #[allow(clippy::too_many_arguments)]
-    pub(super) fn read(source: &Source, atoms: &[ProductAtom], bonds: &[ProductBond], rows: &[Option<usize>],
-        features: &[[i16; 16]], residues: &Residues, complete: &[bool], columns: Columns,
-        provenance: String, unknown: &HashSet<String>) -> Self {
+    pub(super) fn read(
+        source: &Source,
+        atoms: &[ProductAtom],
+        bonds: &[ProductBond],
+        rows: &[Option<usize>],
+        features: &[[i16; 16]],
+        residues: &Residues,
+        complete: &[bool],
+        columns: Columns,
+        provenance: String,
+        unknown: &HashSet<String>,
+    ) -> Self {
         let count = source.atoms.len();
         let mut hydrogen_parent = vec![-1_i64; count];
         for &(child, parent) in &source.hydrogen_bonds {
             if let Some(parent) = parent {
-                hydrogen_parent[child] = if hydrogen_parent[child] == -1 || hydrogen_parent[child] == parent as i64 {
-                    parent as i64
-                } else {
-                    -2
-                };
+                hydrogen_parent[child] =
+                    if hydrogen_parent[child] == -1 || hydrogen_parent[child] == parent as i64 {
+                        parent as i64
+                    } else {
+                        -2
+                    };
             }
         }
         for value in &mut hydrogen_parent {
@@ -244,7 +283,11 @@ impl Snapshot {
             mask.push(atom.position.iter().all(|value| value.is_finite()));
             is_protein.push(atom.protein);
         }
-        let limit = row.iter().map(|&value| value as usize + 1).max().unwrap_or(0);
+        let limit = row
+            .iter()
+            .map(|&value| value as usize + 1)
+            .max()
+            .unwrap_or(0);
         let mut by_row = vec![usize::MAX; limit];
         for (index, &value) in row.iter().enumerate() {
             by_row[value as usize] = index;
@@ -258,9 +301,16 @@ impl Snapshot {
             occupancy,
             mask,
             is_protein,
-            connections: source.connections.iter()
-                .map(|edge| edge.atoms.map(|atom| atom.map_or(-1, |row| row as i64))).collect(),
-            connection_row: source.connections.iter().map(|edge| edge.row as i64).collect(),
+            connections: source
+                .connections
+                .iter()
+                .map(|edge| edge.atoms.map(|atom| atom.map_or(-1, |row| row as i64)))
+                .collect(),
+            connection_row: source
+                .connections
+                .iter()
+                .map(|edge| edge.row as i64)
+                .collect(),
             charge: vec![0.; count],
             charge_known: vec![false; count],
             hybridization: vec![0; count],
@@ -282,7 +332,9 @@ impl Snapshot {
         };
         let mut mapping = vec![usize::MAX; atoms.len()];
         for (index, atom) in atoms.iter().enumerate() {
-            let Some(row) = rows[index].and_then(|row| by_row.get(row).copied()).filter(|&row| row != usize::MAX)
+            let Some(row) = rows[index]
+                .and_then(|row| by_row.get(row).copied())
+                .filter(|&row| row != usize::MAX)
             else {
                 continue;
             };
@@ -335,30 +387,51 @@ impl Snapshot {
     }
 
     /// Shrake-Rupley SASA of noncanonical protein and nonprotein heavy atoms.
-    pub(super) fn sasa(&mut self, source: &Source, document: &CifDocument, model: i64, enabled: bool,
-        canonical: &HashSet<String>) {
+    pub(super) fn sasa(
+        &mut self,
+        source: &Source,
+        document: &CifDocument,
+        model: i64,
+        enabled: bool,
+        canonical: &HashSet<String>,
+    ) {
         // Atoms of one residue share a component, so test each run of one component once.
         let mut previous: Option<(&ShortText, bool, bool)> = None;
-        let selected: Vec<usize> = source.atoms.iter().enumerate().filter(|(index, atom)| {
-            let (water, standard) = match previous {
-                Some((component, water, standard)) if *component == atom.component => (water, standard),
-                _ => {
-                    let water = matches!(atom.component.to_uppercase().as_str(), "HOH" | "DOD" | "WAT");
-                    let standard = canonical.contains(atom.component.as_str());
-                    previous = Some((&atom.component, water, standard));
-                    (water, standard)
-                }
-            };
-            !self.hydrogen[*index]
-                && !water
-                && (!atom.protein || !standard)
-                && self.mask[*index]
-                && self.occupancy[*index] > 0.
-        }).map(|(index, _)| index).collect();
+        let selected: Vec<usize> = source
+            .atoms
+            .iter()
+            .enumerate()
+            .filter(|(index, atom)| {
+                let (water, standard) = match previous {
+                    Some((component, water, standard)) if *component == atom.component => {
+                        (water, standard)
+                    }
+                    _ => {
+                        let water = matches!(
+                            atom.component.to_uppercase().as_str(),
+                            "HOH" | "DOD" | "WAT"
+                        );
+                        let standard = canonical.contains(atom.component.as_str());
+                        previous = Some((&atom.component, water, standard));
+                        (water, standard)
+                    }
+                };
+                !self.hydrogen[*index]
+                    && !water
+                    && (!atom.protein || !standard)
+                    && self.mask[*index]
+                    && self.occupancy[*index] > 0.
+            })
+            .map(|(index, _)| index)
+            .collect();
         let mut error = None;
         if enabled && !selected.is_empty() {
-            let rows: Vec<usize> = selected.iter().map(|&index| self.row[index] as usize).collect();
-            match crate::pdbx::ligand_sasa(document, Some(&rows), model, 1.4, 256, &HashMap::new()) {
+            let rows: Vec<usize> = selected
+                .iter()
+                .map(|&index| self.row[index] as usize)
+                .collect();
+            match crate::pdbx::ligand_sasa(document, Some(&rows), model, 1.4, 256, &HashMap::new())
+            {
                 Ok((found, areas)) => {
                     let areas: HashMap<usize, f64> = found.into_iter().zip(areas).collect();
                     for (&index, row) in selected.iter().zip(&rows) {
@@ -370,7 +443,9 @@ impl Snapshot {
             }
         }
         let known = self.sasa_known.iter().filter(|&&value| value).count();
-        let mut text = String::from("{\"context\":\"all-occupied-nonwater-heavy-in-selected-model\",\"enabled\":");
+        let mut text = String::from(
+            "{\"context\":\"all-occupied-nonwater-heavy-in-selected-model\",\"enabled\":",
+        );
         text.push_str(if enabled { "true" } else { "false" });
         text.push_str(",\"error\":");
         match &error {
@@ -386,21 +461,46 @@ impl Snapshot {
     }
 
     /// Keep raw presence while withholding uncertain added-hydrogen targets.
-    pub(super) fn mask_uncertain_hydrogens(&mut self, source: &Source, uncertainties: &[TargetUncertainty]) {
-        self.target_known = self.mask.iter().zip(&self.occupancy).map(|(&mask, &occupancy)| mask && occupancy > 0.)
+    pub(super) fn mask_uncertain_hydrogens(
+        &mut self,
+        source: &Source,
+        uncertainties: &[TargetUncertainty],
+    ) {
+        self.target_known = self
+            .mask
+            .iter()
+            .zip(&self.occupancy)
+            .map(|(&mask, &occupancy)| mask && occupancy > 0.)
             .collect();
-        let missing: HashSet<[&str; 5]> = uncertainties.iter().map(|row| row.parent_key.each_ref().map(|value| normal(value)))
+        let missing: HashSet<[&str; 5]> = uncertainties
+            .iter()
+            .map(|row| row.parent_key.each_ref().map(|value| normal(value)))
             .collect();
         if missing.is_empty() {
             return;
         }
         let names: HashSet<&str> = missing.iter().map(|key| key[4]).collect();
-        let parent: Vec<bool> = source.atoms.iter().map(|atom| {
-            names.contains(normal(&atom.name)) && missing.contains(&[normal(&atom.chain), normal(&atom.auth_sequence),
-                normal(&atom.insertion), normal(&atom.component), normal(&atom.name)])
-        }).collect();
-        let groups: HashSet<i64> = self.group.iter().zip(&parent).filter(|(_, parent)| **parent)
-            .map(|(&group, _)| group).collect();
+        let parent: Vec<bool> = source
+            .atoms
+            .iter()
+            .map(|atom| {
+                names.contains(normal(&atom.name))
+                    && missing.contains(&[
+                        normal(&atom.chain),
+                        normal(&atom.auth_sequence),
+                        normal(&atom.insertion),
+                        normal(&atom.component),
+                        normal(&atom.name),
+                    ])
+            })
+            .collect();
+        let groups: HashSet<i64> = self
+            .group
+            .iter()
+            .zip(&parent)
+            .filter(|(_, parent)| **parent)
+            .map(|(&group, _)| group)
+            .collect();
         for atom in 0..parent.len() {
             let owner = self.hydrogen_parent[atom];
             let child = if owner >= 0 {
@@ -443,32 +543,70 @@ impl Snapshot {
 
     /// Numeric fields, then labels and exclusion codes as UTF-8 JSON. With `fixed`, the
     /// component, element and name labels also come back as `S8` arrays when they fit.
-    pub(super) fn arrays(&self, source: &Source, exclusions: &[String], fixed: bool) -> Vec<(&'static str, Array)> {
+    pub(super) fn arrays(
+        &self,
+        source: &Source,
+        exclusions: &[String],
+        fixed: bool,
+    ) -> Vec<(&'static str, Array)> {
         let count = self.row.len();
         // The atom array is much larger than the cache, so read it once for every label column.
         let mut scratch = String::new();
-        let mut columns: [Column<'_, ShortText>; 10] = std::array::from_fn(|_| Column::new(count * 6));
-        let mut padded: [Fixed; 3] = std::array::from_fn(|_| Fixed::new(if fixed { source.atoms.len() } else { 0 }));
+        let mut columns: [Column<'_, ShortText>; 10] =
+            std::array::from_fn(|_| Column::new(count * 6));
+        let mut padded: [Fixed; 3] =
+            std::array::from_fn(|_| Fixed::new(if fixed { source.atoms.len() } else { 0 }));
         for atom in &source.atoms {
-            let values = [&atom.alternate, &atom.auth_chain, &atom.auth_sequence, &atom.chain, &atom.component,
-                &atom.element, &atom.entity, &atom.insertion, &atom.name];
+            let values = [
+                &atom.alternate,
+                &atom.auth_chain,
+                &atom.auth_sequence,
+                &atom.chain,
+                &atom.component,
+                &atom.element,
+                &atom.entity,
+                &atom.insertion,
+                &atom.name,
+            ];
             for (column, value) in columns.iter_mut().zip(values) {
                 column.push(value, &mut scratch, ShortText::as_str);
             }
-            columns[9].push(&atom.entity, &mut scratch,
-                |entity| source.entity_types.get(entity.as_str()).map_or("", String::as_str));
+            columns[9].push(&atom.entity, &mut scratch, |entity| {
+                source
+                    .entity_types
+                    .get(entity.as_str())
+                    .map_or("", String::as_str)
+            });
             if fixed {
-                for (label, value) in padded.iter_mut().zip([&atom.component, &atom.element, &atom.name]) {
+                for (label, value) in
+                    padded
+                        .iter_mut()
+                        .zip([&atom.component, &atom.element, &atom.name])
+                {
                     label.push(value);
                 }
             }
         }
-        let mut labels = Vec::with_capacity(columns.iter().map(|column| column.out.len() + 40).sum::<usize>()
-            + source.connections.len() * 64);
+        let mut labels = Vec::with_capacity(
+            columns
+                .iter()
+                .map(|column| column.out.len() + 40)
+                .sum::<usize>()
+                + source.connections.len() * 64,
+        );
         labels.push(b'{');
-        let names = ["source_atom_alternate", "source_atom_auth_chain", "source_atom_auth_sequence",
-            "source_atom_chain", "source_atom_component", "source_atom_element", "source_atom_entity",
-            "source_atom_insertion", "source_atom_name", "source_atom_polymer_type"];
+        let names = [
+            "source_atom_alternate",
+            "source_atom_auth_chain",
+            "source_atom_auth_sequence",
+            "source_atom_chain",
+            "source_atom_component",
+            "source_atom_element",
+            "source_atom_entity",
+            "source_atom_insertion",
+            "source_atom_name",
+            "source_atom_polymer_type",
+        ];
         for (name, column) in names.into_iter().zip(&columns) {
             member(&mut labels, &mut scratch, name, column);
         }
@@ -506,36 +644,99 @@ impl Snapshot {
         let mut out = vec![
             ("source_atom_row", arrays::int64(&self.row, vec![count])),
             ("source_atom_group", arrays::int64(&self.group, vec![count])),
-            ("source_atom_sequence", arrays::int64(&self.sequence, vec![count])),
-            ("source_hydrogen_parent", arrays::int64(&self.hydrogen_parent, vec![count])),
+            (
+                "source_atom_sequence",
+                arrays::int64(&self.sequence, vec![count]),
+            ),
+            (
+                "source_hydrogen_parent",
+                arrays::int64(&self.hydrogen_parent, vec![count]),
+            ),
             ("source_atom_pos", arrays::points(&self.pos, vec![count, 3])),
-            ("source_atom_occupancy", arrays::float32(&self.occupancy, vec![count])),
+            (
+                "source_atom_occupancy",
+                arrays::float32(&self.occupancy, vec![count]),
+            ),
             ("source_atom_mask", arrays::boolean(&self.mask, vec![count])),
-            ("source_atom_is_protein", arrays::boolean(&self.is_protein, vec![count])),
+            (
+                "source_atom_is_protein",
+                arrays::boolean(&self.is_protein, vec![count]),
+            ),
             ("source_connections", arrays::pairs(&self.connections)),
-            ("source_connection_row", arrays::int64(&self.connection_row, vec![self.connection_row.len()])),
-            ("source_atom_charge", arrays::float32(&self.charge, vec![count])),
-            ("source_atom_charge_known", arrays::boolean(&self.charge_known, vec![count])),
-            ("source_atom_hybridization", arrays::int64(&self.hybridization, vec![count])),
-            ("source_atom_hybridization_known", arrays::boolean(&self.hybridization_known, vec![count])),
-            ("source_atom_features", arrays::int16(&features, vec![count, 16])),
-            ("source_atom_connectivity_known", arrays::boolean(&self.connectivity_known, vec![count])),
-            ("source_atom_hydrogen_count", arrays::int64(&self.hydrogen_count, vec![count])),
-            ("source_atom_hydrogen_known", arrays::boolean(&self.hydrogen_known, vec![count])),
-            ("source_chemistry_provenance", arrays::text(self.provenance.clone())),
+            (
+                "source_connection_row",
+                arrays::int64(&self.connection_row, vec![self.connection_row.len()]),
+            ),
+            (
+                "source_atom_charge",
+                arrays::float32(&self.charge, vec![count]),
+            ),
+            (
+                "source_atom_charge_known",
+                arrays::boolean(&self.charge_known, vec![count]),
+            ),
+            (
+                "source_atom_hybridization",
+                arrays::int64(&self.hybridization, vec![count]),
+            ),
+            (
+                "source_atom_hybridization_known",
+                arrays::boolean(&self.hybridization_known, vec![count]),
+            ),
+            (
+                "source_atom_features",
+                arrays::int16(&features, vec![count, 16]),
+            ),
+            (
+                "source_atom_connectivity_known",
+                arrays::boolean(&self.connectivity_known, vec![count]),
+            ),
+            (
+                "source_atom_hydrogen_count",
+                arrays::int64(&self.hydrogen_count, vec![count]),
+            ),
+            (
+                "source_atom_hydrogen_known",
+                arrays::boolean(&self.hydrogen_known, vec![count]),
+            ),
+            (
+                "source_chemistry_provenance",
+                arrays::text(self.provenance.clone()),
+            ),
             ("source_bonds", arrays::pairs(&self.bonds)),
-            ("source_bond_order", arrays::int8(&self.bond_order, vec![self.bond_order.len()])),
-            ("source_bond_order_known", arrays::boolean(&self.bond_order_known, vec![self.bond_order.len()])),
+            (
+                "source_bond_order",
+                arrays::int8(&self.bond_order, vec![self.bond_order.len()]),
+            ),
+            (
+                "source_bond_order_known",
+                arrays::boolean(&self.bond_order_known, vec![self.bond_order.len()]),
+            ),
             ("source_sasa", arrays::float32(&self.sasa, vec![count])),
-            ("source_sasa_mask", arrays::boolean(&self.sasa_known, vec![count])),
-            ("source_sasa_provenance", arrays::text(self.sasa_provenance.clone())),
-            ("source_atom_target_known", arrays::boolean(&self.target_known, vec![count])),
-            ("source_labels", { let count = labels.len(); arrays::uint8(labels, vec![count]) }),
+            (
+                "source_sasa_mask",
+                arrays::boolean(&self.sasa_known, vec![count]),
+            ),
+            (
+                "source_sasa_provenance",
+                arrays::text(self.sasa_provenance.clone()),
+            ),
+            (
+                "source_atom_target_known",
+                arrays::boolean(&self.target_known, vec![count]),
+            ),
+            ("source_labels", {
+                let count = labels.len();
+                arrays::uint8(labels, vec![count])
+            }),
             ("source_exclusion_codes", arrays::text(codes)),
         ];
         if let Some(((component, element), name)) = fixed {
-            out.extend([("source_fixed_component", component), ("source_fixed_element", element),
-                ("source_fixed_name", name)]);
+            out.extend([
+                ("source_fixed_component", component),
+                ("source_fixed_element", element),
+                ("source_fixed_name", name),
+            ]);
         }
         out
     }
@@ -551,7 +752,8 @@ mod tests {
         for text in ["CA", "", "A\0B"] {
             labels.push(&ShortText::new(text));
         }
-        assert!(labels.array().is_some_and(|array| array.dtype == "S8" && array.shape == [3]
+        assert!(labels.array().is_some_and(|array| array.dtype == "S8"
+            && array.shape == [3]
             && array.bytes == b"CA\0\0\0\0\0\0\0\0\0\0\0\0\0\0A\0B\0\0\0\0\0"));
         for text in ["ABCDEFGHI", "A\0"] {
             let mut labels = Fixed::new(1);

@@ -131,7 +131,8 @@ impl Tokens {
         ligand: bool,
         features: [i16; 4],
     ) {
-        self.positions.extend_from_slice(packed.position.as_flattened());
+        self.positions
+            .extend_from_slice(packed.position.as_flattened());
         self.masks.extend(packed.mask.map(u8::from));
         self.presence.extend(packed.presence.map(u8::from));
         self.state.push(packed.state);
@@ -190,9 +191,17 @@ impl Tokens {
                 return Err("Token selection retains a bridge hydrogen without both metals".into());
             }
         }
-        self.bridge_edges = self.bridge_edges.iter().filter_map(|&(hydrogen, metal, kind)| {
-            (inverse[hydrogen] != usize::MAX).then_some((inverse[hydrogen], inverse[metal], kind))
-        }).collect();
+        self.bridge_edges = self
+            .bridge_edges
+            .iter()
+            .filter_map(|&(hydrogen, metal, kind)| {
+                (inverse[hydrogen] != usize::MAX).then_some((
+                    inverse[hydrogen],
+                    inverse[metal],
+                    kind,
+                ))
+            })
+            .collect();
         self.attachments = self
             .attachments
             .iter()
@@ -269,11 +278,16 @@ impl Tokens {
         if lookup.len() != self.keys.len()
             || unique.len() != wanted.len()
             || wanted.len() != self.keys.len()
-            || wanted.iter().any(|key| !lookup.contains_key(&key.each_ref().map(String::as_str)))
+            || wanted
+                .iter()
+                .any(|key| !lookup.contains_key(&key.each_ref().map(String::as_str)))
         {
             return Err("PDB token identities differ from the heavy index".into());
         }
-        let indices: Vec<_> = wanted.iter().map(|key| lookup[&key.each_ref().map(String::as_str)]).collect();
+        let indices: Vec<_> = wanted
+            .iter()
+            .map(|key| lookup[&key.each_ref().map(String::as_str)])
+            .collect();
         self.select(&indices)?;
         renumber_ligands(self);
         Ok(())
@@ -282,9 +296,14 @@ impl Tokens {
     pub fn validate(&self, schema: &Schema, table: &TokenTable) -> Result<(), String> {
         let mut bridges: HashMap<usize, BTreeSet<usize>> = HashMap::new();
         for &(hydrogen, metal, kind) in &self.bridge_edges {
-            if hydrogen >= self.identity.len() || metal >= self.identity.len()
-                || self.identity[hydrogen] != table.hydrogen() || self.ligand[hydrogen] == 0
-                || self.ligand[metal] == 0 || hydrogen == metal || kind != 1 {
+            if hydrogen >= self.identity.len()
+                || metal >= self.identity.len()
+                || self.identity[hydrogen] != table.hydrogen()
+                || self.ligand[hydrogen] == 0
+                || self.ligand[metal] == 0
+                || hydrogen == metal
+                || kind != 1
+            {
                 return Err("Ligand bridge edges have invalid endpoints or type".into());
             }
             if !bridges.entry(hydrogen).or_default().insert(metal) {
@@ -292,8 +311,10 @@ impl Tokens {
             }
         }
         for (row, &identity) in self.identity.iter().enumerate() {
-            if identity == table.hydrogen() && self.ligand[row] != 0
-                && bridges.get(&row).is_none_or(|metals| metals.len() != 2) {
+            if identity == table.hydrogen()
+                && self.ligand[row] != 0
+                && bridges.get(&row).is_none_or(|metals| metals.len() != 2)
+            {
                 return Err("Ligand bridge hydrogen requires exactly two metal edges".into());
             }
         }
@@ -303,9 +324,13 @@ impl Tokens {
             let known = &self.presence[row * 32..(row + 1) * 32];
             let topology = &self.topology[row * 3..(row + 1) * 3];
             // The test has no branch per slot, so the compiler can check a row in vector steps.
-            let finite = mask.iter().zip(self.positions[row * 96..(row + 1) * 96].chunks_exact(3))
+            let finite = mask
+                .iter()
+                .zip(self.positions[row * 96..(row + 1) * 96].chunks_exact(3))
                 .fold(true, |finite, (&observed, xyz)| {
-                    finite & ((observed == 0) | xyz.iter().fold(true, |all, value| all & value.is_finite()))
+                    finite
+                        & ((observed == 0)
+                            | xyz.iter().fold(true, |all, value| all & value.is_finite()))
                 });
             if !finite {
                 return Err("Protonated coordinates contain non-finite observed atoms".into());
@@ -359,7 +384,8 @@ pub(super) fn renumber_ligands(tokens: &mut Tokens) {
     let mut counters = HashMap::new();
     for row in 0..tokens.identity.len() {
         if tokens.ligand[row] != 0 {
-            let (next, segment) = counters.entry(tokens.chains[row])
+            let (next, segment) = counters
+                .entry(tokens.chains[row])
                 .or_insert((0, tokens.polymer_segments[row]));
             if *segment != tokens.polymer_segments[row] {
                 *next += super::continuity::INDEX_SEPARATION - 1;

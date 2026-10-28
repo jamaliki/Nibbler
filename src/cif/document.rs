@@ -549,7 +549,13 @@ impl<'a> TextColumn<'a> {
     /// row count.
     pub(crate) fn parts(self) -> (&'a str, &'a [u32], &'a [u32], Option<&'a [u8]>, usize) {
         let column = self.column;
-        (&column.data, &column.offsets, &column.indices, self.mask, self.rows)
+        (
+            &column.data,
+            &column.offsets,
+            &column.indices,
+            self.mask,
+            self.rows,
+        )
     }
 }
 

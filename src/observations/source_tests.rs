@@ -62,18 +62,50 @@ fn keeps_only_identity_symmetry_covalent_links() {
 #[cfg(feature = "reduce3")]
 fn describe(source: &super::Source) -> String {
     use std::collections::BTreeMap;
-    let atoms: Vec<_> = source.atoms.iter().map(|atom| {
-        format!("{} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {} {:?} {} {} {}", atom.source_row, atom.name,
-            atom.element, atom.chain, atom.component, atom.entity, atom.auth_sequence, atom.auth_chain,
-            atom.auth_component, atom.insertion, atom.alternate, atom.sequence, atom.position.map(f32::to_bits),
-            atom.occupancy.to_bits(), atom.protein, atom.group)
-    }).collect();
-    let connections: Vec<_> = source.connections.iter()
-        .map(|link| format!("{} {:?} {} {} {:?}", link.row, link.atoms, link.kind, link.order, link.symmetries))
+    let atoms: Vec<_> = source
+        .atoms
+        .iter()
+        .map(|atom| {
+            format!(
+                "{} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {} {:?} {} {} {}",
+                atom.source_row,
+                atom.name,
+                atom.element,
+                atom.chain,
+                atom.component,
+                atom.entity,
+                atom.auth_sequence,
+                atom.auth_chain,
+                atom.auth_component,
+                atom.insertion,
+                atom.alternate,
+                atom.sequence,
+                atom.position.map(f32::to_bits),
+                atom.occupancy.to_bits(),
+                atom.protein,
+                atom.group
+            )
+        })
         .collect();
-    format!("{atoms:?} {:?} {:?} {:?} {connections:?} {} {:?} {:?}", source.groups, source.bonds, source.hydrogen_bonds,
-        source.has_protein_annotations, source.lengths.iter().collect::<BTreeMap<_, _>>(),
-        source.entity_types.iter().collect::<BTreeMap<_, _>>())
+    let connections: Vec<_> = source
+        .connections
+        .iter()
+        .map(|link| {
+            format!(
+                "{} {:?} {} {} {:?}",
+                link.row, link.atoms, link.kind, link.order, link.symmetries
+            )
+        })
+        .collect();
+    format!(
+        "{atoms:?} {:?} {:?} {:?} {connections:?} {} {:?} {:?}",
+        source.groups,
+        source.bonds,
+        source.hydrogen_bonds,
+        source.has_protein_annotations,
+        source.lengths.iter().collect::<BTreeMap<_, _>>(),
+        source.entity_types.iter().collect::<BTreeMap<_, _>>()
+    )
 }
 
 #[cfg(feature = "reduce3")]
@@ -96,21 +128,44 @@ metalc1 metalc A GLY 1 N B ZN . ZN\n";
 #[cfg(feature = "reduce3")]
 #[test]
 fn copied_rows_give_the_source_their_own_model_gives() {
-    let original = parse(COPIED.replace("ROWS", "").replace("ZINC", "5.0 5.0 5.0").as_bytes()).expect("fixture");
+    let original = parse(
+        COPIED
+            .replace("ROWS", "")
+            .replace("ZINC", "5.0 5.0 5.0")
+            .as_bytes(),
+    )
+    .expect("fixture");
     let written = COPIED
-        .replace("ROWS", "ATOM 3 H HA2 . GLY A 1 1 ? 1.8 1.0 0.0 1.00 12.0 ? 1 GLY A HA2 1\n")
+        .replace(
+            "ROWS",
+            "ATOM 3 H HA2 . GLY A 1 1 ? 1.8 1.0 0.0 1.00 12.0 ? 1 GLY A HA2 1\n",
+        )
         .replace("ZINC", "6.0 5.0 5.0");
     let document = parse(written.as_bytes()).expect("fixture");
     let model = crate::pdbx::build_model(&original).expect("model");
     let base = super::read_with_sites(&original, 1, model.loop_sites()).expect("source");
     let rows = [0, 1, 1, 2];
-    let hydrogen = [1, 2, 3, 4, 10, 11, 12, 13, 14, 15, 19].iter().fold(0_u64, |mask, bit| mask | 1 << bit);
-    let made = [1 << 1, 1 << 1, hydrogen, 1 << 1 | 1 << 10 | 1 << 11 | 1 << 12];
-    let copied = super::Copied::new(&document, &model, &rows, &made, 1, &base).expect("copied rows");
+    let hydrogen = [1, 2, 3, 4, 10, 11, 12, 13, 14, 15, 19]
+        .iter()
+        .fold(0_u64, |mask, bit| mask | 1 << bit);
+    let made = [
+        1 << 1,
+        1 << 1,
+        hydrogen,
+        1 << 1 | 1 << 10 | 1 << 11 | 1 << 12,
+    ];
+    let copied =
+        super::Copied::new(&document, &model, &rows, &made, 1, &base).expect("copied rows");
     let own = crate::pdbx::build_model(&document).expect("model");
     let expected = super::read_with_sites(&document, 1, own.loop_sites()).expect("source");
     assert_eq!(describe(&copied.source), describe(&expected));
-    assert_eq!((copied.source.atoms.len(), copied.source.connections[0].atoms), (4, [Some(0), Some(3)]));
+    assert_eq!(
+        (
+            copied.source.atoms.len(),
+            copied.source.connections[0].atoms
+        ),
+        (4, [Some(0), Some(3)])
+    );
     assert_eq!(copied.heavy(), [0, 1, 3]);
     assert_eq!(copied.position(3), [6.0, 5.0, 5.0]);
     assert!(copied.copies_name(1, 1) && !copied.copies_name(2, 1));

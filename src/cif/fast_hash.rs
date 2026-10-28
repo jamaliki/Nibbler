@@ -34,10 +34,9 @@ impl Hasher for FastHasher {
         let rest = chunks.remainder();
         if !rest.is_empty() {
             // Shifting bytes in keeps a short tail from becoming a `memcpy` call.
-            let word = rest
-                .iter()
-                .enumerate()
-                .fold(0, |word, (index, &byte)| word | u64::from(byte) << (8 * index));
+            let word = rest.iter().enumerate().fold(0, |word, (index, &byte)| {
+                word | u64::from(byte) << (8 * index)
+            });
             self.add(word ^ ((rest.len() as u64) << 59));
         }
     }

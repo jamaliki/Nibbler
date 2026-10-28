@@ -7,8 +7,11 @@ use crate::hash::{FastMap, FastSet};
 use std::collections::{HashMap, HashSet};
 
 fn listing(keys: &[&[&str]]) -> String {
-    let items: Vec<String> = keys.iter().take(3)
-        .map(|key| json::repr_sequence(key.iter().copied(), true)).collect();
+    let items: Vec<String> = keys
+        .iter()
+        .take(3)
+        .map(|key| json::repr_sequence(key.iter().copied(), true))
+        .collect();
     format!("[{}]", items.join(", "))
 }
 
@@ -40,14 +43,22 @@ pub(super) fn indexed(packed: &mut Packed<'_>, expected: &str) -> Result<String,
         return Ok(text);
     }
     if let Some(selected) = permutation(&packed.keys, expected) {
-        if selected.iter().enumerate().all(|(index, &old)| index == old) {
+        if selected
+            .iter()
+            .enumerate()
+            .all(|(index, &old)| index == old)
+        {
             return Ok(text);
         }
         reorder(packed, &selected);
         return Ok(key_text(&packed.keys));
     }
-    let expected: Vec<Vec<String>> = serde_json::from_str(expected).map_err(|error| error.to_string())?;
-    let wanted_keys: Vec<Vec<&str>> = expected.iter().map(|key| key.iter().map(String::as_str).collect()).collect();
+    let expected: Vec<Vec<String>> =
+        serde_json::from_str(expected).map_err(|error| error.to_string())?;
+    let wanted_keys: Vec<Vec<&str>> = expected
+        .iter()
+        .map(|key| key.iter().map(String::as_str).collect())
+        .collect();
     let actual: HashSet<&[&str]> = packed.keys.iter().map(|key| key.as_slice()).collect();
     let wanted: HashSet<&[&str]> = wanted_keys.iter().map(Vec::as_slice).collect();
     if actual.len() != packed.keys.len() || wanted.len() != expected.len() {
@@ -58,16 +69,30 @@ pub(super) fn indexed(packed: &mut Packed<'_>, expected: &str) -> Result<String,
         let mut added: Vec<&[&str]> = actual.difference(&wanted).copied().collect();
         missing.sort();
         added.sort();
-        return Err(Failure::Value(format!("Protonation changed molecular token identities: missing={}, added={}",
-            listing(&missing), listing(&added))));
+        return Err(Failure::Value(format!(
+            "Protonation changed molecular token identities: missing={}, added={}",
+            listing(&missing),
+            listing(&added)
+        )));
     }
-    if packed.keys.iter().map(|key| key.as_slice()).eq(wanted_keys.iter().map(Vec::as_slice)) {
+    if packed
+        .keys
+        .iter()
+        .map(|key| key.as_slice())
+        .eq(wanted_keys.iter().map(Vec::as_slice))
+    {
         return Ok(text);
     }
-    let lookup: HashMap<&[&str], usize> = packed.keys.iter().enumerate()
-        .map(|(index, key)| (key.as_slice(), index)).collect();
-    let selected: Vec<usize> = wanted_keys.iter()
-        .map(|key| lookup.get(key.as_slice()).copied().unwrap_or(0)).collect();
+    let lookup: HashMap<&[&str], usize> = packed
+        .keys
+        .iter()
+        .enumerate()
+        .map(|(index, key)| (key.as_slice(), index))
+        .collect();
+    let selected: Vec<usize> = wanted_keys
+        .iter()
+        .map(|key| lookup.get(key.as_slice()).copied().unwrap_or(0))
+        .collect();
     reorder(packed, &selected);
     Ok(key_text(&packed.keys))
 }
@@ -151,15 +176,29 @@ fn reorder(packed: &mut Packed<'_>, selected: &[usize]) {
         permute(&mut packed.atom_sasa, selected, &mut done);
         permute(&mut packed.atom_sasa_mask, selected, &mut done);
     }
-    let remap = |value: i64| if value >= 0 { inverse[value as usize] } else { -1 };
-    for value in packed.legacy_token_index.iter_mut().chain(packed.owner.iter_mut()) {
+    let remap = |value: i64| {
+        if value >= 0 {
+            inverse[value as usize]
+        } else {
+            -1
+        }
+    };
+    for value in packed
+        .legacy_token_index
+        .iter_mut()
+        .chain(packed.owner.iter_mut())
+    {
         *value = remap(*value);
     }
     for row in &mut packed.rows {
         row.ncaa_parent_token = remap(row.ncaa_parent_token);
     }
-    for pair in packed.protein_attachment_index.iter_mut().chain(packed.bridge_index.iter_mut())
-        .chain(packed.ligand_bonds.iter_mut()) {
+    for pair in packed
+        .protein_attachment_index
+        .iter_mut()
+        .chain(packed.bridge_index.iter_mut())
+        .chain(packed.ligand_bonds.iter_mut())
+    {
         *pair = pair.map(|token| inverse[token as usize]);
     }
     for pair in &mut packed.attachment_pairs {
@@ -169,7 +208,9 @@ fn reorder(packed: &mut Packed<'_>, selected: &[usize]) {
     for (token, _) in &mut packed.names {
         *token = inverse[*token] as usize;
     }
-    packed.names.sort_by_cached_key(|(token, _)| decimal(*token));
+    packed
+        .names
+        .sort_by_cached_key(|(token, _)| decimal(*token));
     // The keys now hold the indexed values in the indexed order.
     permute(&mut packed.keys, selected, &mut done);
 }

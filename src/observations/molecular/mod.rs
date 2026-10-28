@@ -180,7 +180,10 @@ pub(crate) struct Finished {
 }
 
 /// Legacy keys as compact JSON, written as `json.dumps` writes them.
-fn legacy_key_text<'a>(keys: impl Iterator<Item = &'a [crate::pdbx::ShortText; 5]>, count: usize) -> String {
+fn legacy_key_text<'a>(
+    keys: impl Iterator<Item = &'a [crate::pdbx::ShortText; 5]>,
+    count: usize,
+) -> String {
     let mut out = String::with_capacity(count * 28);
     out.push('[');
     // Tokens of one residue share the first four fields, so keep their text while they repeat.
@@ -208,17 +211,30 @@ fn legacy_key_text<'a>(keys: impl Iterator<Item = &'a [crate::pdbx::ShortText; 5
 }
 
 /// The `label_atom_id` text of the row that holds each product atom, or the product name.
-fn observed(atoms: &[crate::pdbx::ProductAtom], rows: &[Option<usize>], table: Option<&BlockCategory<'_>>,
-    column: Option<usize>) -> Vec<ShortText> {
-    atoms.iter().zip(rows).map(|(atom, row)| observed_name(atom, *row, table, column)).collect()
+fn observed(
+    atoms: &[crate::pdbx::ProductAtom],
+    rows: &[Option<usize>],
+    table: Option<&BlockCategory<'_>>,
+    column: Option<usize>,
+) -> Vec<ShortText> {
+    atoms
+        .iter()
+        .zip(rows)
+        .map(|(atom, row)| observed_name(atom, *row, table, column))
+        .collect()
 }
 
 /// The `label_atom_id` text of `row`, or the name of `atom` without a row.
-fn observed_name(atom: &crate::pdbx::ProductAtom, row: Option<usize>, table: Option<&BlockCategory<'_>>,
-    column: Option<usize>) -> ShortText {
+fn observed_name(
+    atom: &crate::pdbx::ProductAtom,
+    row: Option<usize>,
+    table: Option<&BlockCategory<'_>>,
+    column: Option<usize>,
+) -> ShortText {
     match (row, table, column) {
-        (Some(row), Some(table), Some(column)) =>
-            table.text(row, column).map_or_else(|| ShortText::new(""), |text| ShortText::new(&text)),
+        (Some(row), Some(table), Some(column)) => table
+            .text(row, column)
+            .map_or_else(|| ShortText::new(""), |text| ShortText::new(&text)),
         _ => atom.atom_id.clone(),
     }
 }
@@ -227,9 +243,16 @@ impl View {
     /// Read a view; `built` is the registry-free PDBx model of `document` when the caller
     /// already has it. A model of other blocks is ignored. When `base` is a view whose product
     /// this document gives again, as Reduce3 gives the product of its input, the view shares it.
-    pub(crate) fn read_with_model(document: Arc<CifDocument>, built: Option<Arc<PdbxModel>>, model: i64,
-        chem_data: &Path, schema: &MolecularSchema, base: Option<&Self>) -> Result<Self, Failure> {
-        let built = built.filter(|full| std::ptr::eq(full.source_document().blocks(), document.blocks()));
+    pub(crate) fn read_with_model(
+        document: Arc<CifDocument>,
+        built: Option<Arc<PdbxModel>>,
+        model: i64,
+        chem_data: &Path,
+        schema: &MolecularSchema,
+        base: Option<&Self>,
+    ) -> Result<Self, Failure> {
+        let built =
+            built.filter(|full| std::ptr::eq(full.source_document().blocks(), document.blocks()));
         let full = match built {
             Some(full) => full,
             None => match crate::pdbx::build_model(&document) {
@@ -247,35 +270,67 @@ impl View {
             model,
         };
         // The full model already holds the decoded sites and connections.
-        let selection = crate::pdbx::select_conformer_with_policy(&full, Some(model), 0, ConformerPolicy::Occupancy)?;
-        let table = document.blocks().first()
+        let selection = crate::pdbx::select_conformer_with_policy(
+            &full,
+            Some(model),
+            0,
+            ConformerPolicy::Occupancy,
+        )?;
+        let table = document
+            .blocks()
+            .first()
             .and_then(|block| BlockCategory::find(block.entries(), "atom_site"));
         let count = table.as_ref().map_or(0, BlockCategory::row_count);
-        let column = table.as_ref().and_then(|table| table.column("label_atom_id"));
+        let column = table
+            .as_ref()
+            .and_then(|table| table.column("label_atom_id"));
         let whole = selection.atom_rows.iter().copied().eq(0..count);
-        let shared = base.filter(|base| whole && base.source.model == model && base.chem_data == chem_data
-            && base.product.schema == schema.schema_sha256);
+        let shared = base.filter(|base| {
+            whole
+                && base.source.model == model
+                && base.chem_data == chem_data
+                && base.product.schema == schema.schema_sha256
+        });
         // A failure leaves the product to the full read, which reports errors in its own order.
         if let Some(base) = shared
             && let Some(own) = &base.product.model
             && product::polymer_chains(&document).is_ok_and(|chains| chains == base.product.chains)
-            && let Some(rows) = crate::pdbx::product_rows_in(&base.product.chemistry, own, &full, model)
+            && let Some(rows) =
+                crate::pdbx::product_rows_in(&base.product.chemistry, own, &full, model)
         {
-            let observed = observed(base.product.chemistry.atoms(), &rows, table.as_ref(), column);
-            return Ok(Self { source, document, chem_data: chem_data.to_owned(), product: Arc::clone(&base.product),
-                rows, observed });
+            let observed = observed(
+                base.product.chemistry.atoms(),
+                &rows,
+                table.as_ref(),
+                column,
+            );
+            return Ok(Self {
+                source,
+                document,
+                chem_data: chem_data.to_owned(),
+                product: Arc::clone(&base.product),
+                rows,
+                observed,
+            });
         }
         let selected = if whole {
             full
         } else {
-            Arc::new(crate::pdbx::build_model(&crate::pdbx::selected_atom_document(&document, &selection.atom_rows)?)?)
+            Arc::new(crate::pdbx::build_model(
+                &crate::pdbx::selected_atom_document(&document, &selection.atom_rows)?,
+            )?)
         };
         let registry = crate::pdbx::chemical_library_registry(&selected, chem_data)
             .map_err(|message| SemanticError::new("PDBX_LINK_PRODUCT", message, Vec::new()))?;
-        let chemistry = crate::pdbx::prepare_product(&selected, Some(&registry), model, None, false)?;
+        let chemistry =
+            crate::pdbx::prepare_product(&selected, Some(&registry), model, None, false)?;
         let atoms = chemistry.atoms();
-        let rows: Vec<_> = atoms.iter()
-            .map(|atom| atom.source_row.and_then(|row| selection.atom_rows.get(row).copied()))
+        let rows: Vec<_> = atoms
+            .iter()
+            .map(|atom| {
+                atom.source_row
+                    .and_then(|row| selection.atom_rows.get(row).copied())
+            })
             .collect();
         let observed = observed(atoms, &rows, table.as_ref(), column);
         let chains = product::polymer_chains(&document)?;
@@ -285,12 +340,36 @@ impl View {
         let domains = product::domains(atoms, chemistry.bonds(), &residues, &chains, perception);
         let incident = product::incident(atoms, chemistry.bonds());
         let mut local = vec![u32::MAX; atoms.len()];
-        let graphs = domains.iter()
-            .map(|domain| product::local_graph(atoms, chemistry.bonds(), &domain.atoms, &incident, &mut local))
+        let graphs = domains
+            .iter()
+            .map(|domain| {
+                product::local_graph(
+                    atoms,
+                    chemistry.bonds(),
+                    &domain.atoms,
+                    &incident,
+                    &mut local,
+                )
+            })
             .collect();
-        let product = Product { model: whole.then_some(selected), schema: schema.schema_sha256.clone(), chains,
-            chemistry, residues, features, domains, graphs };
-        Ok(Self { source, document, chem_data: chem_data.to_owned(), product: Arc::new(product), rows, observed })
+        let product = Product {
+            model: whole.then_some(selected),
+            schema: schema.schema_sha256.clone(),
+            chains,
+            chemistry,
+            residues,
+            features,
+            domains,
+            graphs,
+        };
+        Ok(Self {
+            source,
+            document,
+            chem_data: chem_data.to_owned(),
+            product: Arc::new(product),
+            rows,
+            observed,
+        })
     }
 
     /// Read the view of `document`, which Reduce3 wrote from the document of `source`, from
@@ -299,57 +378,117 @@ impl View {
     /// when [`Self::read_with_model`] might give another view or an error.
     #[cfg(feature = "reduce3")]
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn read_copied(document: Arc<CifDocument>, source: &Arc<PdbxModel>, rows: &[u32], made: &[u64],
-        model: i64, chem_data: &Path, schema: &MolecularSchema, base: &Self) -> Option<Self> {
-        let own = base.product.model.as_ref().filter(|own| Arc::ptr_eq(own, source))?;
-        if base.source.model != model || base.chem_data != chem_data || base.product.schema != schema.schema_sha256 {
+    pub(crate) fn read_copied(
+        document: Arc<CifDocument>,
+        source: &Arc<PdbxModel>,
+        rows: &[u32],
+        made: &[u64],
+        model: i64,
+        chem_data: &Path,
+        schema: &MolecularSchema,
+        base: &Self,
+    ) -> Option<Self> {
+        let own = base
+            .product
+            .model
+            .as_ref()
+            .filter(|own| Arc::ptr_eq(own, source))?;
+        if base.source.model != model
+            || base.chem_data != chem_data
+            || base.product.schema != schema.schema_sha256
+        {
             return None;
         }
-        let copied = super::source::Copied::new(&document, own, rows, made, model, &base.source.source)?;
+        let copied =
+            super::source::Copied::new(&document, own, rows, made, model, &base.source.source)?;
         if product::polymer_chains(&document).ok()? != base.product.chains {
             return None;
         }
         let atoms = base.product.chemistry.atoms();
-        let rows = crate::pdbx::product_rows_with(&base.product.chemistry, own, model, copied.heavy(),
-            |row| copied.identity(row), |row| copied.position(row))?;
-        let table = document.blocks().first().and_then(|block| BlockCategory::find(block.entries(), "atom_site"));
-        let column = table.as_ref().and_then(|table| table.column("label_atom_id"));
+        let rows = crate::pdbx::product_rows_with(
+            &base.product.chemistry,
+            own,
+            model,
+            copied.heavy(),
+            |row| copied.identity(row),
+            |row| copied.position(row),
+        )?;
+        let table = document
+            .blocks()
+            .first()
+            .and_then(|block| BlockCategory::find(block.entries(), "atom_site"));
+        let column = table
+            .as_ref()
+            .and_then(|table| table.column("label_atom_id"));
         // A row that copies the name of the row of `base` holds the same text.
-        let observed = atoms.iter().zip(&rows).zip(base.rows.iter().zip(&base.observed))
+        let observed = atoms
+            .iter()
+            .zip(&rows)
+            .zip(base.rows.iter().zip(&base.observed))
             .map(|((atom, row), (base_row, name))| match (*row, *base_row) {
                 (Some(row), Some(base_row)) if copied.copies_name(row, base_row) => name.clone(),
                 _ => observed_name(atom, *row, table.as_ref(), column),
             })
             .collect();
-        let source = PreparedSource { source: copied.source, model };
-        Some(Self { source, document, chem_data: chem_data.to_owned(), product: Arc::clone(&base.product), rows,
-            observed })
+        let source = PreparedSource {
+            source: copied.source,
+            model,
+        };
+        Some(Self {
+            source,
+            document,
+            chem_data: chem_data.to_owned(),
+            product: Arc::clone(&base.product),
+            rows,
+            observed,
+        })
     }
 
     /// Atoms and bonds of each perception graph; caps follow the product atoms.
     pub(crate) fn perception_graphs(&self) -> Vec<Graph<'_>> {
         let atoms = self.product.chemistry.atoms();
-        self.product.graphs.iter().map(|graph| {
-            let mut result: Vec<_> = graph.ordered.iter().map(|&old| GraphAtom {
-                atom: &atoms[old], observed: &self.observed[old], source_row: self.rows[old], cap: false,
-            }).collect();
-            result.extend(graph.caps.iter().map(|&old| GraphAtom {
-                atom: &atoms[old], observed: &self.observed[old], source_row: None, cap: true,
-            }));
-            (result, graph.bonds.as_slice())
-        }).collect()
+        self.product
+            .graphs
+            .iter()
+            .map(|graph| {
+                let mut result: Vec<_> = graph
+                    .ordered
+                    .iter()
+                    .map(|&old| GraphAtom {
+                        atom: &atoms[old],
+                        observed: &self.observed[old],
+                        source_row: self.rows[old],
+                        cap: false,
+                    })
+                    .collect();
+                result.extend(graph.caps.iter().map(|&old| GraphAtom {
+                    atom: &atoms[old],
+                    observed: &self.observed[old],
+                    source_row: None,
+                    cap: true,
+                }));
+                (result, graph.bonds.as_slice())
+            })
+            .collect()
     }
 
     pub(crate) fn ligand_components(&self) -> Vec<String> {
         self.source.components()
     }
 
-    pub(crate) fn missing_hydrogen_dictionaries(&self, chem_data: &Path) -> Result<Vec<String>, String> {
+    pub(crate) fn missing_hydrogen_dictionaries(
+        &self,
+        chem_data: &Path,
+    ) -> Result<Vec<String>, String> {
         self.source.missing_hydrogen_dictionaries(chem_data)
     }
 
     /// Merge RDKit domain features; caps never change native H counts or charges.
-    fn merge(&self, perceived: &[Vec<u8>], columns: Columns) -> Result<(Vec<[i16; 16]>, String), Failure> {
+    fn merge(
+        &self,
+        perceived: &[Vec<u8>],
+        columns: Columns,
+    ) -> Result<(Vec<[i16; 16]>, String), Failure> {
         if perceived.len() != self.product.graphs.len() || columns.count != 16 {
             return Err("Perceived features must describe every ligand domain".into());
         }
@@ -408,9 +547,11 @@ impl View {
             audit.push_str(&total.to_string());
             audit.push('}');
         }
-        let provenance = format!("{{\"boundary\":\"perception-only-H-saturation;native-H-charge-retained;\
+        let provenance = format!(
+            "{{\"boundary\":\"perception-only-H-saturation;native-H-charge-retained;\
             boundary-hybridization-unknown\",\"domains\":[{audit}],\"policy\":\"ligand-and-direct-host-residue.v1\",\
-            \"polymer_targets\":\"native-linked-product-H-charge-and-unchanged-CCD-hybridization\"}}");
+            \"polymer_targets\":\"native-linked-product-H-charge-and-unchanged-CCD-hybridization\"}}"
+        );
         Ok((features, provenance))
     }
 
@@ -419,16 +560,25 @@ impl View {
     /// Atoms of one product residue share the first four key fields, so the targets of a
     /// residue borrow them from its first atom. `product::apply` then finds a repeated
     /// residue by address without reading the text.
-    fn targets(&self, features: &[[i16; 16]], complete: &[bool], modified: &[bool],
-        columns: Columns) -> Vec<ProductTarget<&str>> {
+    fn targets(
+        &self,
+        features: &[[i16; 16]],
+        complete: &[bool],
+        modified: &[bool],
+        columns: Columns,
+    ) -> Vec<ProductTarget<&str>> {
         let atoms = self.product.chemistry.atoms();
         let mut previous: Option<(u32, [&str; 4])> = None;
         // Reserve for every atom: a filtered iterator gives no length, and growing a list this
         // large copies it each time.
         let mut targets = Vec::with_capacity(atoms.len());
         for (index, atom) in atoms.iter().enumerate() {
-            if !atom.active || atom.source_row.is_none()
-                || atom.element == "H" || atom.element == "D" || atom.element == "T" {
+            if !atom.active
+                || atom.source_row.is_none()
+                || atom.element == "H"
+                || atom.element == "D"
+                || atom.element == "T"
+            {
                 continue;
             }
             let id = self.product.residues.of_atom[index];
@@ -438,7 +588,10 @@ impl View {
                     let prefix = [
                         atom.asym_id.as_str(),
                         atom.auth_sequence_id.as_str(),
-                        atom.insertion_code.as_deref().filter(|code| !code.is_empty()).unwrap_or("?"),
+                        atom.insertion_code
+                            .as_deref()
+                            .filter(|code| !code.is_empty())
+                            .unwrap_or("?"),
                         atom.component_id.as_str(),
                     ];
                     previous = Some((id, prefix));
@@ -446,28 +599,54 @@ impl View {
                 }
             };
             let residue = id as usize;
-            targets.push(ProductTarget::new([prefix[0], prefix[1], prefix[2], prefix[3], self.observed[index].as_str()],
-                atom.sequence_id, atom.formal_charge, i64::from(features[index][columns.hybridization]),
-                atom.hydrogen_count, complete[residue], modified[residue]));
+            targets.push(ProductTarget::new(
+                [
+                    prefix[0],
+                    prefix[1],
+                    prefix[2],
+                    prefix[3],
+                    self.observed[index].as_str(),
+                ],
+                atom.sequence_id,
+                atom.formal_charge,
+                i64::from(features[index][columns.hybridization]),
+                atom.hydrogen_count,
+                complete[residue],
+                modified[residue],
+            ));
         }
         targets
     }
 }
 
 /// Build legacy tokens, the source snapshot and typed Atom84 rows.
-pub(crate) fn finish(view: &View, perceived: &[Vec<u8>], packer: &Packer<'_>,
-    options: &Options<'_>) -> Result<Finished, Failure> {
+pub(crate) fn finish(
+    view: &View,
+    perceived: &[Vec<u8>],
+    packer: &Packer<'_>,
+    options: &Options<'_>,
+) -> Result<Finished, Failure> {
     let columns = packer.molecular.perception.columns;
     let (features, provenance) = view.merge(perceived, columns)?;
     let atoms = view.product.chemistry.atoms();
     let bonds = view.product.chemistry.bonds();
-    let (complete, modified) = product::completeness(atoms, bonds, &view.product.residues, &features, columns);
+    let (complete, modified) =
+        product::completeness(atoms, bonds, &view.product.residues, &features, columns);
     let targets = view.targets(&features, &complete, &modified, columns);
-    let mut legacy = view.source.pack(packer.schema, packer.features, packer.hydrogen_parents,
-        packer.table, packer.excluded, &PackOptions {
-            model: view.source.model, complete: options.complete, topology_policy: "observed_connectivity",
-            protein_only: false, chem_data: Some(&view.chem_data),
-        })?;
+    let mut legacy = view.source.pack(
+        packer.schema,
+        packer.features,
+        packer.hydrogen_parents,
+        packer.table,
+        packer.excluded,
+        &PackOptions {
+            model: view.source.model,
+            complete: options.complete,
+            topology_policy: "observed_connectivity",
+            protein_only: false,
+            chem_data: Some(&view.chem_data),
+        },
+    )?;
     super::product::apply(&mut legacy, packer.schema, packer.table, &targets)?;
     let uncertainties: Vec<TargetUncertainty> = match options.uncertainties {
         Some(text) => serde_json::from_str(text).map_err(|error| error.to_string())?,
@@ -476,36 +655,87 @@ pub(crate) fn finish(view: &View, perceived: &[Vec<u8>], packer: &Packer<'_>,
     super::uncertainty::apply(&mut legacy, packer.schema, &uncertainties)?;
     legacy.protein_gaps();
     legacy.validate(packer.schema, packer.table)?;
-    let mut source = snapshot::Snapshot::read(&view.source.source, atoms, bonds, &view.rows, &features,
-        &view.product.residues, &complete, columns, provenance, &packer.molecular.unknown_components);
+    let mut source = snapshot::Snapshot::read(
+        &view.source.source,
+        atoms,
+        bonds,
+        &view.rows,
+        &features,
+        &view.product.residues,
+        &complete,
+        columns,
+        provenance,
+        &packer.molecular.unknown_components,
+    );
     // Disabled SASA changes only its provenance text, which the index output omits.
     if options.sasa || !options.index {
-        source.sasa(&view.source.source, &view.document, view.source.model, options.sasa,
-            &packer.molecular.perception.protein);
+        source.sasa(
+            &view.source.source,
+            &view.document,
+            view.source.model,
+            options.sasa,
+            &packer.molecular.perception.protein,
+        );
     }
     source.mask_uncertain_hydrogens(&view.source.source, &uncertainties);
     source.mask_unknown_chemistry();
-    let mut packed = pack::pack(&legacy, &view.source.source, &source, packer.molecular, packer.table, options.index)?;
+    let mut packed = pack::pack(
+        &legacy,
+        &view.source.source,
+        &source,
+        packer.molecular,
+        packer.table,
+        options.index,
+    )?;
     let ordered = match options.expected {
         Some(text) => Some(order::indexed(&mut packed, text)?),
         None => None,
     };
-    let retained = || legacy.keys.iter().zip(&packed.legacy_token_index)
-        .filter(|(_, token)| **token >= 0).map(|(key, _)| key);
+    let retained = || {
+        legacy
+            .keys
+            .iter()
+            .zip(&packed.legacy_token_index)
+            .filter(|(_, token)| **token >= 0)
+            .map(|(key, _)| key)
+    };
     let (keys, required) = if options.keys_json {
-        (Keys::Text(ordered.unwrap_or_else(|| order::key_text(&packed.keys))),
-            Keys::Text(legacy_key_text(retained(), legacy.keys.len())))
+        (
+            Keys::Text(ordered.unwrap_or_else(|| order::key_text(&packed.keys))),
+            Keys::Text(legacy_key_text(retained(), legacy.keys.len())),
+        )
     } else {
-        (Keys::Lists(packed.keys.iter().map(|key| key.map(str::to_owned).to_vec()).collect()),
-            Keys::Lists(retained().map(|key| key.iter().map(String::from).collect()).collect()))
+        (
+            Keys::Lists(
+                packed
+                    .keys
+                    .iter()
+                    .map(|key| key.map(str::to_owned).to_vec())
+                    .collect(),
+            ),
+            Keys::Lists(
+                retained()
+                    .map(|key| key.iter().map(String::from).collect())
+                    .collect(),
+            ),
+        )
     };
     let arrays = if options.index {
         packed.index_arrays()
     } else {
         let mut arrays = packed.row_arrays();
-        arrays.extend(source.arrays(&view.source.source, &packer.molecular.exclusions, options.reference_labels));
+        arrays.extend(source.arrays(
+            &view.source.source,
+            &packer.molecular.exclusions,
+            options.reference_labels,
+        ));
         arrays.extend(packed.target_arrays(packer.molecular));
         arrays
     };
-    Ok(Finished { arrays, keys, required, stats: packed.stats })
+    Ok(Finished {
+        arrays,
+        keys,
+        required,
+        stats: packed.stats,
+    })
 }

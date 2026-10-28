@@ -3,10 +3,10 @@
 use std::borrow::Cow;
 
 use super::dictionary_source::split_tag;
-use super::document::{CifEntry, CifItem, CifLoop, CifValueRef, RowValues};
-use super::text_column::TextCell;
 #[cfg(feature = "python")]
 use super::document::TextColumn;
+use super::document::{CifEntry, CifItem, CifLoop, CifValueRef, RowValues};
+use super::text_column::TextCell;
 
 /// Whether `tag` belongs to `category`, ignoring ASCII case.
 pub(crate) fn in_category(tag: &str, category: &str) -> bool {

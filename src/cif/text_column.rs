@@ -151,7 +151,12 @@ impl<'a> SourceColumnBuilder<'a> {
     /// Start from a copy of `source`'s text, with room for `rows` rows and `entries` new
     /// entries of `text` bytes in all; `None` when the source entries do not start at 0
     /// and end at the end of its text.
-    pub(crate) fn new(source: TextColumn<'a>, rows: usize, entries: usize, text: usize) -> Option<Self> {
+    pub(crate) fn new(
+        source: TextColumn<'a>,
+        rows: usize,
+        entries: usize,
+        text: usize,
+    ) -> Option<Self> {
         let (data, offsets, indices, mask, source_rows) = source.parts();
         let end = *offsets.last()? as usize;
         if offsets.first() != Some(&0) || data.len() != end || indices.len() < source_rows {
@@ -179,7 +184,9 @@ impl<'a> SourceColumnBuilder<'a> {
     /// Append the value of source row `row`, or `?` when the source has no such row.
     #[inline]
     pub(crate) fn push_source(&mut self, row: usize) {
-        let state = self.source_mask.map_or(Some(0), |mask| mask.get(row).copied());
+        let state = self
+            .source_mask
+            .map_or(Some(0), |mask| mask.get(row).copied());
         match (state, self.source_indices.get(row)) {
             (Some(1), Some(_)) => self.push_index(0, 1),
             (Some(2), Some(_)) | (None, _) | (_, None) => self.push_index(0, 2),

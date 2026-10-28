@@ -3,7 +3,9 @@
 use std::borrow::Cow;
 use std::collections::{BTreeSet, HashMap};
 
-use crate::cif::{BlockCategory, CifBlock, CifDocument, CifLoop, CifValueRef, FastMap, TextColumn, numeric};
+use crate::cif::{
+    BlockCategory, CifBlock, CifDocument, CifLoop, CifValueRef, FastMap, TextColumn, numeric,
+};
 use crate::pdbx::{AtomSite, ShortText};
 
 pub(crate) struct Atom {
@@ -44,14 +46,29 @@ pub(crate) struct Connection {
     pub order: ShortText,
     pub symmetries: [ShortText; 2],
 }
-type Connections = (Vec<(usize, usize)>, Vec<(usize, Option<usize>)>, Vec<Connection>);
-type Occurrence<'a> = (Cow<'a, str>, i64, Cow<'a, str>, Cow<'a, str>, Cow<'a, str>, Cow<'a, str>);
+type Connections = (
+    Vec<(usize, usize)>,
+    Vec<(usize, Option<usize>)>,
+    Vec<Connection>,
+);
+type Occurrence<'a> = (
+    Cow<'a, str>,
+    i64,
+    Cow<'a, str>,
+    Cow<'a, str>,
+    Cow<'a, str>,
+    Cow<'a, str>,
+);
 type Residue<'a> = (Cow<'a, str>, i64, Cow<'a, str>, Cow<'a, str>);
 type Endpoint<'a> = (&'a str, i64, &'a str, &'a str);
 /// The atom names that connections name in each residue, each with its candidate slot.
 type Wanted<'a> = FastMap<(&'a str, i64, &'a str), Vec<(&'a str, usize)>>;
 
-fn value<'a>(table: &BlockCategory<'a>, row: usize, column: Option<usize>) -> Option<CifValueRef<'a>> {
+fn value<'a>(
+    table: &BlockCategory<'a>,
+    row: usize,
+    column: Option<usize>,
+) -> Option<CifValueRef<'a>> {
     column.and_then(|c| table.value(row, c))
 }
 
@@ -62,10 +79,14 @@ fn text_of(value: Option<CifValueRef<'_>>) -> Cow<'_, str> {
         Some(CifValueRef::Unknown) => Cow::Borrowed("?"),
         Some(CifValueRef::NotApplicable) | None => Cow::Borrowed("."),
         Some(CifValueRef::Text(text)) => Cow::Borrowed(text.as_str()),
-        Some(CifValueRef::Integer(number, original)) => original
-            .map_or_else(|| Cow::Owned(number.to_string()), |text| Cow::Borrowed(text.as_str())),
-        Some(CifValueRef::Float(number, _, original)) => original
-            .map_or_else(|| Cow::Owned(number.to_string()), |text| Cow::Borrowed(text.as_str())),
+        Some(CifValueRef::Integer(number, original)) => original.map_or_else(
+            || Cow::Owned(number.to_string()),
+            |text| Cow::Borrowed(text.as_str()),
+        ),
+        Some(CifValueRef::Float(number, _, original)) => original.map_or_else(
+            || Cow::Owned(number.to_string()),
+            |text| Cow::Borrowed(text.as_str()),
+        ),
     }
 }
 
@@ -94,7 +115,8 @@ fn normal(value: &str) -> &str {
 fn plain(text: &ShortText) -> Option<&[u8]> {
     let bytes = text.as_bytes();
     let printable = |byte: Option<&u8>| byte.is_some_and(|byte| (0x21..0x80).contains(byte));
-    (printable(bytes.first()) && printable(bytes.last()) && bytes != b"." && bytes != b"?").then_some(bytes)
+    (printable(bytes.first()) && printable(bytes.last()) && bytes != b"." && bytes != b"?")
+        .then_some(bytes)
 }
 
 /// Apply [`normal`] without copying borrowed text.
@@ -117,7 +139,9 @@ impl<'a> Reader<'a> {
     fn new(table: &BlockCategory<'a>, column: Option<usize>) -> Self {
         match column {
             None => Self::Absent,
-            Some(column) => table.text_column(column).map_or(Self::Table(column), Self::Text),
+            Some(column) => table
+                .text_column(column)
+                .map_or(Self::Table(column), Self::Text),
         }
     }
 
@@ -152,7 +176,11 @@ fn integer(table: &BlockCategory<'_>, row: usize, column: Option<usize>) -> Opti
     integer_of(value(table, row, column))
 }
 
-fn checked_number(value: Option<CifValueRef<'_>>, row: usize, name: &str) -> Result<Option<f64>, String> {
+fn checked_number(
+    value: Option<CifValueRef<'_>>,
+    row: usize,
+    name: &str,
+) -> Result<Option<f64>, String> {
     let number = number_of(value);
     let present = value
         .is_some_and(|value| !matches!(value, CifValueRef::Unknown | CifValueRef::NotApplicable));
@@ -291,16 +319,28 @@ impl<'a> Partner<'a> {
     }
 }
 
-fn connections(entries: &[crate::cif::CifEntry], atoms: &[Atom], groups: &[Vec<usize>]) -> Result<Connections, String> {
+fn connections(
+    entries: &[crate::cif::CifEntry],
+    atoms: &[Atom],
+    groups: &[Vec<usize>],
+) -> Result<Connections, String> {
     let mut pairs = BTreeSet::new();
     let mut hydrogen_pairs = BTreeSet::new();
     let mut records = Vec::new();
     let Some(table) = BlockCategory::find(entries, "struct_conn") else {
         return Ok((Vec::new(), Vec::new(), Vec::new()));
     };
-    let columns = [PartnerColumns::find(&table, 1), PartnerColumns::find(&table, 2)];
+    let columns = [
+        PartnerColumns::find(&table, 1),
+        PartnerColumns::find(&table, 2),
+    ];
     let partners: Vec<[Partner<'_>; 2]> = (0..table.row_count())
-        .map(|row| [Partner::read(&table, row, &columns[0]), Partner::read(&table, row, &columns[1])])
+        .map(|row| {
+            [
+                Partner::read(&table, row, &columns[0]),
+                Partner::read(&table, row, &columns[1]),
+            ]
+        })
         .collect();
     // Give each atom identity that some connection names a slot, and list the names
     // that each named residue needs.
@@ -312,9 +352,14 @@ fn connections(entries: &[crate::cif::CifEntry], atoms: &[Atom], groups: &[Vec<u
             pair.each_ref().map(|partner| {
                 let key = partner.key.as_ref()?;
                 let next = slots.len();
-                let slot = *slots.entry((&*key.0, key.1, &*key.2, &*key.3)).or_insert(next);
+                let slot = *slots
+                    .entry((&*key.0, key.1, &*key.2, &*key.3))
+                    .or_insert(next);
                 if slot == next {
-                    residues.entry((&*key.0, key.1, &*key.2)).or_default().push((&*key.3, slot));
+                    residues
+                        .entry((&*key.0, key.1, &*key.2))
+                        .or_default()
+                        .push((&*key.3, slot));
                 }
                 Some(slot)
             })
@@ -329,14 +374,19 @@ fn connections(entries: &[crate::cif::CifEntry], atoms: &[Atom], groups: &[Vec<u
             let Some(atom) = rows.first().map(|&first| &atoms[first]) else {
                 continue;
             };
-            let residue = (normal(&atom.chain), atom.sequence.max(-1), normal(&atom.component));
+            let residue = (
+                normal(&atom.chain),
+                atom.sequence.max(-1),
+                normal(&atom.component),
+            );
             let Some(names) = residues.get(&residue) else {
                 continue;
             };
             for &index in rows {
                 let name = &atoms[index].name;
                 let name = plain(name).unwrap_or_else(|| normal(name).as_bytes());
-                if let Some(&(_, slot)) = names.iter().find(|(wanted, _)| wanted.as_bytes() == name) {
+                if let Some(&(_, slot)) = names.iter().find(|(wanted, _)| wanted.as_bytes() == name)
+                {
                     candidates[slot].push(index);
                 }
             }
@@ -350,7 +400,9 @@ fn connections(entries: &[crate::cif::CifEntry], atoms: &[Atom], groups: &[Vec<u
     ];
     let resolve = |row: usize, partner: usize| -> Result<Option<usize>, String> {
         match partner_slots[row][partner - 1] {
-            Some(slot) => partners[row][partner - 1].resolve(row, partner, atoms, &candidates[slot]),
+            Some(slot) => {
+                partners[row][partner - 1].resolve(row, partner, atoms, &candidates[slot])
+            }
             None => Ok(None),
         }
     };
@@ -358,7 +410,9 @@ fn connections(entries: &[crate::cif::CifEntry], atoms: &[Atom], groups: &[Vec<u
         // Short text holds these values inline, so a record allocates nothing.
         let kind = text_of(value(&table, row, kind_column));
         let kind = match normal(&kind) {
-            text if text.bytes().any(|byte| byte.is_ascii_uppercase()) => ShortText::new(&text.to_ascii_lowercase()),
+            text if text.bytes().any(|byte| byte.is_ascii_uppercase()) => {
+                ShortText::new(&text.to_ascii_lowercase())
+            }
             text => ShortText::new(text),
         };
         let symmetries = symmetry_columns.map(|column| text_of(value(&table, row, column)));
@@ -447,8 +501,12 @@ impl Numbers<'_> {
 }
 
 /// Return a site's optional text, or for an unset value the `?` or `.` of its cell.
-fn site_text<'a>(text: Option<&'a ShortText>, column: Reader<'a>, table: &BlockCategory<'a>,
-    row: usize) -> Cow<'a, str> {
+fn site_text<'a>(
+    text: Option<&'a ShortText>,
+    column: Reader<'a>,
+    table: &BlockCategory<'a>,
+    row: usize,
+) -> Cow<'a, str> {
     match text {
         Some(text) => Cow::Borrowed(text.as_str()),
         None => text_of(column.get(table, row)),
@@ -472,13 +530,24 @@ fn collect_atoms<'a>(
     let mut occurrences = FastMap::<Occurrence<'a>, usize>::default();
     let mut alternatives = FastMap::<Residue<'a>, Cow<'a, str>>::default();
     let mut previous: Option<(Occurrence<'a>, usize)> = None;
-    for SiteRow { row, fields, sequence, numbers } in rows {
+    for SiteRow {
+        row,
+        fields,
+        sequence,
+        numbers,
+    } in rows
+    {
         let chain = normal_cow(&fields[2]);
         let insertion = normal_cow(&fields[6]);
         let author = normal_cow(&fields[5]);
         let alternate = normal_cow(&fields[7]);
         if !alternate.is_empty() {
-            let residue = (chain.clone(), sequence.max(-1), insertion.clone(), author.clone());
+            let residue = (
+                chain.clone(),
+                sequence.max(-1),
+                insertion.clone(),
+                author.clone(),
+            );
             match alternatives.get(&residue) {
                 Some(choice) if *choice != alternate => {
                     return Err(
@@ -515,15 +584,29 @@ fn collect_atoms<'a>(
         let protein = if types.is_empty() {
             normal(&fields[8]).eq_ignore_ascii_case("ATOM")
         } else {
-            protein_types.get(normal(&fields[4])).copied().unwrap_or(false)
+            protein_types
+                .get(normal(&fields[4]))
+                .copied()
+                .unwrap_or(false)
         };
         let position = numbers.position(row)?;
         let source_row =
             u32::try_from(row).map_err(|_| "atom_site row exceeds the source index limit")?;
         let occupied = numbers.occupancy(row)?;
         groups[group].push(atoms.len());
-        let [name, element, chain, component, entity, auth_sequence, insertion, alternate, _, auth_chain, auth_component] =
-            fields;
+        let [
+            name,
+            element,
+            chain,
+            component,
+            entity,
+            auth_sequence,
+            insertion,
+            alternate,
+            _,
+            auth_chain,
+            auth_component,
+        ] = fields;
         atoms.push(Atom {
             source_row,
             name: ShortText::new(&name),
@@ -572,11 +655,15 @@ fn distinct_names(atoms: &[Atom], rows: &[usize]) -> bool {
             return false;
         };
         short &= name.len() <= 7;
-        *key = name.iter().fold(name.len() as u64, |key, &byte| key << 8 | u64::from(byte));
+        *key = name
+            .iter()
+            .fold(name.len() as u64, |key, &byte| key << 8 | u64::from(byte));
     }
     if !short {
         return rows.iter().enumerate().all(|(index, &row)| {
-            rows[..index].iter().all(|&other| atoms[other].name != atoms[row].name)
+            rows[..index]
+                .iter()
+                .all(|&other| atoms[other].name != atoms[row].name)
         });
     }
     let keys = &mut keys[..rows.len()];
@@ -610,10 +697,18 @@ fn collect_sites<'a>(
     types: &HashMap<String, String>,
     protein_types: &FastMap<&str, bool>,
 ) -> Result<Option<CollectedAtoms>, String> {
-    let finite = |site: &AtomSite| [site.x, site.y, site.z, site.occupancy].iter().all(|n| n.is_finite());
+    let finite = |site: &AtomSite| {
+        [site.x, site.y, site.z, site.occupancy]
+            .iter()
+            .all(|n| n.is_finite())
+    };
     // An error stands only when the sites were usable; otherwise the cells decide.
     let fail = |row: usize, message: String| {
-        if sites[row..].iter().all(finite) { Err(message) } else { Ok(None) }
+        if sites[row..].iter().all(finite) {
+            Err(message)
+        } else {
+            Ok(None)
+        }
     };
     let insertion_column = Reader::new(table, table.column("pdbx_PDB_ins_code"));
     let alternate_column = Reader::new(table, table.column("label_alt_id"));
@@ -639,7 +734,8 @@ fn collect_sites<'a>(
         let sequence = site.label_seq_id.unwrap_or(-1);
         let insertion = short(site.insertion_code.as_ref(), insertion_column, row);
         let alternate = short(site.label_alt_id.as_ref(), alternate_column, row);
-        let text = |value: Option<&'a ShortText>, column: Reader<'a>| site_text(value, column, table, row);
+        let text =
+            |value: Option<&'a ShortText>, column: Reader<'a>| site_text(value, column, table, row);
         if !blank(&alternate, &spellings) {
             let alternate = normal_cow(&text(site.label_alt_id.as_ref(), alternate_column));
             let residue = (
@@ -650,7 +746,10 @@ fn collect_sites<'a>(
             );
             match alternatives.get(&residue) {
                 Some(choice) if *choice != alternate => {
-                    return fail(row, "Resolve alternate conformers before native target packing".to_owned());
+                    return fail(
+                        row,
+                        "Resolve alternate conformers before native target packing".to_owned(),
+                    );
                 }
                 Some(_) => {}
                 None => {
@@ -685,7 +784,12 @@ fn collect_sites<'a>(
                         let next = proteins.len();
                         let group = *occurrences.entry(occurrence.clone()).or_insert(next);
                         if group == next {
-                            proteins.push(protein_types.get(occurrence.3.as_ref()).copied().unwrap_or(false));
+                            proteins.push(
+                                protein_types
+                                    .get(occurrence.3.as_ref())
+                                    .copied()
+                                    .unwrap_or(false),
+                            );
                         }
                         previous = Some((occurrence, group));
                         group
@@ -700,7 +804,10 @@ fn collect_sites<'a>(
             protein
         };
         let Ok(source_row) = u32::try_from(row) else {
-            return fail(row, "atom_site row exceeds the source index limit".to_owned());
+            return fail(
+                row,
+                "atom_site row exceeds the source index limit".to_owned(),
+            );
         };
         atoms.push(Atom {
             source_row,
@@ -733,8 +840,11 @@ pub(crate) fn read(document: &CifDocument, model: i64) -> Result<Source, String>
 /// Read as [`read`] does. `sites` are the loop and atom sites that
 /// [`crate::pdbx::PdbxModel::loop_sites`] gives for `document`; when they describe the
 /// same cells, the rows are read from them instead of being decoded again.
-pub(crate) fn read_with_sites(document: &CifDocument, model: i64,
-    sites: Option<(&CifLoop, &[AtomSite])>) -> Result<Source, String> {
+pub(crate) fn read_with_sites(
+    document: &CifDocument,
+    model: i64,
+    sites: Option<(&CifLoop, &[AtomSite])>,
+) -> Result<Source, String> {
     let block = document
         .blocks()
         .iter()
@@ -751,7 +861,10 @@ pub(crate) fn read_with_sites(document: &CifDocument, model: i64,
     let protein_types: FastMap<&str, bool> = types
         .iter()
         .map(|(entity, kind)| {
-            (entity.as_str(), kind.to_ascii_lowercase().starts_with("polypeptide"))
+            (
+                entity.as_str(),
+                kind.to_ascii_lowercase().starts_with("polypeptide"),
+            )
         })
         .collect();
     let row_count = table.row_count();
@@ -764,7 +877,10 @@ pub(crate) fn read_with_sites(document: &CifDocument, model: i64,
             return None;
         };
         let fits = std::ptr::eq(*found, only)
-            && [sequence_index, model_index].into_iter().flatten().all(|column| !only.holds_floats(column));
+            && [sequence_index, model_index]
+                .into_iter()
+                .flatten()
+                .all(|column| !only.holds_floats(column));
         fits.then_some(sites)
     });
     let collected = match sites {
@@ -777,7 +893,8 @@ pub(crate) fn read_with_sites(document: &CifDocument, model: i64,
             let columns = FIELDS.map(|name| Reader::new(&table, table.column(name)));
             let model_column = Reader::new(&table, model_index);
             let sequence_column = Reader::new(&table, sequence_index);
-            let coordinates = ["Cartn_x", "Cartn_y", "Cartn_z"].map(|name| Reader::new(&table, table.column(name)));
+            let coordinates = ["Cartn_x", "Cartn_y", "Cartn_z"]
+                .map(|name| Reader::new(&table, table.column(name)));
             let occupancy_column = Reader::new(&table, table.column("occupancy"));
             let rows = (0..row_count)
                 .filter(|&row| integer_of(model_column.get(&table, row)).unwrap_or(-1) == model)
@@ -801,16 +918,34 @@ pub(crate) fn read_with_sites(document: &CifDocument, model: i64,
 /// The `_atom_site` items of a decoded site, in the order of the masks of [`Copied`].
 #[cfg(feature = "reduce3")]
 const ITEMS: [&str; 21] = [
-    "group_pdb", "id", "type_symbol", "label_atom_id", "label_alt_id", "label_comp_id", "label_asym_id",
-    "label_entity_id", "label_seq_id", "pdbx_pdb_ins_code", "cartn_x", "cartn_y", "cartn_z", "occupancy",
-    "b_iso_or_equiv", "pdbx_formal_charge", "auth_seq_id", "auth_comp_id", "auth_asym_id", "auth_atom_id",
+    "group_pdb",
+    "id",
+    "type_symbol",
+    "label_atom_id",
+    "label_alt_id",
+    "label_comp_id",
+    "label_asym_id",
+    "label_entity_id",
+    "label_seq_id",
+    "pdbx_pdb_ins_code",
+    "cartn_x",
+    "cartn_y",
+    "cartn_z",
+    "occupancy",
+    "b_iso_or_equiv",
+    "pdbx_formal_charge",
+    "auth_seq_id",
+    "auth_comp_id",
+    "auth_asym_id",
+    "auth_atom_id",
     "pdbx_pdb_model_num",
 ];
 
 /// The items, by their bits in [`ITEMS`] masks, that every row must copy from its source
 /// row: the residue fields and the model number.
 #[cfg(feature = "reduce3")]
-const RESIDUE: u32 = 1 | 1 << 5 | 1 << 6 | 1 << 7 | 1 << 8 | 1 << 9 | 1 << 16 | 1 << 17 | 1 << 18 | 1 << 20;
+const RESIDUE: u32 =
+    1 | 1 << 5 | 1 << 6 | 1 << 7 | 1 << 8 | 1 << 9 | 1 << 16 | 1 << 17 | 1 << 18 | 1 << 20;
 
 /// The items the linked product reads from a heavy site, other than its coordinates.
 #[cfg(feature = "reduce3")]
@@ -847,8 +982,14 @@ impl<'a> Copied<'a> {
     /// wrote itself must decode as the model decodes them. Outside `_atom_site` and
     /// `_atom_type`, which the model does not read, the documents must hold the same
     /// entries; and `base` must hold an atom for each site, in order.
-    pub(crate) fn new(document: &'a CifDocument, model_of: &'a crate::pdbx::PdbxModel, rows: &'a [u32],
-        made: &'a [u64], model: i64, base: &Source) -> Option<Self> {
+    pub(crate) fn new(
+        document: &'a CifDocument,
+        model_of: &'a crate::pdbx::PdbxModel,
+        rows: &'a [u32],
+        made: &'a [u64],
+        model: i64,
+        base: &Source,
+    ) -> Option<Self> {
         use crate::pdbx::fields::category_tables;
         let ([block], [original]) = (document.blocks(), model_of.source_document().blocks()) else {
             return None;
@@ -862,47 +1003,81 @@ impl<'a> Copied<'a> {
         let BlockCategory::Loop(found) = &table else {
             return None;
         };
-        let columns = [table.column("label_seq_id"), table.column("pdbx_PDB_model_num")];
-        if !std::ptr::eq(*found, only) || only.row_count() != rows.len() || rows.len() != made.len()
-            || only.tags() != own.tags() || only.holds_number_spellings()
-            || columns.into_iter().flatten().any(|column| only.holds_floats(column))
+        let columns = [
+            table.column("label_seq_id"),
+            table.column("pdbx_PDB_model_num"),
+        ];
+        if !std::ptr::eq(*found, only)
+            || only.row_count() != rows.len()
+            || rows.len() != made.len()
+            || only.tags() != own.tags()
+            || only.holds_number_spellings()
+            || columns
+                .into_iter()
+                .flatten()
+                .any(|column| only.holds_floats(column))
             || base.atoms.len() != sites.len()
-            || !base.atoms.iter().enumerate().all(|(index, atom)| atom.source_row as usize == index)
+            || !base
+                .atoms
+                .iter()
+                .enumerate()
+                .all(|(index, atom)| atom.source_row as usize == index)
             || !same_entries(block, original, only, own)
         {
             return None;
         }
         let columns = ITEMS.map(|item| {
-            only.tags().iter().position(|tag| crate::cif::split_tag(tag).is_some_and(|(category, name)| {
-                category.eq_ignore_ascii_case("atom_site") && name.eq_ignore_ascii_case(item)
-            }))
+            only.tags().iter().position(|tag| {
+                crate::cif::split_tag(tag).is_some_and(|(category, name)| {
+                    category.eq_ignore_ascii_case("atom_site") && name.eq_ignore_ascii_case(item)
+                })
+            })
         });
         let bits = columns.map(|column| {
-            column.and_then(|column| u32::try_from(column).ok()).filter(|bit| *bit < u64::BITS)
+            column
+                .and_then(|column| u32::try_from(column).ok())
+                .filter(|bit| *bit < u64::BITS)
         });
-        let held_by = |made: u64| bits.iter().rev().fold(0, |held, bit| {
-            held << 1 | u32::from(bit.is_some_and(|bit| made >> bit & 1 == 0))
-        });
-        let tables = category_tables(crate::cif::CategoryView::new(block.entries()), "atom_site", ITEMS);
+        let held_by = |made: u64| {
+            bits.iter().rev().fold(0, |held, bit| {
+                held << 1 | u32::from(bit.is_some_and(|bit| made >> bit & 1 == 0))
+            })
+        };
+        let tables = category_tables(
+            crate::cif::CategoryView::new(block.entries()),
+            "atom_site",
+            ITEMS,
+        );
         let [values] = tables.as_slice() else {
             return None;
         };
         if values.rows() != rows.len() {
             return None;
         }
-        let (mut element, mut name, mut alternate) = (values.column(2), values.column(3), values.column(4));
+        let (mut element, mut name, mut alternate) =
+            (values.column(2), values.column(3), values.column(4));
         let mut numbers = [10, 11, 12, 13].map(|field| values.column(field));
         let (mut b_iso, mut charge) = (values.column(14), values.column(15));
-        let [id, auth_name, alternate_column] = [1, 19, 4].map(|item| Reader::new(&table, columns[item]));
+        let [id, auth_name, alternate_column] =
+            [1, 19, 4].map(|item| Reader::new(&table, columns[item]));
         // A required text item decodes unless its value is absent, `?` or `.`.
         let present = |column: Reader<'a>, row: usize| {
-            !matches!(column.get(&table, row), None | Some(CifValueRef::Unknown | CifValueRef::NotApplicable))
+            !matches!(
+                column.get(&table, row),
+                None | Some(CifValueRef::Unknown | CifValueRef::NotApplicable)
+            )
         };
         let category = "atom_site";
         let mut atoms = Vec::with_capacity(rows.len());
         let mut occupancy = Vec::with_capacity(rows.len());
-        let mut copies = Self { sites, rows, numbers: Vec::new(), names: Vec::with_capacity(rows.len()),
-            heavy: Vec::new(), source: Source::default() };
+        let mut copies = Self {
+            sites,
+            rows,
+            numbers: Vec::new(),
+            names: Vec::with_capacity(rows.len()),
+            heavy: Vec::new(),
+            source: Source::default(),
+        };
         let mut copied = vec![false; sites.len()];
         // The group of each group of `base`, numbered as the rows first name them.
         let mut groups = vec![usize::MAX; base.groups.len()];
@@ -925,15 +1100,26 @@ impl<'a> Copied<'a> {
             if wrote(1) && !present(id, row) || wrote(19) && !present(auth_name, row) {
                 return None;
             }
-            if wrote(14) { b_iso.optional_float(row, row, category, "b_iso_or_equiv").ok()?; }
-            if wrote(15) { charge.optional_charge(row, row, category, "pdbx_formal_charge").ok()?; }
+            if wrote(14) {
+                b_iso
+                    .optional_float(row, row, category, "b_iso_or_equiv")
+                    .ok()?;
+            }
+            if wrote(15) {
+                charge
+                    .optional_charge(row, row, category, "pdbx_formal_charge")
+                    .ok()?;
+            }
             let element = if wrote(2) {
-                element.required_short(row, row, category, "type_symbol").ok()?
+                element
+                    .required_short(row, row, category, "type_symbol")
+                    .ok()?
             } else {
                 site.element.clone()
             };
             let name = if wrote(3) {
-                name.required_short(row, row, category, "label_atom_id").ok()?
+                name.required_short(row, row, category, "label_atom_id")
+                    .ok()?
             } else {
                 site.label_atom_id.clone()
             };
@@ -953,7 +1139,9 @@ impl<'a> Copied<'a> {
             if held & NUMBERS != NUMBERS {
                 for ((item, column), value) in (10..).zip(&mut numbers).zip(&mut decoded) {
                     if wrote(item) {
-                        *value = column.required_float(row, row, category, "coordinate").ok()?;
+                        *value = column
+                            .required_float(row, row, category, "coordinate")
+                            .ok()?;
                     }
                 }
                 copies.numbers.push((u32::try_from(row).ok()?, decoded));
@@ -1000,7 +1188,15 @@ impl<'a> Copied<'a> {
             return None;
         }
         let groups = group_rows(&atoms, count);
-        copies.source = finish(block, model, atoms, &occupancy, groups, entity_types(block.entries())).ok()?;
+        copies.source = finish(
+            block,
+            model,
+            atoms,
+            &occupancy,
+            groups,
+            entity_types(block.entries()),
+        )
+        .ok()?;
         Some(copies)
     }
 
@@ -1017,7 +1213,10 @@ impl<'a> Copied<'a> {
 
     /// The coordinates of row `row`, as the model of the document decodes them.
     pub(crate) fn position(&self, row: usize) -> [f64; 3] {
-        let [x, y, z, _] = match self.numbers.binary_search_by_key(&row, |&(written, _)| written as usize) {
+        let [x, y, z, _] = match self
+            .numbers
+            .binary_search_by_key(&row, |&(written, _)| written as usize)
+        {
             Ok(index) => self.numbers[index].1,
             Err(_) => {
                 let site = self.identity(row);
@@ -1029,7 +1228,11 @@ impl<'a> Copied<'a> {
 
     /// Whether row `row` copies the atom name of site `site`, and so holds the same text.
     pub(crate) fn copies_name(&self, row: usize, site: usize) -> bool {
-        self.names.get(row) == Some(&true) && self.rows.get(row).is_some_and(|&copied| copied as usize == site)
+        self.names.get(row) == Some(&true)
+            && self
+                .rows
+                .get(row)
+                .is_some_and(|&copied| copied as usize == site)
     }
 }
 
@@ -1040,19 +1243,36 @@ fn same_entries(block: &CifBlock, other: &CifBlock, loop_: &CifLoop, other_loop:
     use crate::cif::{CifEntry, in_category};
     fn kept(entry: &CifEntry, skipped: &CifLoop) -> bool {
         match entry {
-            CifEntry::Loop(values) => !std::ptr::eq(values, skipped)
-                && !values.tags().first().is_some_and(|tag| in_category(tag, "atom_type")),
+            CifEntry::Loop(values) => {
+                !std::ptr::eq(values, skipped)
+                    && !values
+                        .tags()
+                        .first()
+                        .is_some_and(|tag| in_category(tag, "atom_type"))
+            }
             CifEntry::Item(item) => !in_category(item.tag(), "atom_type"),
             CifEntry::Frame(_) => true,
         }
     }
-    block.entries().iter().filter(|entry| kept(entry, loop_))
-        .eq(other.entries().iter().filter(|entry| kept(entry, other_loop)))
+    block
+        .entries()
+        .iter()
+        .filter(|entry| kept(entry, loop_))
+        .eq(other
+            .entries()
+            .iter()
+            .filter(|entry| kept(entry, other_loop)))
 }
 
 /// Keep one atom per name in each residue, then read the connections and entity lengths.
-fn finish(block: &CifBlock, model: i64, atoms: Vec<Atom>, occupancy: &[f32], mut groups: Vec<Vec<usize>>,
-    types: HashMap<String, String>) -> Result<Source, String> {
+fn finish(
+    block: &CifBlock,
+    model: i64,
+    atoms: Vec<Atom>,
+    occupancy: &[f32],
+    mut groups: Vec<Vec<usize>>,
+    types: HashMap<String, String>,
+) -> Result<Source, String> {
     if atoms.is_empty() {
         return Err(format!("model_id {model} is not present in the source"));
     }

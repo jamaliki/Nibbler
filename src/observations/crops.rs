@@ -95,7 +95,9 @@ impl View {
             || !chains.len().is_multiple_of(8)
             || usable.len() != count
             || ligand.iter().chain(usable).any(|&value| value > 1)
-            || center_eligible.is_some_and(|values| values.len() != count || values.iter().any(|&value| value > 1))
+            || center_eligible.is_some_and(|values| {
+                values.len() != count || values.iter().any(|&value| value > 1)
+            })
         {
             return Err("Invalid spatial-crop input shapes, masks or size".into());
         }
@@ -121,9 +123,15 @@ impl View {
             chains,
             ligand,
             usable: usable.iter().map(|&value| value != 0).collect(),
-            center_eligible: center_eligible.map_or_else(|| vec![true; count], |values| values.iter().map(|&value| value != 0).collect()),
+            center_eligible: center_eligible.map_or_else(
+                || vec![true; count],
+                |values| values.iter().map(|&value| value != 0).collect(),
+            ),
             chain_sizes,
-            chain_minimum: chain_ligand.iter().map(|&ligand| if ligand { 1 } else { 50 }).collect(),
+            chain_minimum: chain_ligand
+                .iter()
+                .map(|&ligand| if ligand { 1 } else { 50 })
+                .collect(),
             chain_protein: chain_ligand.iter().map(|&ligand| !ligand).collect(),
             chain_ligand,
             size,
@@ -658,7 +666,10 @@ impl<'a> Sweep<'a> {
         let span = |budget: f64| ((budget.max(0.).sqrt() + 1e-3) / cells.cell) as usize + 1;
         let budget = reach * reach;
         let range = |axis: usize, steps: usize| {
-            (low[axis].saturating_sub(steps), (high[axis] + steps).min(cells.dims[axis] - 1))
+            (
+                low[axis].saturating_sub(steps),
+                (high[axis] + steps).min(cells.dims[axis] - 1),
+            )
         };
         let (x0, x1) = range(0, span(budget));
         let (y0, y1) = range(1, span(budget));
@@ -695,7 +706,8 @@ impl<'a> Sweep<'a> {
             total += last - first;
             protein += after[0] - before[0];
             ligands += after[1] - before[1];
-            self.single_ranges.push((before[2] as usize, after[2] as usize));
+            self.single_ranges
+                .push((before[2] as usize, after[2] as usize));
         }
         self.cover = if total == cells.points.len() {
             Some(u32::MAX)
@@ -731,7 +743,9 @@ impl<'a> Sweep<'a> {
         // Along one axis, a token in cell `at` lies at most this far from any point in the
         // block, with the binning allowance.
         let far = |axis: usize, at: usize| {
-            (at + 1).saturating_sub(low[axis]).max((high[axis] + 1).saturating_sub(at)) as f64
+            (at + 1)
+                .saturating_sub(low[axis])
+                .max((high[axis] + 1).saturating_sub(at)) as f64
                 * cells.cell
                 + 1e-3
         };
@@ -741,7 +755,10 @@ impl<'a> Sweep<'a> {
             let width = (high[axis] + 1 - low[axis]) as f64;
             (steps >= width).then(|| {
                 let steps = steps as usize;
-                ((high[axis] + 1).saturating_sub(steps), (low[axis] + steps - 1).min(cells.dims[axis] - 1))
+                (
+                    (high[axis] + 1).saturating_sub(steps),
+                    (low[axis] + steps - 1).min(cells.dims[axis] - 1),
+                )
             })
         };
         let mut count = 0;
@@ -931,7 +948,11 @@ impl<'a> Sweep<'a> {
         // A block's gathered ligand tokens bound the ligand tokens and chains of its crops, so
         // few enough of them prove that no crop is over a limit. Uncapped plans measure every
         // ligand centre to report its counts.
-        let ligand_bound = if view.capped() { view.token_limit.min(view.chain_limit) } else { 0 };
+        let ligand_bound = if view.capped() {
+            view.token_limit.min(view.chain_limit)
+        } else {
+            0
+        };
         let mut outcomes = vec![rejected; count];
         let mut store = Vec::new();
         let blocks: [usize; 3] =
@@ -939,9 +960,17 @@ impl<'a> Sweep<'a> {
         // Visit blocks in a serpentine order so that consecutive blocks touch.
         let rank = |home: [usize; 3]| -> usize {
             let block: [usize; 3] = std::array::from_fn(|axis| home[axis] / BLOCK_CELLS);
-            let y = if block[0].is_multiple_of(2) { block[1] } else { blocks[1] - 1 - block[1] };
+            let y = if block[0].is_multiple_of(2) {
+                block[1]
+            } else {
+                blocks[1] - 1 - block[1]
+            };
             let row = block[0] * blocks[1] + y;
-            let z = if row.is_multiple_of(2) { block[2] } else { blocks[2] - 1 - block[2] };
+            let z = if row.is_multiple_of(2) {
+                block[2]
+            } else {
+                blocks[2] - 1 - block[2]
+            };
             row * blocks[2] + z
         };
         let mut centres: Vec<(usize, [u32; 3], usize)> = (0..count)
@@ -960,7 +989,8 @@ impl<'a> Sweep<'a> {
             let block = centres[start].0;
             let end = start + centres[start..].partition_point(|centre| centre.0 == block);
             let home = self.cells.home(view.positions[centres[start].2]);
-            let low: [usize; 3] = std::array::from_fn(|axis| home[axis] / BLOCK_CELLS * BLOCK_CELLS);
+            let low: [usize; 3] =
+                std::array::from_fn(|axis| home[axis] / BLOCK_CELLS * BLOCK_CELLS);
             let high: [usize; 3] = std::array::from_fn(|axis| {
                 (low[axis] + BLOCK_CELLS - 1).min(self.cells.dims[axis] - 1)
             });
@@ -978,7 +1008,13 @@ impl<'a> Sweep<'a> {
                 }
                 reach *= 1.5;
             }
-            let skipped = |center: usize| if view.ligand[center] { skip_ligand } else { skip };
+            let skipped = |center: usize| {
+                if view.ligand[center] {
+                    skip_ligand
+                } else {
+                    skip
+                }
+            };
             if (start..end).all(|row| skipped(centres[row].2)) {
                 start = end;
                 continue;
@@ -1061,7 +1097,17 @@ pub(crate) fn plan(
     size: usize,
     center_eligible: Option<&[u8]>,
 ) -> Result<CropPlans, String> {
-    plan_with_chain_policy(positions, chains, ligand, usable, size, center_eligible, None, None, Some(LIGAND_LIMITS))
+    plan_with_chain_policy(
+        positions,
+        chains,
+        ligand,
+        usable,
+        size,
+        center_eligible,
+        None,
+        None,
+        Some(LIGAND_LIMITS),
+    )
 }
 
 /// Plan every crop under the ligand limits, or under none with `ligand_limits` None.
@@ -1071,8 +1117,14 @@ pub(crate) fn plan(
 /// those limits' plans, and those counts give their retry weight.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn plan_with_chain_policy(
-    positions: &[u8], chains: &[u8], ligand: &[u8], usable: &[u8], size: usize,
-    center_eligible: Option<&[u8]>, chain_minimum: Option<&[u8]>, chain_protein: Option<&[u8]>,
+    positions: &[u8],
+    chains: &[u8],
+    ligand: &[u8],
+    usable: &[u8],
+    size: usize,
+    center_eligible: Option<&[u8]>,
+    chain_minimum: Option<&[u8]>,
+    chain_protein: Option<&[u8]>,
     ligand_limits: Option<(u32, u32)>,
 ) -> Result<CropPlans, String> {
     let mut view = View::read(positions, chains, ligand, usable, size, center_eligible)?;
@@ -1082,24 +1134,42 @@ pub(crate) fn plan_with_chain_policy(
         None => (u32::MAX, u32::MAX),
     };
     if let (Some(minimum), Some(protein)) = (chain_minimum, chain_protein) {
-        if minimum.len() != view.chain_sizes.len() * 8 || protein.len() != view.chain_sizes.len()
-            || protein.iter().any(|&value| value > 1) {
+        if minimum.len() != view.chain_sizes.len() * 8
+            || protein.len() != view.chain_sizes.len()
+            || protein.iter().any(|&value| value > 1)
+        {
             return Err("Crop chain policy must cover every chain ID".into());
         }
-        view.chain_minimum = minimum.chunks_exact(8).map(|row|
-            usize::try_from(i64::from_ne_bytes(std::array::from_fn(|i| row[i])))
-                .map_err(|_| "Crop chain minimum must be positive"))
+        view.chain_minimum = minimum
+            .chunks_exact(8)
+            .map(|row| {
+                usize::try_from(i64::from_ne_bytes(std::array::from_fn(|i| row[i])))
+                    .map_err(|_| "Crop chain minimum must be positive")
+            })
             .collect::<Result<Vec<_>, _>>()?;
         view.chain_protein = protein.iter().map(|&value| value != 0).collect();
-        if view.chain_minimum.iter().enumerate().any(|(chain, &count)| count == 0
-            || view.chain_protein[chain] && (count < 50 || view.chain_ligand[chain])) {
-            return Err("Protein crop chains require at least 50 residues and cannot be ligands".into());
+        if view
+            .chain_minimum
+            .iter()
+            .enumerate()
+            .any(|(chain, &count)| {
+                count == 0 || view.chain_protein[chain] && (count < 50 || view.chain_ligand[chain])
+            })
+        {
+            return Err(
+                "Protein crop chains require at least 50 residues and cannot be ligands".into(),
+            );
         }
     } else if chain_minimum.is_some() || chain_protein.is_some() {
         return Err("Crop chain minima and protein flags must be supplied together".into());
     }
     let total = view.center_eligible.iter().filter(|&&value| value).count();
-    let ligand_count = view.ligand.iter().zip(&view.center_eligible).filter(|&(ligand, eligible)| *ligand && *eligible).count();
+    let ligand_count = view
+        .ligand
+        .iter()
+        .zip(&view.center_eligible)
+        .filter(|&(ligand, eligible)| *ligand && *eligible)
+        .count();
     let mut result = CropPlans::empty(view.chain_sizes.len().div_ceil(64).max(1));
     let mut retry = 0;
     // A view of ligands alone keeps no protein chain; uncapped plans still report its counts.
@@ -1145,7 +1215,9 @@ pub(crate) fn plan_with_chain_policy(
     repeats.retain(|_, count| *count > 1);
     let mut shared: HashMap<[u32; 3], Crop> = HashMap::new();
     for center in 0..view.positions.len() {
-        if !view.center_eligible[center] { continue; }
+        if !view.center_eligible[center] {
+            continue;
+        }
         let key = site_key(view.positions[center]);
         let ((bits, over, ligands), boundary) = if let Some(crop) = shared.get(&key) {
             crop.clone()
@@ -1176,7 +1248,13 @@ pub(crate) fn plan_with_chain_policy(
 }
 
 /// Weight the accepted centres and normalise the weights.
-fn finish(mut result: CropPlans, view: &View, retry: usize, total: usize, ligand_count: usize) -> CropPlans {
+fn finish(
+    mut result: CropPlans,
+    view: &View,
+    retry: usize,
+    total: usize,
+    ligand_count: usize,
+) -> CropPlans {
     let base = if ligand_count > 0 {
         (0.01 + 0.99 * retry as f64 / ligand_count as f64) / total as f64
     } else {

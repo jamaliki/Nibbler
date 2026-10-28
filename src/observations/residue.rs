@@ -35,7 +35,9 @@ pub(super) fn hydrogen(element: &ShortText) -> bool {
 
 /// Whether the element is H, D or T in either case.
 fn protein_hydrogen(element: &ShortText) -> bool {
-    ["H", "D", "T", "h", "d", "t"].iter().any(|value| element == value)
+    ["H", "D", "T", "h", "d", "t"]
+        .iter()
+        .any(|value| element == value)
 }
 
 pub(super) fn finite(xyz: [f32; 3]) -> bool {
@@ -68,7 +70,12 @@ pub(super) fn nearest(position: [f32; 3], heavy: &[(usize, [f32; 3])]) -> Option
     (first.1 > 0.5 && first.1 < 1.6 && second - first.1 >= 0.2).then_some(first.0)
 }
 
-fn protein_parent(schema: &Residue, names: &[ShortText], atom: &Atom, heavy: &[(usize, [f32; 3])]) -> Option<usize> {
+fn protein_parent(
+    schema: &Residue,
+    names: &[ShortText],
+    atom: &Atom,
+    heavy: &[(usize, [f32; 3])],
+) -> Option<usize> {
     let named_parent = |name: &ShortText| {
         names
             .iter()
@@ -83,11 +90,11 @@ fn protein_parent(schema: &Residue, names: &[ShortText], atom: &Atom, heavy: &[(
         })
         .or_else(|| {
             if atom.element.eq_ignore_ascii_case("D") || atom.element.eq_ignore_ascii_case("T") {
-                named_parent(&ShortText::new(
-                    &atom
-                        .name
-                        .replacen(&atom.element.to_ascii_uppercase(), "H", 1),
-                ))
+                named_parent(&ShortText::new(&atom.name.replacen(
+                    &atom.element.to_ascii_uppercase(),
+                    "H",
+                    1,
+                )))
             } else {
                 None
             }
@@ -150,10 +157,18 @@ pub(super) fn pack(
         }
         children.push((parent, atom));
     }
-    children.sort_by(|first, second| first.0.cmp(&second.0).then_with(|| first.1.name.cmp(&second.1.name)));
+    children.sort_by(|first, second| {
+        first
+            .0
+            .cmp(&second.0)
+            .then_with(|| first.1.name.cmp(&second.1.name))
+    });
     for group in children.chunk_by(|first, second| first.0 == second.0) {
         let parent = group[0].0 as i64;
-        let mut slots = schema.parents.iter().enumerate()
+        let mut slots = schema
+            .parents
+            .iter()
+            .enumerate()
             .filter_map(|(slot, &value)| (value == parent).then_some(slot));
         if group.len() > slots.clone().count() {
             invalid = true;
@@ -180,15 +195,11 @@ pub(super) fn pack(
             }
         }
     }
-    let mut matches = schema
-        .states
-        .iter()
-        .enumerate()
-        .filter(|(_, state)| {
-            linked.is_none_or(|value| state.linked == value)
-                && state.present.iter().zip(result.mask).all(|(&a, b)| a == b)
-                && (!constrain_termini || state.topology()[..2] == topology[..2])
-        });
+    let mut matches = schema.states.iter().enumerate().filter(|(_, state)| {
+        linked.is_none_or(|value| state.linked == value)
+            && state.present.iter().zip(result.mask).all(|(&a, b)| a == b)
+            && (!constrain_termini || state.topology()[..2] == topology[..2])
+    });
     if let (Some((index, state)), None) = (matches.next(), matches.next()) {
         result.state = index as i64;
         result.state_known = true;

@@ -10,12 +10,16 @@ fn site(source: &Source, group: usize, name: &str) -> Option<[f32; 3]> {
         let atom = &source.atoms[row];
         ((atom.name == name || name == "O3'" && atom.name == "O3*")
             && residue::finite(atom.position))
-            .then_some(atom.position)
+        .then_some(atom.position)
     })
 }
 
 pub(super) fn distant(source: &Source, left: usize, right: usize, protein: bool) -> bool {
-    let (a, b, limit) = if protein { ("CA", "CA", 4.) } else { ("O3'", "P", 2.4) };
+    let (a, b, limit) = if protein {
+        ("CA", "CA", 4.)
+    } else {
+        ("O3'", "P", 2.4)
+    };
     match (site(source, left, a), site(source, right, b)) {
         (Some(a), Some(b)) => residue::distance(a, b) > limit,
         // Missing nucleotide link atoms cannot establish backbone continuity.
@@ -27,10 +31,16 @@ pub(super) fn apply(source: &Source, mapping: &[usize], tokens: &mut Tokens) {
     let mut chains = BTreeMap::<_, BTreeMap<_, usize>>::new();
     for (group, rows) in source.groups.iter().enumerate() {
         let atom = &source.atoms[rows[0]];
-        let kind = source.entity_types.get(atom.entity.as_str()).map(|s| s.to_ascii_lowercase());
+        let kind = source
+            .entity_types
+            .get(atom.entity.as_str())
+            .map(|s| s.to_ascii_lowercase());
         let nucleic = kind.is_some_and(|s| s.contains("ribonucleotide"));
         if atom.sequence > 0 && !atom.protein && nucleic {
-            chains.entry((&atom.chain, &atom.entity)).or_default().insert(atom.sequence, group);
+            chains
+                .entry((&atom.chain, &atom.entity))
+                .or_default()
+                .insert(atom.sequence, group);
         }
     }
     for groups in chains.values() {
@@ -44,7 +54,9 @@ pub(super) fn apply(source: &Source, mapping: &[usize], tokens: &mut Tokens) {
             }
             for &row in &source.groups[group] {
                 let token = mapping[row];
-                if token == usize::MAX { continue; }
+                if token == usize::MAX {
+                    continue;
+                }
                 tokens.polymer_segments[token] = segment;
             }
             previous = Some((number, group));
@@ -66,9 +78,11 @@ pub(super) fn retained_proteins(tokens: &mut Tokens) {
         for &row in rows.iter() {
             let number = tokens.sequence[row];
             let position = tokens.positions[row * 96 + 3..][..3]
-                .try_into().unwrap_or([f32::NAN; 3]);
+                .try_into()
+                .unwrap_or([f32::NAN; 3]);
             if let Some((before, site)) = previous
-                && number == before + 1 && residue::distance(site, position) > 4.
+                && number == before + 1
+                && residue::distance(site, position) > 4.
             {
                 offset += (INDEX_SEPARATION - (number - before)).max(0);
             }

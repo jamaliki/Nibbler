@@ -62,20 +62,50 @@ fn sparse_chain_ids_survive_complete_residue_filtering() {
 
 #[test]
 fn masked_centers_stay_in_the_neighbor_budget_and_cohort() {
-    let positions: Vec<u8> = (0..53).flat_map(|_| [0_f32; 3]).flat_map(f32::to_ne_bytes).collect();
-    let chains: Vec<u8> = (0..53).map(|row| if row < 50 { 0_i64 } else { 1 }).flat_map(i64::to_ne_bytes).collect();
+    let positions: Vec<u8> = (0..53)
+        .flat_map(|_| [0_f32; 3])
+        .flat_map(f32::to_ne_bytes)
+        .collect();
+    let chains: Vec<u8> = (0..53)
+        .map(|row| if row < 50 { 0_i64 } else { 1 })
+        .flat_map(i64::to_ne_bytes)
+        .collect();
     let ligand: Vec<_> = (0..53).map(|row| u8::from(row >= 50)).collect();
     let mut eligible = vec![1; 53];
     eligible[52] = 0;
-    let result = plan(&positions, &chains, &ligand, &vec![1; 53], 53, Some(&eligible)).unwrap();
+    let result = plan(
+        &positions,
+        &chains,
+        &ligand,
+        &vec![1; 53],
+        53,
+        Some(&eligible),
+    )
+    .unwrap();
     assert_eq!(result.centers, (0..52).collect::<Vec<_>>());
     assert_eq!(result.bits, vec![3; 52]);
     assert!((result.mass - 1.).abs() < 1e-14);
     assert!((result.probabilities[50] - (0.01 / 52. + 0.99 / 2.)).abs() < 1e-14);
-    let limited = plan(&positions, &chains, &ligand, &vec![1; 53], 52, Some(&eligible)).unwrap();
+    let limited = plan(
+        &positions,
+        &chains,
+        &ligand,
+        &vec![1; 53],
+        52,
+        Some(&eligible),
+    )
+    .unwrap();
     assert_eq!(limited.bits, vec![1; 52]);
     assert_eq!(limited.ties, vec![51; 52]);
-    let none = plan(&positions, &chains, &ligand, &vec![1; 53], 53, Some(&vec![0; 53])).unwrap();
+    let none = plan(
+        &positions,
+        &chains,
+        &ligand,
+        &vec![1; 53],
+        53,
+        Some(&vec![0; 53]),
+    )
+    .unwrap();
     assert_eq!(none.mass, 0.);
     assert!(none.centers.is_empty());
 }
@@ -233,7 +263,9 @@ fn capped_from(uncapped: &CropPlans, view: &View, (tokens, chains): (u32, u32)) 
             result.centers.push(uncapped.centers[plan]);
             result.radii.push(uncapped.radii[plan]);
             result.ties.push(uncapped.ties[plan]);
-            result.bits.extend_from_slice(&uncapped.bits[plan * words..(plan + 1) * words]);
+            result
+                .bits
+                .extend_from_slice(&uncapped.bits[plan * words..(plan + 1) * words]);
             result.ligand_tokens.push(count);
             result.ligand_chains.push(kept);
         }
@@ -243,32 +275,88 @@ fn capped_from(uncapped: &CropPlans, view: &View, (tokens, chains): (u32, u32)) 
 
 /// Assert that two plans agree bit for bit.
 fn assert_same(actual: &CropPlans, expected: &CropPlans, label: &str) {
-    let floats = |values: &[f32]| values.iter().map(|value| value.to_bits()).collect::<Vec<_>>();
-    let doubles = |values: &[f64]| values.iter().map(|value| value.to_bits()).collect::<Vec<_>>();
+    let floats = |values: &[f32]| {
+        values
+            .iter()
+            .map(|value| value.to_bits())
+            .collect::<Vec<_>>()
+    };
+    let doubles = |values: &[f64]| {
+        values
+            .iter()
+            .map(|value| value.to_bits())
+            .collect::<Vec<_>>()
+    };
     assert_eq!(actual.centers, expected.centers, "centres {label}");
-    assert_eq!(floats(&actual.radii), floats(&expected.radii), "radii {label}");
+    assert_eq!(
+        floats(&actual.radii),
+        floats(&expected.radii),
+        "radii {label}"
+    );
     assert_eq!(actual.ties, expected.ties, "ties {label}");
     assert_eq!(actual.bits, expected.bits, "chain bits {label}");
-    assert_eq!(actual.ligand_tokens, expected.ligand_tokens, "ligand tokens {label}");
-    assert_eq!(actual.ligand_chains, expected.ligand_chains, "ligand chains {label}");
-    assert_eq!(actual.centre_ligand_tokens, expected.centre_ligand_tokens, "centre tokens {label}");
-    assert_eq!(actual.centre_ligand_chains, expected.centre_ligand_chains, "centre chains {label}");
-    assert_eq!(doubles(&actual.probabilities), doubles(&expected.probabilities), "weights {label}");
-    assert_eq!(actual.mass.to_bits(), expected.mass.to_bits(), "mass {label}");
+    assert_eq!(
+        actual.ligand_tokens, expected.ligand_tokens,
+        "ligand tokens {label}"
+    );
+    assert_eq!(
+        actual.ligand_chains, expected.ligand_chains,
+        "ligand chains {label}"
+    );
+    assert_eq!(
+        actual.centre_ligand_tokens, expected.centre_ligand_tokens,
+        "centre tokens {label}"
+    );
+    assert_eq!(
+        actual.centre_ligand_chains, expected.centre_ligand_chains,
+        "centre chains {label}"
+    );
+    assert_eq!(
+        doubles(&actual.probabilities),
+        doubles(&expected.probabilities),
+        "weights {label}"
+    );
+    assert_eq!(
+        actual.mass.to_bits(),
+        expected.mass.to_bits(),
+        "mass {label}"
+    );
 }
 
 /// Check the sweep plans of `layout` against `reference_plan`, bit for bit, and return the
 /// accepted and over-limit centre counts.
 fn check_sweep(layout: &Layout, size: usize) -> (usize, usize) {
-    let positions: Vec<u8> = layout.positions.iter().flatten().flat_map(|value| value.to_ne_bytes()).collect();
-    let chains: Vec<u8> = layout.chains.iter().flat_map(|value| value.to_ne_bytes()).collect();
+    let positions: Vec<u8> = layout
+        .positions
+        .iter()
+        .flatten()
+        .flat_map(|value| value.to_ne_bytes())
+        .collect();
+    let chains: Vec<u8> = layout
+        .chains
+        .iter()
+        .flat_map(|value| value.to_ne_bytes())
+        .collect();
     let eligible = layout.eligible.as_deref();
-    let minimum: Option<Vec<u8>> = layout
+    let minimum: Option<Vec<u8>> = layout.policy.as_ref().map(|(minimum, _)| {
+        minimum
+            .iter()
+            .flat_map(|value| value.to_ne_bytes())
+            .collect()
+    });
+    let protein = layout
         .policy
         .as_ref()
-        .map(|(minimum, _)| minimum.iter().flat_map(|value| value.to_ne_bytes()).collect());
-    let protein = layout.policy.as_ref().map(|(_, protein)| protein.as_slice());
-    let mut view = View::read(&positions, &chains, &layout.ligand, &layout.usable, size, eligible).unwrap();
+        .map(|(_, protein)| protein.as_slice());
+    let mut view = View::read(
+        &positions,
+        &chains,
+        &layout.ligand,
+        &layout.usable,
+        size,
+        eligible,
+    )
+    .unwrap();
     if let Some((minimum, protein)) = &layout.policy {
         view.chain_minimum = minimum.iter().map(|&value| value as usize).collect();
         view.chain_protein = protein.iter().map(|&value| value != 0).collect();
@@ -279,18 +367,36 @@ fn check_sweep(layout: &Layout, size: usize) -> (usize, usize) {
     let mut results = Vec::new();
     for limits in [Some(LIGAND_LIMITS), None, Some((20, 3))] {
         let result = plan_with_chain_policy(
-            &positions, &chains, &layout.ligand, &layout.usable, size, eligible, minimum.as_deref(),
-            protein, limits,
+            &positions,
+            &chains,
+            &layout.ligand,
+            &layout.usable,
+            size,
+            eligible,
+            minimum.as_deref(),
+            protein,
+            limits,
         )
         .unwrap();
         (view.token_limit, view.chain_limit) = limits.unwrap_or((u32::MAX, u32::MAX));
         let (expected, over) = reference_plan(&view);
-        assert_same(&result, &expected, &format!("at size {size} under {limits:?}"));
+        assert_same(
+            &result,
+            &expected,
+            &format!("at size {size} under {limits:?}"),
+        );
         results.push((result, over));
     }
-    for (limits, (capped, _)) in [LIGAND_LIMITS, (20, 3)].into_iter().zip([&results[0], &results[2]]) {
+    for (limits, (capped, _)) in [LIGAND_LIMITS, (20, 3)]
+        .into_iter()
+        .zip([&results[0], &results[2]])
+    {
         let derived = capped_from(&results[1].0, &view, limits);
-        assert_same(&derived, capped, &format!("derived at size {size} under {limits:?}"));
+        assert_same(
+            &derived,
+            capped,
+            &format!("derived at size {size} under {limits:?}"),
+        );
     }
     let (capped, over) = &results[0];
     (capped.centers.len(), *over)
@@ -316,24 +422,43 @@ fn uncapped_full_scan_plans_reproduce_capped_plans() {
     for trial in 0..60 {
         let count = 300 + trial * 17;
         let chain_ids: Vec<i64> = (0..count)
-            .map(|index| if index < 200 { (index / 100) as i64 } else { 2 + ((index - 200) / (1 + trial % 9)) as i64 })
+            .map(|index| {
+                if index < 200 {
+                    (index / 100) as i64
+                } else {
+                    2 + ((index - 200) / (1 + trial % 9)) as i64
+                }
+            })
             .collect();
-        let ligand: Vec<u8> = chain_ids.iter().map(|&chain| u8::from(chain >= 2)).collect();
+        let ligand: Vec<u8> = chain_ids
+            .iter()
+            .map(|&chain| u8::from(chain >= 2))
+            .collect();
         let positions: Vec<u8> = (0..count)
             .flat_map(|_| std::array::from_fn::<f32, 3, _>(|_| 10. * normal(&mut state)))
             .flat_map(f32::to_ne_bytes)
             .collect();
-        let chains: Vec<u8> = chain_ids.iter().flat_map(|value| value.to_ne_bytes()).collect();
+        let chains: Vec<u8> = chain_ids
+            .iter()
+            .flat_map(|value| value.to_ne_bytes())
+            .collect();
         let usable = vec![1; count];
         let size = [50, 128, 256][trial % 3];
         let run = |limits| {
-            plan_with_chain_policy(&positions, &chains, &ligand, &usable, size, None, None, None, limits).unwrap()
+            plan_with_chain_policy(
+                &positions, &chains, &ligand, &usable, size, None, None, None, limits,
+            )
+            .unwrap()
         };
         let view = View::read(&positions, &chains, &ligand, &usable, size, None).unwrap();
         let uncapped = run(None);
         for limits in [LIGAND_LIMITS, (10, 2)] {
             let capped = run(Some(limits));
-            assert_same(&capped_from(&uncapped, &view, limits), &capped, &format!("trial {trial} under {limits:?}"));
+            assert_same(
+                &capped_from(&uncapped, &view, limits),
+                &capped,
+                &format!("trial {trial} under {limits:?}"),
+            );
             rejected += uncapped.centers.len() - capped.centers.len();
         }
     }
@@ -342,9 +467,16 @@ fn uncapped_full_scan_plans_reproduce_capped_plans() {
 
 #[test]
 fn rejects_reserved_ligand_limits() {
-    let positions: Vec<u8> = (0..60).flat_map(|index| [index as f32, 0., 0.]).flat_map(f32::to_ne_bytes).collect();
+    let positions: Vec<u8> = (0..60)
+        .flat_map(|index| [index as f32, 0., 0.])
+        .flat_map(f32::to_ne_bytes)
+        .collect();
     let chains: Vec<u8> = (0..60).flat_map(|_| 0_i64.to_ne_bytes()).collect();
-    let run = |limits| plan_with_chain_policy(&positions, &chains, &[0; 60], &[1; 60], 50, None, None, None, limits);
+    let run = |limits| {
+        plan_with_chain_policy(
+            &positions, &chains, &[0; 60], &[1; 60], 50, None, None, None, limits,
+        )
+    };
     assert!(run(Some((u32::MAX, 9))).is_err());
     assert!(run(Some((64, u32::MAX))).is_err());
     assert_eq!(run(Some((0, 0))).unwrap().centers.len(), 60);
@@ -371,16 +503,24 @@ fn sweep_matches_the_full_scan_on_ties_and_equal_coordinates() {
             .collect(),
     );
     let chains: Vec<i64> = (0..count).map(|index| (index / 60) as i64).collect();
-    let ligand: Vec<u8> = chains.iter().map(|&chain| u8::from(chain % 7 == 3)).collect();
+    let ligand: Vec<u8> = chains
+        .iter()
+        .map(|&chain| u8::from(chain % 7 == 3))
+        .collect();
     let mut accepted = 0;
     for (index, positions) in all.into_iter().enumerate() {
         let layout = Layout {
             positions,
             chains: chains.clone(),
             ligand: ligand.clone(),
-            usable: (0..count).map(|_| u8::from(uniform(&mut state) > 0.05)).collect(),
-            eligible: (index % 2 == 1)
-                .then(|| (0..count).map(|_| u8::from(uniform(&mut state) < 0.5)).collect()),
+            usable: (0..count)
+                .map(|_| u8::from(uniform(&mut state) > 0.05))
+                .collect(),
+            eligible: (index % 2 == 1).then(|| {
+                (0..count)
+                    .map(|_| u8::from(uniform(&mut state) < 0.5))
+                    .collect()
+            }),
             policy: None,
         };
         for size in [50, 384, 512] {
@@ -408,28 +548,37 @@ fn sweep_skips_protein_free_blocks_exactly() {
         .collect();
     let mut rejected = 0;
     for share in [0.2, 0.01, 0.002] {
-        let single: Vec<bool> =
-            (0..count).map(|index| index >= protein_rows && uniform(&mut state) < share).collect();
+        let single: Vec<bool> = (0..count)
+            .map(|index| index >= protein_rows && uniform(&mut state) < share)
+            .collect();
         let chains = chains_with_singles((0..count).map(|index| (index / 100) as i64), &single);
         let chain_count = chains.iter().max().map_or(0, |&value| value + 1) as usize;
         let mut protein = vec![0_u8; chain_count];
         for &chain in &chains[..protein_rows] {
             protein[chain as usize] = 1;
         }
-        let minimum = protein.iter().map(|&value| if value == 1 { 50 } else { 1 }).collect();
+        let minimum = protein
+            .iter()
+            .map(|&value| if value == 1 { 50 } else { 1 })
+            .collect();
         let layout = Layout {
             positions: positions.clone(),
             chains,
             ligand: single.iter().map(|&value| u8::from(value)).collect(),
             usable: (0..count)
-                .map(|index| u8::from(index < protein_rows || single[index] || uniform(&mut state) < 0.9))
+                .map(|index| {
+                    u8::from(index < protein_rows || single[index] || uniform(&mut state) < 0.9)
+                })
                 .collect(),
             eligible: None,
             policy: Some((minimum, protein)),
         };
         for size in [50, 384, 512] {
             let (accepted, over) = check_sweep(&layout, size);
-            assert!(accepted >= protein_rows, "{accepted} accepted at size {size}");
+            assert!(
+                accepted >= protein_rows,
+                "{accepted} accepted at size {size}"
+            );
             rejected += count - accepted - over;
         }
     }
@@ -443,14 +592,18 @@ fn sweep_proves_the_ligand_chain_limit_exactly() {
     let count = 4100;
     let mut over_count = 0;
     for (spread, share) in [(25., 0.15), (12., 0.05), (40., 0.3)] {
-        let positions: Vec<[f32; 3]> =
-            (0..count).map(|_| std::array::from_fn(|_| spread * normal(&mut state))).collect();
+        let positions: Vec<[f32; 3]> = (0..count)
+            .map(|_| std::array::from_fn(|_| spread * normal(&mut state)))
+            .collect();
         let single: Vec<bool> = (0..count).map(|_| uniform(&mut state) < share).collect();
         let layout = Layout {
             positions,
             chains: chains_with_singles((0..count).map(|index| (index / 150) as i64), &single),
             ligand: single.iter().map(|&value| u8::from(value)).collect(),
-            usable: single.iter().map(|&value| u8::from(value || uniform(&mut state) < 0.8)).collect(),
+            usable: single
+                .iter()
+                .map(|&value| u8::from(value || uniform(&mut state) < 0.8))
+                .collect(),
             eligible: None,
             policy: None,
         };
@@ -460,7 +613,10 @@ fn sweep_proves_the_ligand_chain_limit_exactly() {
             over_count += over;
         }
     }
-    assert!(over_count > 20_000, "only {over_count} centres over the limit");
+    assert!(
+        over_count > 20_000,
+        "only {over_count} centres over the limit"
+    );
 }
 
 /// A filter that recounts every neighbour for each centre; `View::filter` must agree with it.
@@ -559,7 +715,8 @@ fn chain_tallies_match_the_reference_filter() {
         let size = 50 + trial % 150;
         let mut view = View::read(&bytes, &chains, &ligand, &usable, size, None).unwrap();
         // Default, custom and absent ligand limits.
-        (view.token_limit, view.chain_limit) = [LIGAND_LIMITS, (30, 4), (u32::MAX, u32::MAX)][trial % 3];
+        (view.token_limit, view.chain_limit) =
+            [LIGAND_LIMITS, (30, 4), (u32::MAX, u32::MAX)][trial % 3];
         for chain in 0..view.chain_minimum.len() {
             if !view.chain_ligand[chain] {
                 view.chain_minimum[chain] = 1 + (uniform(&mut state) * 12.) as usize;

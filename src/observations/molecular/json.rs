@@ -5,7 +5,10 @@ use std::fmt::Write;
 /// Append `value` as a JSON string with `ensure_ascii` escaping.
 pub(super) fn string(out: &mut String, value: &str) {
     out.push('"');
-    if value.bytes().all(|byte| matches!(byte, b' '..=b'~') && byte != b'"' && byte != b'\\') {
+    if value
+        .bytes()
+        .all(|byte| matches!(byte, b' '..=b'~') && byte != b'"' && byte != b'\\')
+    {
         out.push_str(value);
         out.push('"');
         return;
@@ -45,7 +48,11 @@ pub(super) fn strings<'a>(out: &mut String, values: impl IntoIterator<Item = &'a
 
 /// Append Python's `repr` of a string.
 pub(super) fn repr(out: &mut String, value: &str) {
-    let quote = if value.contains('\'') && !value.contains('"') { '"' } else { '\'' };
+    let quote = if value.contains('\'') && !value.contains('"') {
+        '"'
+    } else {
+        '\''
+    };
     out.push(quote);
     for character in value.chars() {
         let code = character as u32;

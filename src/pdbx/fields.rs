@@ -54,7 +54,9 @@ impl<'a> Field<'a> {
     fn new(column: Option<CategoryColumn<'a>>) -> Self {
         match column {
             None => Self::Absent,
-            Some(column) => column.text_column().map_or(Self::Column(column), Self::Text),
+            Some(column) => column
+                .text_column()
+                .map_or(Self::Column(column), Self::Text),
         }
     }
 
@@ -112,7 +114,9 @@ fn value_float(value: Option<CifValueRef<'_>>) -> Result<Option<f64>, String> {
     let Some(text) = value_str(value) else {
         return Ok(None);
     };
-    parse_float(&text).map(Some).ok_or_else(|| text.into_owned())
+    parse_float(&text)
+        .map(Some)
+        .ok_or_else(|| text.into_owned())
 }
 
 /// One logical category row with its requested columns resolved once per occurrence.
@@ -275,8 +279,10 @@ impl<'a, T: Clone> Column<'a, T> {
 impl Column<'_, Option<ShortText>> {
     #[inline(always)]
     pub(crate) fn optional_short(&mut self, row: usize) -> Option<ShortText> {
-        self.get::<()>(row, |value| Ok(value_str(value).map(|text| ShortText::new(&text))))
-            .unwrap_or_default()
+        self.get::<()>(row, |value| {
+            Ok(value_str(value).map(|text| ShortText::new(&text)))
+        })
+        .unwrap_or_default()
     }
 
     /// Return the text in `row`; `logical_row` numbers the row in error contexts.

@@ -328,8 +328,12 @@ fn add_polymer_links(
             continue;
         };
         if kind.contains("peptide") {
-            let ca = |residue: usize| graph.residues[residue].atoms.get("CA")
-                .and_then(|atom| graph.atoms[atom].coordinates);
+            let ca = |residue: usize| {
+                graph.residues[residue]
+                    .atoms
+                    .get("CA")
+                    .and_then(|atom| graph.atoms[atom].coordinates)
+            };
             if let (Some(p), Some(q)) = (ca(left), ca(right))
                 && p.iter().zip(q).map(|(x, y)| (x - y).powi(2)).sum::<f64>() > 4_f64.powi(2)
             {

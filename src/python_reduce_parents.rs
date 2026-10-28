@@ -49,8 +49,12 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[pyfunction]
 #[pyo3(signature = (document, *, chem_data, model=1))]
-fn reduce_chemical_sources(py: Python<'_>, document: &PyCifDocument, chem_data: PathBuf,
-    model: i64) -> PyResult<Vec<PathBuf>> {
+fn reduce_chemical_sources(
+    py: Python<'_>,
+    document: &PyCifDocument,
+    chem_data: PathBuf,
+    model: i64,
+) -> PyResult<Vec<PathBuf>> {
     py.detach(|| observations::chemical_sources(document.document(), model, &chem_data))
         .map_err(PyValueError::new_err)
 }
@@ -65,6 +69,8 @@ fn reduce_required_parent_sources(
     chem_data: Option<PathBuf>,
 ) -> PyResult<Vec<u32>> {
     let source = Arc::clone(document.document());
-    py.detach(|| observations::required_parent_sources(&source, expected_keys, model, chem_data.as_deref()))
-        .map_err(PyValueError::new_err)
+    py.detach(|| {
+        observations::required_parent_sources(&source, expected_keys, model, chem_data.as_deref())
+    })
+    .map_err(PyValueError::new_err)
 }

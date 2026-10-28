@@ -143,8 +143,16 @@ pub(super) fn contacts(
     }
     let bonded = bonded_lists(
         flat.pos.len(),
-        graph.bonds.iter().map(|b| (b.indices[0], b.indices[1]))
-            .chain(graph.symmetry_bonds.iter().map(|b| (b.indices[0], b.indices[1]))),
+        graph
+            .bonds
+            .iter()
+            .map(|b| (b.indices[0], b.indices[1]))
+            .chain(
+                graph
+                    .symmetry_bonds
+                    .iter()
+                    .map(|b| (b.indices[0], b.indices[1])),
+            ),
     );
     let mut info = extra_atom_info_validation(
         structure,

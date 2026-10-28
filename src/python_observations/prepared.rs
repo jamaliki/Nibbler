@@ -1,11 +1,11 @@
 //! Python holds one frozen source while the packer loads component features.
 
+use crate::cif::FastMap;
 use crate::observations;
+use crate::pdbx::ShortText;
 #[cfg(feature = "reduce3")]
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use crate::cif::FastMap;
-use crate::pdbx::ShortText;
 use pyo3::types::{PyByteArray, PyDict, PyList, PyString};
 #[cfg(feature = "reduce3")]
 use std::path::PathBuf;
@@ -17,7 +17,10 @@ pub(super) struct PreparedObservationSource {
 
 #[pymethods]
 impl PreparedObservationSource {
-    fn atom_table<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyDict>, Bound<'py, PyDict>)> {
+    fn atom_table<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<(Bound<'py, PyDict>, Bound<'py, PyDict>)> {
         let source = &self.source.source;
         let count = source.atoms.len();
         let buffers = PyDict::new(py);
@@ -26,38 +29,117 @@ impl PreparedObservationSource {
             if let Some(parent) = parent {
                 parents[child] = if parents[child] == -1 || parents[child] == parent as i64 {
                     parent as i64
-                } else { -2 };
+                } else {
+                    -2
+                };
             }
         }
-        for value in &mut parents { if *value < 0 { *value = -1; } }
+        for value in &mut parents {
+            if *value < 0 {
+                *value = -1;
+            }
+        }
         let put = |name, dtype, shape: Vec<usize>, data: Vec<u8>| {
             buffers.set_item(name, (dtype, shape, PyByteArray::new(py, &data)))
         };
         let integers: [(&str, Vec<i64>); 4] = [
-            ("source_atom_row", source.atoms.iter().map(|atom| i64::from(atom.source_row)).collect()),
-            ("source_atom_group", source.atoms.iter().map(|atom| atom.group as i64).collect()),
-            ("source_atom_sequence", source.atoms.iter().map(|atom| atom.sequence).collect()),
+            (
+                "source_atom_row",
+                source
+                    .atoms
+                    .iter()
+                    .map(|atom| i64::from(atom.source_row))
+                    .collect(),
+            ),
+            (
+                "source_atom_group",
+                source.atoms.iter().map(|atom| atom.group as i64).collect(),
+            ),
+            (
+                "source_atom_sequence",
+                source.atoms.iter().map(|atom| atom.sequence).collect(),
+            ),
             ("source_hydrogen_parent", parents),
         ];
         for (name, values) in integers {
-            put(name, "=i8", vec![count], bytes(count, values.iter().map(|v| v.to_ne_bytes())))?;
+            put(
+                name,
+                "=i8",
+                vec![count],
+                bytes(count, values.iter().map(|v| v.to_ne_bytes())),
+            )?;
         }
-        put("source_atom_pos", "=f4", vec![count, 3], bytes(3 * count, source.atoms.iter()
-            .flat_map(|atom| atom.position).map(f32::to_ne_bytes)))?;
-        put("source_atom_occupancy", "=f4", vec![count], bytes(count, source.atoms.iter()
-            .map(|atom| atom.occupancy.to_ne_bytes())))?;
+        put(
+            "source_atom_pos",
+            "=f4",
+            vec![count, 3],
+            bytes(
+                3 * count,
+                source
+                    .atoms
+                    .iter()
+                    .flat_map(|atom| atom.position)
+                    .map(f32::to_ne_bytes),
+            ),
+        )?;
+        put(
+            "source_atom_occupancy",
+            "=f4",
+            vec![count],
+            bytes(
+                count,
+                source.atoms.iter().map(|atom| atom.occupancy.to_ne_bytes()),
+            ),
+        )?;
         for (name, values) in [
-            ("source_atom_mask", source.atoms.iter().map(|atom| u8::from(atom.position.iter().all(|v| v.is_finite()))).collect()),
-            ("source_atom_is_protein", source.atoms.iter().map(|atom| u8::from(atom.protein)).collect()),
+            (
+                "source_atom_mask",
+                source
+                    .atoms
+                    .iter()
+                    .map(|atom| u8::from(atom.position.iter().all(|v| v.is_finite())))
+                    .collect(),
+            ),
+            (
+                "source_atom_is_protein",
+                source
+                    .atoms
+                    .iter()
+                    .map(|atom| u8::from(atom.protein))
+                    .collect(),
+            ),
         ] {
             put(name, "?", vec![count], values)?;
         }
         let edges = source.connections.len();
-        put("source_connection_index", "=i8", vec![2, edges], bytes(2 * edges, (0..2).flat_map(|side|
-            source.connections.iter().map(move |edge| edge.atoms[side].map_or(-1, |row| row as i64)))
-            .map(i64::to_ne_bytes)))?;
-        put("source_connection_row", "=i8", vec![edges], bytes(edges, source.connections.iter()
-            .map(|edge| (edge.row as i64).to_ne_bytes())))?;
+        put(
+            "source_connection_index",
+            "=i8",
+            vec![2, edges],
+            bytes(
+                2 * edges,
+                (0..2)
+                    .flat_map(|side| {
+                        source
+                            .connections
+                            .iter()
+                            .map(move |edge| edge.atoms[side].map_or(-1, |row| row as i64))
+                    })
+                    .map(i64::to_ne_bytes),
+            ),
+        )?;
+        put(
+            "source_connection_row",
+            "=i8",
+            vec![edges],
+            bytes(
+                edges,
+                source
+                    .connections
+                    .iter()
+                    .map(|edge| (edge.row as i64).to_ne_bytes()),
+            ),
+        )?;
         // Labels repeat heavily, so each distinct value becomes one Python string that
         // the lists share.
         let labels = PyDict::new(py);
@@ -83,7 +165,10 @@ impl PreparedObservationSource {
         let polymer_types = atoms.iter().map(|atom| match entity {
             Some((previous, kind)) if *previous == atom.entity => kind,
             _ => {
-                let kind = source.entity_types.get(atom.entity.as_str()).map_or("", String::as_str);
+                let kind = source
+                    .entity_types
+                    .get(atom.entity.as_str())
+                    .map_or("", String::as_str);
                 entity = Some((&atom.entity, kind));
                 kind
             }
@@ -110,8 +195,13 @@ impl PreparedObservationSource {
 
     #[cfg(feature = "reduce3")]
     #[pyo3(signature = (*, chem_data))]
-    fn missing_hydrogen_dictionaries(&self, py: Python<'_>, chem_data: PathBuf) -> PyResult<Vec<String>> {
-        py.detach(|| self.source.missing_hydrogen_dictionaries(&chem_data)).map_err(PyValueError::new_err)
+    fn missing_hydrogen_dictionaries(
+        &self,
+        py: Python<'_>,
+        chem_data: PathBuf,
+    ) -> PyResult<Vec<String>> {
+        py.detach(|| self.source.missing_hydrogen_dictionaries(&chem_data))
+            .map_err(PyValueError::new_err)
     }
 }
 
@@ -131,15 +221,22 @@ where
 {
     // Most columns repeat the previous row's value, which skips the map.
     let mut last: Option<(&T, Bound<'py, PyString>)> = None;
-    values.map(|value| {
-        if let Some((previous, string)) = &last && **previous == *value {
-            return string.clone();
-        }
-        let text = value.as_ref();
-        let string = strings.entry(text).or_insert_with(|| PyString::new(py, text)).clone();
-        last = Some((value, string.clone()));
-        string
-    }).collect()
+    values
+        .map(|value| {
+            if let Some((previous, string)) = &last
+                && **previous == *value
+            {
+                return string.clone();
+            }
+            let text = value.as_ref();
+            let string = strings
+                .entry(text)
+                .or_insert_with(|| PyString::new(py, text))
+                .clone();
+            last = Some((value, string.clone()));
+            string
+        })
+        .collect()
 }
 
 /// Concatenate fixed-width native-endian values into one byte buffer.

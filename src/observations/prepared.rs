@@ -13,7 +13,10 @@ pub(crate) struct PreparedSource {
 
 impl PreparedSource {
     pub(crate) fn read(document: &CifDocument, model: i64) -> Result<Self, String> {
-        Ok(Self { source: source::read(document, model)?, model })
+        Ok(Self {
+            source: source::read(document, model)?,
+            model,
+        })
     }
 
     pub(crate) fn components(&self) -> Vec<String> {
@@ -30,15 +33,33 @@ impl PreparedSource {
     }
 
     #[cfg(feature = "reduce3")]
-    pub(crate) fn missing_hydrogen_dictionaries(&self, chem_data: &Path) -> Result<Vec<String>, String> {
-        let library = crate::reduce::load_monomer_library(Some(chem_data)).map_err(|error| error.to_string())?;
+    pub(crate) fn missing_hydrogen_dictionaries(
+        &self,
+        chem_data: &Path,
+    ) -> Result<Vec<String>, String> {
+        let library = crate::reduce::load_monomer_library(Some(chem_data))
+            .map_err(|error| error.to_string())?;
         Ok(super::parents::missing(&library, &self.source))
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn pack(&self, schema: &Schema, features: &LigandFeatures,
-        hydrogen_parents: &HydrogenParents, table: &TokenTable, excluded: &[String],
-        options: &PackOptions<'_>) -> Result<Tokens, String> {
-        super::pack_source(&self.source, schema, features, hydrogen_parents, table, excluded, options)
+    pub(crate) fn pack(
+        &self,
+        schema: &Schema,
+        features: &LigandFeatures,
+        hydrogen_parents: &HydrogenParents,
+        table: &TokenTable,
+        excluded: &[String],
+        options: &PackOptions<'_>,
+    ) -> Result<Tokens, String> {
+        super::pack_source(
+            &self.source,
+            schema,
+            features,
+            hydrogen_parents,
+            table,
+            excluded,
+            options,
+        )
     }
 }
