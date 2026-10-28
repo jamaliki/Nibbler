@@ -315,7 +315,7 @@ impl Ownership {
 }
 
 /// Expand one legacy Atom32 token by name, starting unsupplied protein slots at CA.
-fn legacy_row(legacy: &Tokens, old: usize, molecular: &MolecularSchema, bridges: bool) -> Row {
+fn legacy_row(legacy: &Tokens, old: usize, molecular: &MolecularSchema) -> Row {
     let ligand = legacy.ligand[old] != 0;
     let aatype = legacy.identity[old];
     let kind = if ligand { 21 } else { aatype.clamp(0, 20) as usize };
@@ -351,11 +351,9 @@ fn legacy_row(legacy: &Tokens, old: usize, molecular: &MolecularSchema, bridges:
     row.ligand_hydrogen_known = legacy.hydrogen_known[old] != 0;
     row.ligand_hybridization = legacy.hybridization[old];
     row.covalently_bound_to_protein = legacy.covalent[old] != 0;
-    if bridges {
-        row.crop_positions = [legacy.crop_positions[old * 3], legacy.crop_positions[old * 3 + 1],
-            legacy.crop_positions[old * 3 + 2]];
-        row.crop_center_eligible = legacy.crop_center_eligible[old] != 0;
-    }
+    row.crop_positions = [legacy.crop_positions[old * 3], legacy.crop_positions[old * 3 + 1],
+        legacy.crop_positions[old * 3 + 2]];
+    row.crop_center_eligible = legacy.crop_center_eligible[old] != 0;
     row.token_kind = if ligand { 3 } else { 0 };
     row.token_atom_mask = if ligand { row.mask } else { [true; SLOTS] };
     row
@@ -978,7 +976,6 @@ pub(super) fn pack<'a>(legacy: &'a Tokens, source: &'a Source, snapshot: &'a Sna
     molecular: &'a MolecularSchema, table: &'a TokenTable, index: bool) -> Result<Packed<'a>, Failure> {
     let groups = Groups::read(source, snapshot)?;
     let count = legacy.identity.len();
-    let bridges = !legacy.bridge_edges.is_empty();
     let mut text = String::new();
     // Tokens of one residue are adjacent, so reuse the previous lookup while the residue key repeats.
     let mut previous: Option<(&[ShortText; 5], Option<usize>)> = None;
@@ -1065,7 +1062,7 @@ pub(super) fn pack<'a>(legacy: &'a Tokens, source: &'a Source, snapshot: &'a Sna
             }
             continue;
         }
-        let mut row = legacy_row(legacy, old, molecular, bridges);
+        let mut row = legacy_row(legacy, old, molecular);
         row.sequence_target_known = ligand || !molecular.unknown_components.contains(key[3].as_str());
         if let Some(group) = group {
             row.molecular_group = group as i64;

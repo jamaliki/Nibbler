@@ -27,6 +27,7 @@ def packer(table):
 @pytest.mark.parametrize("case", sorted(RECORD["cases"]))
 def test_the_66_token_table_reproduces_the_element_list_packer(case):
     # Recorded with Nibbler 9b8041e from the 43 elements and hydrogen; see record_token_parity.py.
+    # Only molecular crop_positions digests were corrected for the no-bridge packing bug.
     chem_data = os.environ.get("REDUCE3_CHEM_DATA")
     expected = RECORD["cases"][case]
     actual = packed(packer(token_table(*RECORD["ligand_elements"])), (ROOT / case).read_bytes(), chem_data)

@@ -4,6 +4,14 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
 
 ## [0.1.0] - Unreleased
 
+### Fixed
+
+- Molecular packing preserves crop reference positions and centre eligibility for
+  ordinary proteins and ligands, including the index pass. Previously, views without
+  metal-hydride bridges received zero crop positions, making spatial crops select
+  tokens by index and potentially discard their ligand centre. Existing crop indices
+  and prepared records must be rebuilt to receive the correction.
+
 ### Added
 
 - `mmcif.without_hydrogens` removes the H, D and T `atom_site` rows, case-insensitive on
