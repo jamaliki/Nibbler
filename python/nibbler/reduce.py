@@ -62,7 +62,9 @@ def available() -> bool:
 
 
 def hydrogen_parents(
-    document: CifDocument, *, chem_data: str | PathLike[str] | None = None,
+    document: CifDocument,
+    *,
+    chem_data: str | PathLike[str] | None = None,
     model_id: int = 1,
 ) -> dict[str, dict[str, str]]:
     """Return hydrogen parents from the dictionaries Reduce3 selects."""
@@ -72,12 +74,18 @@ def hydrogen_parents(
         raise ValueError("model_id must be a one-based model number")
     if not hasattr(_core, "reduce_hydrogen_parents"):
         raise RuntimeError("This Nibbler build has no Reduce3 hydrogen-parent helper")
-    return _core.reduce_hydrogen_parents(document,
-        chem_data=None if chem_data is None else fspath(chem_data), model=model_id)
+    return _core.reduce_hydrogen_parents(
+        document,
+        chem_data=None if chem_data is None else fspath(chem_data),
+        model=model_id,
+    )
 
 
 def required_parent_sources(
-    document: CifDocument, expected_keys_json: str, *, model_id: int = 1,
+    document: CifDocument,
+    expected_keys_json: str,
+    *,
+    model_id: int = 1,
     chem_data: str | PathLike[str] | None = None,
 ) -> list[int]:
     """Map checked target keys to original heavy-atom source rows."""
@@ -89,13 +97,21 @@ def required_parent_sources(
         raise ValueError("model_id must be a one-based model number")
     if not hasattr(_core, "reduce_required_parent_sources"):
         raise RuntimeError("This Nibbler build has no required-parent source helper")
-    return _core.reduce_required_parent_sources(document, expected_keys_json, model=model_id,
-        chem_data=None if chem_data is None else fspath(chem_data))
+    return _core.reduce_required_parent_sources(
+        document,
+        expected_keys_json,
+        model=model_id,
+        chem_data=None if chem_data is None else fspath(chem_data),
+    )
 
 
-def chemical_sources(document: CifDocument, *, chem_data: str | PathLike[str], model_id: int = 1) -> list[str]:
+def chemical_sources(
+    document: CifDocument, *, chem_data: str | PathLike[str], model_id: int = 1
+) -> list[str]:
     """List the selected restraint, CCD, and library-index files for provenance."""
-    return _core.reduce_chemical_sources(document, chem_data=fspath(chem_data), model=model_id)
+    return _core.reduce_chemical_sources(
+        document, chem_data=fspath(chem_data), model=model_id
+    )
 
 
 def run(
@@ -202,16 +218,26 @@ def run(
         raise ValueError(
             "n_terminal_charge must be 'residue_one', 'first_in_chain', or 'no_charge'"
         )
-    if (isinstance(allow_missing_restraints_for, (str, bytes))
-            or not isinstance(allow_missing_restraints_for, Sequence)
-            or any(not isinstance(name, str) for name in allow_missing_restraints_for)):
-        raise TypeError("allow_missing_restraints_for must be a sequence of component identifiers")
-    if required_hydrogen_target_keys is not None and not isinstance(required_hydrogen_target_keys, str):
+    if (
+        isinstance(allow_missing_restraints_for, (str, bytes))
+        or not isinstance(allow_missing_restraints_for, Sequence)
+        or any(not isinstance(name, str) for name in allow_missing_restraints_for)
+    ):
+        raise TypeError(
+            "allow_missing_restraints_for must be a sequence of component identifiers"
+        )
+    if required_hydrogen_target_keys is not None and not isinstance(
+        required_hydrogen_target_keys, str
+    ):
         raise TypeError("required_hydrogen_target_keys must be a JSON string")
-    if (isinstance(ignored_target_key_components, (str, bytes))
-            or not isinstance(ignored_target_key_components, Sequence)
-            or any(not isinstance(name, str) for name in ignored_target_key_components)):
-        raise TypeError("ignored_target_key_components must be a sequence of component identifiers")
+    if (
+        isinstance(ignored_target_key_components, (str, bytes))
+        or not isinstance(ignored_target_key_components, Sequence)
+        or any(not isinstance(name, str) for name in ignored_target_key_components)
+    ):
+        raise TypeError(
+            "ignored_target_key_components must be a sequence of component identifiers"
+        )
     flags = {
         "add_flip_movers": add_flip_movers,
         "compat": compat,
@@ -279,7 +305,11 @@ def run(
         "ignored_target_key_components": list(ignored_target_key_components),
     }
     try:
-        output, report, statuses = _core.reduce_document(document, options, parents_view)
+        output, report, statuses = _core.reduce_document(
+            document, options, parents_view
+        )
     except ValueError as error:
         raise_chemistry_error(error)
-    return Reduction(document=output, report=report, target_uncertainties=tuple(json.loads(statuses)))
+    return Reduction(
+        document=output, report=report, target_uncertainties=tuple(json.loads(statuses))
+    )

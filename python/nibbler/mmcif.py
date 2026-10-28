@@ -112,7 +112,12 @@ def prepare_chemistry(
     model = source if isinstance(source, MmcifModel) else read(source)
     try:
         return _core.prepare_mmcif_chemistry(
-            model, registry, model_number, alternate_id, chem_data, use_observed_hydrogens
+            model,
+            registry,
+            model_number,
+            alternate_id,
+            chem_data,
+            use_observed_hydrogens,
         )
     except ValueError as error:
         raise_chemistry_error(error)

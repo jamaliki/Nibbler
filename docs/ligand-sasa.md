@@ -84,8 +84,11 @@ For already decoded coordinate arrays, use the same kernel directly:
 
 ```python
 areas = nibbler.geometry.sasa(
-    coordinates, vdw_radii, ligand_atom_indices,
-    probe_radius=1.4, point_count=256,
+    coordinates,
+    vdw_radii,
+    ligand_atom_indices,
+    probe_radius=1.4,
+    point_count=256,
 )
 ```
 

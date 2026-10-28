@@ -34,8 +34,12 @@ def test_native_graph_covers_valid_controls(chemistry, name):
 
 
 def test_native_hydrogen_outlier_keeps_input_coordinates(chemistry):
-    result = validate(CASES / "displaced_hydrogen.cif", chem_data=chemistry,
-                      use_cdl=False, include_graph=True)
+    result = validate(
+        CASES / "displaced_hydrogen.cif",
+        chem_data=chemistry,
+        use_cdl=False,
+        include_graph=True,
+    )
     assert result["complete"]
     assert any(row["check"] == "bonds" for row in result["failures"])
     assert any(row["name"] == "HA" for row in result["atoms"])
@@ -53,8 +57,9 @@ def test_cached_chemistry_is_safe_across_threads(chemistry):
 
 
 def test_default_findings_keep_source_atom_ids_without_a_full_graph(chemistry):
-    result = validate(CASES / "displaced_hydrogen.cif", chem_data=chemistry,
-                      use_cdl=False)
+    result = validate(
+        CASES / "displaced_hydrogen.cif", chem_data=chemistry, use_cdl=False
+    )
     assert "atoms" not in result
     assert "graph" not in result
     assert result["failures"]
@@ -68,8 +73,9 @@ def test_multiple_coordinate_blocks_cannot_be_omitted(chemistry):
 
 
 def test_invalid_formal_charge_cannot_become_neutral(chemistry):
-    source = (b"data_charge\nloop_\n_atom_site.id\n"
-              b"_atom_site.pdbx_formal_charge\n1 bogus\n")
+    source = (
+        b"data_charge\nloop_\n_atom_site.id\n_atom_site.pdbx_formal_charge\n1 bogus\n"
+    )
     with pytest.raises(ValueError, match="invalid formal charge"):
         validate(source, chem_data=chemistry)
 

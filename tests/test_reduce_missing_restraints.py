@@ -20,9 +20,17 @@ def document(components=("UNL",)):
     for index, component in enumerate(components):
         chain = gemmi.Chain(f"U{index}")
         residue = gemmi.Residue()
-        residue.name, residue.seqid, residue.het_flag = component, gemmi.SeqId(900 + index, " "), "H"
+        residue.name, residue.seqid, residue.het_flag = (
+            component,
+            gemmi.SeqId(900 + index, " "),
+            "H",
+        )
         atom = gemmi.Atom()
-        atom.name, atom.element, atom.pos = "C1", gemmi.Element("C"), gemmi.Position(100 + index, 100, 100)
+        atom.name, atom.element, atom.pos = (
+            "C1",
+            gemmi.Element("C"),
+            gemmi.Position(100 + index, 100, 100),
+        )
         residue.add_atom(atom)
         chain.add_residue(residue)
         structure[0].add_chain(chain)
@@ -42,28 +50,49 @@ def test_allowed_unl_keeps_heavy_atoms_and_matches_existing_unknown_mode():
     source = document()
     with pytest.raises(nibbler.ChemistryError, match="UNL"):
         run(source, stop_on_any_missing_hydrogen=True)
-    allowed = run(source, stop_on_any_missing_hydrogen=True, allow_missing_restraints_for=EXCLUDED)
+    allowed = run(
+        source, stop_on_any_missing_hydrogen=True, allow_missing_restraints_for=EXCLUDED
+    )
     reference = run(source)
     assert allowed.document.to_canonical() == reference.document.to_canonical()
     assert "Allowed missing restraints for components UNL" in allowed.report
     pa = pytest.importorskip("pyarrow")
-    rows = pa.RecordBatchReader.from_stream(allowed.document.project("atom_site")).read_all().to_pylist()
+    rows = (
+        pa.RecordBatchReader.from_stream(allowed.document.project("atom_site"))
+        .read_all()
+        .to_pylist()
+    )
     unl = [row for row in rows if row["label_comp_id"] == "UNL"]
-    assert len(unl) == 1 and unl[0]["label_atom_id"] == "C1" and unl[0]["type_symbol"] == "C"
-    assert [float(unl[0][key]) for key in ("Cartn_x", "Cartn_y", "Cartn_z")] == [100., 100., 100.]
+    assert (
+        len(unl) == 1
+        and unl[0]["label_atom_id"] == "C1"
+        and unl[0]["type_symbol"] == "C"
+    )
+    assert [float(unl[0][key]) for key in ("Cartn_x", "Cartn_y", "Cartn_z")] == [
+        100.0,
+        100.0,
+        100.0,
+    ]
 
 
 def test_unlisted_missing_component_still_fails():
     source = document(("UNL", "NO_SUCH_COMPONENT"))
     with pytest.raises(nibbler.ChemistryError, match="NO_SUCH_COMPONENT") as caught:
-        run(source, stop_on_any_missing_hydrogen=True, allow_missing_restraints_for=EXCLUDED)
+        run(
+            source,
+            stop_on_any_missing_hydrogen=True,
+            allow_missing_restraints_for=EXCLUDED,
+        )
     assert "UNL" not in str(caught.value)
 
 
 def test_known_component_outputs_are_unchanged_with_the_allowlist():
     strict = run(CRAMBIN, stop_on_any_missing_hydrogen=True)
-    allowed = run(CRAMBIN, stop_on_any_missing_hydrogen=True,
-                  allow_missing_restraints_for=[*EXCLUDED, "THR", "CYS", "PRO"])
+    allowed = run(
+        CRAMBIN,
+        stop_on_any_missing_hydrogen=True,
+        allow_missing_restraints_for=[*EXCLUDED, "THR", "CYS", "PRO"],
+    )
     assert allowed.document.to_canonical() == strict.document.to_canonical()
     assert "Allowed missing restraints" not in allowed.report
 
@@ -73,8 +102,11 @@ def test_allowed_missing_dictionary_does_not_allow_unplaced_hydrogens():
     source = gemmi.cif.read_file(str(ADDUCT))
     source.sole_block().find_mmcif_category("_struct_conn.").erase()
     with pytest.raises(nibbler.ChemistryError, match="H351") as caught:
-        run(nibbler.cif.read(source.as_string().encode()), stop_on_any_missing_hydrogen=True,
-            allow_missing_restraints_for=[*EXCLUDED, "Z41"])
+        run(
+            nibbler.cif.read(source.as_string().encode()),
+            stop_on_any_missing_hydrogen=True,
+            allow_missing_restraints_for=[*EXCLUDED, "Z41"],
+        )
     assert "H352" in str(caught.value)
 
 
@@ -85,18 +117,24 @@ def test_known_native_labels_match_the_existing_lenient_control():
     from nibbler.observations import ObservationPacker
 
     source = document()
-    allowed = run(source, stop_on_any_missing_hydrogen=True, allow_missing_restraints_for=EXCLUDED)
+    allowed = run(
+        source, stop_on_any_missing_hydrogen=True, allow_missing_restraints_for=EXCLUDED
+    )
     control = run(source)
     packer = ObservationPacker(Path(schema).read_text(), token_table("C"), EXCLUDED)
     actual, keys = packer.pack(allowed.document, complete=True, validate=True)
-    expected, expected_keys = packer.pack(control.document, complete=True, validate=True)
+    expected, expected_keys = packer.pack(
+        control.document, complete=True, validate=True
+    )
     assert keys == expected_keys and all(key[3] != "UNL" for key in keys)
     assert actual.keys() == expected.keys()
     for name in actual:
         dtype, shape, buffer = actual[name]
         old_dtype, old_shape, old_buffer = expected[name]
         assert dtype == old_dtype and shape == old_shape
-        np.testing.assert_array_equal(np.frombuffer(buffer, dtype=dtype), np.frombuffer(old_buffer, dtype=dtype))
+        np.testing.assert_array_equal(
+            np.frombuffer(buffer, dtype=dtype), np.frombuffer(old_buffer, dtype=dtype)
+        )
 
 
 @pytest.mark.parametrize("invalid", ["UNL", [1], {"UNL"}])

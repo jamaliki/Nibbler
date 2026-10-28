@@ -42,7 +42,7 @@ def complex_document():
         for slot, (name, element) in enumerate(names):
             raw += (
                 f"ATOM {5 * residue + slot + 1} 1 A {residue + 1} {residue + 1} "
-                f"ALA {name} {element} {3 * residue + slot * .2 + 1} 2 3 "
+                f"ALA {name} {element} {3 * residue + slot * 0.2 + 1} 2 3 "
                 f"1 1 ALA A {name} . ? 10\n"
             )
     raw += (
@@ -53,8 +53,10 @@ def complex_document():
 
 
 def arrays(buffers):
-    return {name: np.frombuffer(data, dtype=dtype).reshape(shape)
-            for name, (dtype, shape, data) in buffers.items()}
+    return {
+        name: np.frombuffer(data, dtype=dtype).reshape(shape)
+        for name, (dtype, shape, data) in buffers.items()
+    }
 
 
 @pytest.mark.parametrize("index", [False, True])
@@ -80,9 +82,11 @@ def test_molecular_crop_keeps_the_ligand_center(tmp_path, index):
     np.testing.assert_array_equal(result["crop_positions"], expected)
     assert result["crop_center_eligible"].all()
     plans, _ = packer.crop_plans(
-        result["crop_positions"].tobytes(), result["chain_idx"].tobytes(),
+        result["crop_positions"].tobytes(),
+        result["chain_idx"].tobytes(),
         result["is_ligand"].tobytes(),
-        (result["is_ligand"] | result["mask"][:, 1]).tobytes(), crop_size=52,
+        (result["is_ligand"] | result["mask"][:, 1]).tobytes(),
+        crop_size=52,
     )
     plans = arrays(plans)
     ligand_plan = np.flatnonzero(plans["crop_center"] == 60).item()

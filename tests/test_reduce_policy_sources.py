@@ -15,18 +15,26 @@ FLAGS = [(False, False), (False, True), (True, False), (True, True)]
 
 
 def run(source, keys, flags, **options):
-    return nibbler.reduce.run(source, model_id=options.pop("model_id", 1),
-        required_hydrogen_target_keys=keys, stop_on_any_missing_hydrogen=True,
+    return nibbler.reduce.run(
+        source,
+        model_id=options.pop("model_id", 1),
+        required_hydrogen_target_keys=keys,
+        stop_on_any_missing_hydrogen=True,
         allow_undefined_ligand_targets=flags[0],
-        allow_unresolved_bond_targets=flags[1], **options)
+        allow_unresolved_bond_targets=flags[1],
+        **options,
+    )
 
 
 @pytest.mark.parametrize("flags", FLAGS)
-@pytest.mark.parametrize("keys,message", [
-    ("[", "EOF"),
-    (json.dumps([["A", "1", "?", "KHP", "C1"]] * 2), "duplicates"),
-    ("[]", "Invalid coordinate number"),
-])
+@pytest.mark.parametrize(
+    "keys,message",
+    [
+        ("[", "EOF"),
+        (json.dumps([["A", "1", "?", "KHP", "C1"]] * 2), "duplicates"),
+        ("[]", "Invalid coordinate number"),
+    ],
+)
 def test_key_checks_precede_source_and_library_errors(flags, keys, message, tmp_path):
     source = parent_document([row("C1", "C", x="wrong")])
     with pytest.raises(nibbler.ChemistryError, match=message) as raised:
@@ -45,11 +53,14 @@ def test_model_two_keeps_original_heavy_coordinates(flags, models):
 
 
 @pytest.mark.parametrize("flags", FLAGS)
-@pytest.mark.parametrize("models,selected,message", [
-    ([2], 1, "not present"),
-    ([2, 3, 2], 2, "ambiguous"),
-    ([2, "02"], 2, "ambiguous"),
-])
+@pytest.mark.parametrize(
+    "models,selected,message",
+    [
+        ([2], 1, "not present"),
+        ([2, 3, 2], 2, "ambiguous"),
+        ([2, "02"], 2, "ambiguous"),
+    ],
+)
 def test_missing_or_ambiguous_models_keep_error_class(flags, models, selected, message):
     source = document(models)
     with pytest.raises(nibbler.ChemistryError, match=message) as raised:
@@ -76,7 +87,9 @@ def test_selected_alternate_keeps_source_coordinates(flags):
 @pytest.mark.parametrize("flags", FLAGS)
 def test_unresolved_alternates_fail_before_library_loading(flags, tmp_path):
     source = alternate_document(["A", "B"])
-    with pytest.raises(nibbler.ChemistryError, match="Resolve alternate conformers") as raised:
+    with pytest.raises(
+        nibbler.ChemistryError, match="Resolve alternate conformers"
+    ) as raised:
         run(source, target_keys(source, 2), flags, model_id=2, chem_data=tmp_path)
     assert raised.value.code == "REDUCE_INVALID_MODEL"
 
@@ -90,7 +103,9 @@ def test_late_bridge_library_error_keeps_plain_value_error(tmp_path):
 
 def test_required_bridge_library_error_keeps_chemistry_error(tmp_path):
     keys = json.dumps([["L", "601", "?", "EJ2", "H"]])
-    with pytest.raises(nibbler.ChemistryError, match="REDUCE_MONOMER_LIBRARY_NOT_FOUND") as raised:
+    with pytest.raises(
+        nibbler.ChemistryError, match="REDUCE_MONOMER_LIBRARY_NOT_FOUND"
+    ) as raised:
         run(bridge_source(), keys, (True, False), chem_data=tmp_path)
     assert raised.value.code == "REDUCE_INVALID_MODEL"
 

@@ -20,22 +20,34 @@ else:
 
 
 def arrays(buffers):
-    return {name: np.frombuffer(buffer, dtype=dtype).reshape(shape)
-            for name, (dtype, shape, buffer) in buffers.items()}
+    return {
+        name: np.frombuffer(buffer, dtype=dtype).reshape(shape)
+        for name, (dtype, shape, buffer) in buffers.items()
+    }
 
 
 def decode(raw):
     _, _, _, _, _, count, residues = struct.unpack_from("<4sBBBBII", raw)
     offsets = np.frombuffer(raw, dtype="<u4", count=count + 1, offset=16)
     start = 16 + 4 * (count + 1)
-    sequence = raw[start:start + residues].decode()
-    aa = np.array(["ARNDCQEGHILKMFPSTWYV".index(letter) for letter in sequence], dtype=np.int64)
+    sequence = raw[start : start + residues].decode()
+    aa = np.array(
+        ["ARNDCQEGHILKMFPSTWYV".index(letter) for letter in sequence], dtype=np.int64
+    )
     xyz = np.frombuffer(raw, dtype=np.uint8, offset=start + residues)
     xyz = xyz.reshape(4, -1).T.copy().view("<f4").reshape(residues, 14, 3)
-    physical = np.array([[bool(name) for name in SPEC["residues"][identity]["names"][:14]] for identity in aa])
+    physical = np.array(
+        [
+            [bool(name) for name in SPEC["residues"][identity]["names"][:14]]
+            for identity in aa
+        ]
+    )
     finite = np.isfinite(xyz)
-    if (np.isinf(xyz).any() or np.any(xyz[~physical] != 0)
-            or np.any(finite.any(-1) != finite.all(-1))):
+    if (
+        np.isinf(xyz).any()
+        or np.any(xyz[~physical] != 0)
+        or np.any(finite.any(-1) != finite.all(-1))
+    ):
         raise ValueError("Invalid packed coordinates")
     mask = physical & finite.all(-1)
     if not mask[:, 1].all():
@@ -52,7 +64,7 @@ def protein(length, sequence=None):
         names = SPEC["residues"][aa]["names"][:14]
         for slot, name in enumerate(names):
             if name:
-                xyz[row, slot] = [row * 3.8 + 1.4, slot * .1, 0]
+                xyz[row, slot] = [row * 3.8 + 1.4, slot * 0.1, 0]
         xyz[row, 0] = [row * 3.8, 0, 0]
         xyz[row, 2] = [row * 3.8 + 2.5, 0, 0]
     return sequence, xyz
@@ -61,10 +73,12 @@ def protein(length, sequence=None):
 def encode(proteins):
     lengths = [len(sequence) for sequence, _ in proteins]
     coords = np.concatenate([xyz for _, xyz in proteins])
-    return (struct.pack("<4sBBBBII", b"A14P", 1, 32, 1, 0, len(lengths), sum(lengths))
-            + np.asarray([0, *np.cumsum(lengths)], dtype="<u4").tobytes()
-            + "".join(sequence for sequence, _ in proteins).encode()
-            + coords.view(np.uint8).reshape(-1, 4).T.tobytes())
+    return (
+        struct.pack("<4sBBBBII", b"A14P", 1, 32, 1, 0, len(lengths), sum(lengths))
+        + np.asarray([0, *np.cumsum(lengths)], dtype="<u4").tobytes()
+        + "".join(sequence for sequence, _ in proteins).encode()
+        + coords.view(np.uint8).reshape(-1, 4).T.tobytes()
+    )
 
 
 def native():
@@ -79,11 +93,27 @@ def scan(raw, **kwargs):
 def reference(raw):
     decoded = decode(raw)
     worker = native()
-    result = {key: [] for key in ("eligible", "complete_residues", "max_chain_residues", "reconstructed_chains")}
-    for index, (start, end) in enumerate(zip(decoded["sample_offsets"][:-1], decoded["sample_offsets"][1:])):
-        document, chains, _ = worker.protein_document(decoded["pos"][start:end].tobytes(),
-            decoded["mask"][start:end].tobytes(), decoded["aatype"][start:end].tobytes(), f"AF-{index}")
-        buffers, _ = worker.pack(document, protein_only=True, complete_tokens=True, validate=True)
+    result = {
+        key: []
+        for key in (
+            "eligible",
+            "complete_residues",
+            "max_chain_residues",
+            "reconstructed_chains",
+        )
+    }
+    for index, (start, end) in enumerate(
+        zip(decoded["sample_offsets"][:-1], decoded["sample_offsets"][1:])
+    ):
+        document, chains, _ = worker.protein_document(
+            decoded["pos"][start:end].tobytes(),
+            decoded["mask"][start:end].tobytes(),
+            decoded["aatype"][start:end].tobytes(),
+            f"AF-{index}",
+        )
+        buffers, _ = worker.pack(
+            document, protein_only=True, complete_tokens=True, validate=True
+        )
         tokens = arrays(buffers)
         _, counts = np.unique(tokens["chain_idx"], return_counts=True)
         maximum = int(counts.max(initial=0))
@@ -102,10 +132,15 @@ def test_full_packed_shard_matches_native_document_and_complete_chain_counts():
         np.testing.assert_array_equal(actual[key], expected[key], err_msg=key)
     np.testing.assert_array_equal(actual["eligible"], [False, False, True, True])
     assert actual["eligible"].dtype == bool
-    assert all(value.dtype == np.int64 for key, value in actual.items() if key != "eligible")
+    assert all(
+        value.dtype == np.int64 for key, value in actual.items() if key != "eligible"
+    )
 
 
-@pytest.mark.parametrize("case", ["sidechain_gap", "backbone_gap", "split_chains", "all_incomplete", "exact_crop"])
+@pytest.mark.parametrize(
+    "case",
+    ["sidechain_gap", "backbone_gap", "split_chains", "all_incomplete", "exact_crop"],
+)
 def test_missing_atoms_and_chain_breaks_match_complete_token_output(case):
     sequence, xyz = protein(384 if case == "exact_crop" else 60)
     if case == "sidechain_gap":
@@ -126,10 +161,17 @@ def test_missing_atoms_and_chain_breaks_match_complete_token_output(case):
         assert actual["reconstructed_chains"].tolist() == [1]
 
 
-@pytest.mark.parametrize("value", [.8, 1.8, np.nextafter(np.float32(.8), np.float32(1)),
-                                  np.nextafter(np.float32(.8), np.float32(0)),
-                                  np.nextafter(np.float32(1.8), np.float32(1)),
-                                  np.nextafter(np.float32(1.8), np.float32(2))])
+@pytest.mark.parametrize(
+    "value",
+    [
+        0.8,
+        1.8,
+        np.nextafter(np.float32(0.8), np.float32(1)),
+        np.nextafter(np.float32(0.8), np.float32(0)),
+        np.nextafter(np.float32(1.8), np.float32(1)),
+        np.nextafter(np.float32(1.8), np.float32(2)),
+    ],
+)
 def test_connectivity_uses_native_float32_strict_distance_bounds(value):
     sequence, xyz = protein(60)
     xyz[29, 2] = [0, 0, 0]
@@ -140,9 +182,24 @@ def test_connectivity_uses_native_float32_strict_distance_bounds(value):
         np.testing.assert_array_equal(actual[key], expected[key], err_msg=key)
 
 
-@pytest.mark.parametrize("bits", [0, 0x80000000, 1, 0x80000001, 0x007fffff, 0x00800000,
-                                 0x3f800001, 0xbf800001, 0x7f7fffff, 0xff7fffff,
-                                 0x7fc00001, 0xffc01234, 0x7f800001])
+@pytest.mark.parametrize(
+    "bits",
+    [
+        0,
+        0x80000000,
+        1,
+        0x80000001,
+        0x007FFFFF,
+        0x00800000,
+        0x3F800001,
+        0xBF800001,
+        0x7F7FFFFF,
+        0xFF7FFFFF,
+        0x7FC00001,
+        0xFFC01234,
+        0x7F800001,
+    ],
+)
 def test_exponent_finite_checks_match_decoder_and_native_tokens(bits):
     sequence, xyz = protein(50)
     xyz[0, 4] = np.uint32(bits).view(np.float32)
@@ -150,10 +207,14 @@ def test_exponent_finite_checks_match_decoder_and_native_tokens(bits):
     actual, expected = scan(raw), reference(raw)
     for key in actual:
         np.testing.assert_array_equal(actual[key], expected[key], err_msg=key)
-    assert bool(actual["eligible"][0]) == bool(np.isfinite(np.uint32(bits).view(np.float32)))
+    assert bool(actual["eligible"][0]) == bool(
+        np.isfinite(np.uint32(bits).view(np.float32))
+    )
 
 
-@pytest.mark.parametrize("case", ["infinite", "negative_infinite", "partial_nan", "missing_ca", "padding"])
+@pytest.mark.parametrize(
+    "case", ["infinite", "negative_infinite", "partial_nan", "missing_ca", "padding"]
+)
 def test_invalid_coordinate_fields_fail_like_the_full_decoder(case):
     sequence, xyz = protein(50)
     if case in {"infinite", "negative_infinite"}:
@@ -191,7 +252,9 @@ def test_scan_reads_the_arrow_buffer_without_mutating_or_retaining_it(unsigned):
     assert result["eligible"].tolist() == [True]
 
 
-@pytest.mark.parametrize("buffer", [lambda raw: bytearray(raw), lambda raw: memoryview(raw)[::2]])
+@pytest.mark.parametrize(
+    "buffer", [lambda raw: bytearray(raw), lambda raw: memoryview(raw)[::2]]
+)
 def test_scan_rejects_mutable_or_noncontiguous_buffers(buffer):
     with pytest.raises(ValueError, match="read-only contiguous"):
         native().afdb_eligibility(buffer(encode([protein(50)])))

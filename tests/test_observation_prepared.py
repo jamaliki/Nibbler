@@ -11,7 +11,13 @@ import pytest
 import nibbler
 from nibbler.observations import PreparedObservationSource
 from test_observation_ligand_hydrogens import (
-    ULW_PARENTS, ULW_ROWS, arrays, document, ligand_document, ligand_packer, ulw_packer,
+    ULW_PARENTS,
+    ULW_ROWS,
+    arrays,
+    document,
+    ligand_document,
+    ligand_packer,
+    ulw_packer,
 )
 from test_observation_protein_parents import document as protein_document
 
@@ -29,24 +35,42 @@ def assert_equal(first, second):
 @pytest.mark.parametrize("complete", [False, True])
 @pytest.mark.parametrize("complete_tokens", [False, True])
 @pytest.mark.parametrize("with_keys", [False, True])
-@pytest.mark.parametrize("hydrogens_unknown,chemical_unknown", [(False, False), (False, True), (True, False), (True, True)])
-def test_prepared_pack_matches_all_target_options(complete, complete_tokens, with_keys,
-                                                 hydrogens_unknown, chemical_unknown):
+@pytest.mark.parametrize(
+    "hydrogens_unknown,chemical_unknown",
+    [(False, False), (False, True), (True, False), (True, True)],
+)
+def test_prepared_pack_matches_all_target_options(
+    complete, complete_tokens, with_keys, hydrogens_unknown, chemical_unknown
+):
     native = ligand_packer()
     doc = ligand_document(3)
     source = native.prepare_source(doc)
     _, keys = native.pack(doc)
-    options = dict(complete=complete, complete_tokens=complete_tokens, with_keys=with_keys,
-        expected_keys=json.dumps(keys[::-1]), validate=True,
-        target_uncertainties=json.dumps([dict(parent_key=keys[0], hydrogens_unknown=hydrogens_unknown,
-            chemical_unknown=chemical_unknown, reasons=["test"]) ]))
+    options = dict(
+        complete=complete,
+        complete_tokens=complete_tokens,
+        with_keys=with_keys,
+        expected_keys=json.dumps(keys[::-1]),
+        validate=True,
+        target_uncertainties=json.dumps(
+            [
+                dict(
+                    parent_key=keys[0],
+                    hydrogens_unknown=hydrogens_unknown,
+                    chemical_unknown=chemical_unknown,
+                    reasons=["test"],
+                )
+            ]
+        ),
+    )
     assert_equal(native.pack(doc, **options), native.pack_prepared(source, **options))
 
 
 def test_source_owns_its_selected_model_and_cannot_change_document():
     native = ligand_packer()
-    doc = document("HETATM C4 C G LIG 1 . 101 . 0 0 0 1\n"
-                   "HETATM C4 C G LIG 1 . 101 . 20 0 0 2\n")
+    doc = document(
+        "HETATM C4 C G LIG 1 . 101 . 0 0 0 1\nHETATM C4 C G LIG 1 . 101 . 20 0 0 2\n"
+    )
     first = native.prepare_source(doc, model=1)
     second = native.prepare_source(doc, model=2)
     assert_equal(native.pack(doc, model=2), native.pack_prepared(second))
@@ -82,8 +106,14 @@ def test_prepared_source_reads_current_parent_tables_and_keeps_owned_buffers():
     assert tokens["pos"][0, 0, 0] == 5
 
 
-@pytest.mark.parametrize("options", [dict(expected_keys="not JSON"), dict(target_uncertainties="not JSON"),
-    dict(expected_keys=json.dumps([["missing"] * 5]))])
+@pytest.mark.parametrize(
+    "options",
+    [
+        dict(expected_keys="not JSON"),
+        dict(target_uncertainties="not JSON"),
+        dict(expected_keys=json.dumps([["missing"] * 5])),
+    ],
+)
 def test_prepared_target_failures_keep_document_api_errors(options):
     native = ligand_packer()
     doc = ligand_document(3)
@@ -98,13 +128,24 @@ def test_prepared_target_failures_keep_document_api_errors(options):
 def test_protein_topology_and_complete_targets_match():
     native = ligand_packer()
     doc = protein_document()
-    options = dict(complete=True, protein_only=True, complete_tokens=True,
-                   topology_policy="entity_sequence", validate=True, with_keys=False)
-    assert_equal(native.pack(doc, **options), native.pack_prepared(native.prepare_source(doc), **options))
+    options = dict(
+        complete=True,
+        protein_only=True,
+        complete_tokens=True,
+        topology_policy="entity_sequence",
+        validate=True,
+        with_keys=False,
+    )
+    assert_equal(
+        native.pack(doc, **options),
+        native.pack_prepared(native.prepare_source(doc), **options),
+    )
     with pytest.raises(ValueError) as expected:
         native.pack(doc, protein_only=True, topology_policy="bad")
     with pytest.raises(ValueError) as actual:
-        native.pack_prepared(native.prepare_source(doc), protein_only=True, topology_policy="bad")
+        native.pack_prepared(
+            native.prepare_source(doc), protein_only=True, topology_policy="bad"
+        )
     assert str(actual.value) == str(expected.value)
 
 
@@ -124,7 +165,9 @@ def test_source_and_model_errors_precede_dictionary_loading():
     assert str(actual.value) == str(expected.value)
 
 
-@pytest.mark.skipif(not os.environ.get("REDUCE3_CHEM_DATA"), reason="Set REDUCE3_CHEM_DATA")
+@pytest.mark.skipif(
+    not os.environ.get("REDUCE3_CHEM_DATA"), reason="Set REDUCE3_CHEM_DATA"
+)
 def test_dictionary_queries_match_each_heavy_atom_snapshot():
     native = ulw_packer()
     chem = os.environ["REDUCE3_CHEM_DATA"]
@@ -148,14 +191,18 @@ class PathLike:
         return self.value
 
 
-@pytest.mark.skipif(not os.environ.get("REDUCE3_CHEM_DATA"), reason="Set REDUCE3_CHEM_DATA")
+@pytest.mark.skipif(
+    not os.environ.get("REDUCE3_CHEM_DATA"), reason="Set REDUCE3_CHEM_DATA"
+)
 @pytest.mark.parametrize("convert", [str, Path, PathLike])
 def test_supported_chem_paths_keep_queries_and_invalid_model_errors(convert):
     native = ulw_packer()
     chem = convert(os.environ["REDUCE3_CHEM_DATA"])
     doc = document(ULW_ROWS)
     source = native.prepare_source(doc)
-    assert source.missing_hydrogen_dictionaries(chem_data=chem) == native.missing_hydrogen_dictionaries(doc, chem_data=chem)
+    assert source.missing_hydrogen_dictionaries(
+        chem_data=chem
+    ) == native.missing_hydrogen_dictionaries(doc, chem_data=chem)
     with pytest.raises(ValueError) as expected:
         native.missing_hydrogen_dictionaries(doc, chem_data=chem, model=7)
     with pytest.raises(ValueError) as actual:

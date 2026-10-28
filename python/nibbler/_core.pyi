@@ -215,10 +215,16 @@ def prepare_mmcif_chemistry(
     use_observed_hydrogens: bool = True,
 ) -> PreparedChemistry: ...
 def select_mmcif_conformer(
-    model: MmcifModel, model_number: int | None = None, seed: int = 0, policy: str = "occupancy"
+    model: MmcifModel,
+    model_number: int | None = None,
+    seed: int = 0,
+    policy: str = "occupancy",
 ) -> ConformerSelection: ...
 def select_document_conformer(
-    document: CifDocument, model_number: int | None = None, seed: int = 0, policy: str = "occupancy"
+    document: CifDocument,
+    model_number: int | None = None,
+    seed: int = 0,
+    policy: str = "occupancy",
 ) -> ConformerSelection: ...
 def select_conformer_arrays(
     coordinates: list[list[float]],
@@ -258,10 +264,16 @@ def validate_mmcif_model(model: MmcifModel) -> ValidationFields: ...
 def reduce_document(
     document: CifDocument, options: Mapping[str, object]
 ) -> tuple[CifDocument, str, str]: ...
-def reduce_required_parent_sources(document: CifDocument, expected_keys: str, *,
-                                   model: int = 1, chem_data: str | None = None) -> list[int]: ...
-def reduce_chemical_sources(document: CifDocument, *, chem_data: str,
-                            model: int = 1) -> list[str]: ...
+def reduce_required_parent_sources(
+    document: CifDocument,
+    expected_keys: str,
+    *,
+    model: int = 1,
+    chem_data: str | None = None,
+) -> list[int]: ...
+def reduce_chemical_sources(
+    document: CifDocument, *, chem_data: str, model: int = 1
+) -> list[str]: ...
 def validate_geometry_document(
     document: CifDocument,
     chem_data: str,
@@ -272,10 +284,13 @@ def validate_geometry_document(
     restraint_dictionaries: list[CifDocument] | None = None,
     restraint_links: list[tuple[str, int, int]] | None = None,
 ) -> str: ...
+
 class PreparedObservationSource:
     """Frozen selected-model snapshot, unchanged by later document edits."""
     def ligand_components(self) -> list[str]: ...
-    def atom_table(self) -> tuple[dict[str, tuple[str, list[int], bytearray]], dict[str, list[str]]]: ...
+    def atom_table(
+        self,
+    ) -> tuple[dict[str, tuple[str, list[int], bytearray]], dict[str, list[str]]]: ...
     def missing_hydrogen_dictionaries(self, *, chem_data: str) -> list[str]: ...
 
 class LigandTokenTable(TypedDict):
@@ -286,37 +301,77 @@ class LigandTokenTable(TypedDict):
     hydrogen: int
 
 class ObservationPacker:
-    def __init__(self, schema: str, token_table: LigandTokenTable, excluded: list[str]) -> None: ...
-    def add_component(self, component: str, features: dict[str, tuple[int, int, int, int]]) -> None: ...
+    def __init__(
+        self, schema: str, token_table: LigandTokenTable, excluded: list[str]
+    ) -> None: ...
+    def add_component(
+        self, component: str, features: dict[str, tuple[int, int, int, int]]
+    ) -> None: ...
     def add_hydrogen_parents(self, component: str, parents: dict[str, str]) -> None: ...
-    def afdb_eligibility(self, payload: object, *, min_chain_residues: int = 50,
-                         crop_size: int = 384) -> dict[str, tuple[str, list[int], bytearray]]: ...
+    def afdb_eligibility(
+        self, payload: object, *, min_chain_residues: int = 50, crop_size: int = 384
+    ) -> dict[str, tuple[str, list[int], bytearray]]: ...
     @staticmethod
-    def crop_permutation(before: bytes, after: bytes, chains: bytes, ligand: bytes) -> list[int]: ...
+    def crop_permutation(
+        before: bytes, after: bytes, chains: bytes, ligand: bytes
+    ) -> list[int]: ...
     @staticmethod
-    def crop_plans(positions: bytes, chains: bytes, ligand: bytes, usable: bytes, *, crop_size: int = 384,
-                   centre_eligible: bytes | None = None, chain_minimum: bytes | None = None,
-                   chain_protein: bytes | None = None, ligand_limits: tuple[int, int] | None = (64, 9)
-                   ) -> tuple[dict[str, tuple[str, list[int], bytearray]], float]: ...
-    def ligand_components(self, document: CifDocument, *, model: int = 1) -> list[str]: ...
-    def missing_hydrogen_dictionaries(self, document: CifDocument, *, chem_data: str,
-                                     model: int = 1) -> list[str]: ...
-    def prepare_source(self, document: CifDocument, *, model: int = 1) -> PreparedObservationSource:
+    def crop_plans(
+        positions: bytes,
+        chains: bytes,
+        ligand: bytes,
+        usable: bytes,
+        *,
+        crop_size: int = 384,
+        centre_eligible: bytes | None = None,
+        chain_minimum: bytes | None = None,
+        chain_protein: bytes | None = None,
+        ligand_limits: tuple[int, int] | None = (64, 9),
+    ) -> tuple[dict[str, tuple[str, list[int], bytearray]], float]: ...
+    def ligand_components(
+        self, document: CifDocument, *, model: int = 1
+    ) -> list[str]: ...
+    def missing_hydrogen_dictionaries(
+        self, document: CifDocument, *, chem_data: str, model: int = 1
+    ) -> list[str]: ...
+    def prepare_source(
+        self, document: CifDocument, *, model: int = 1
+    ) -> PreparedObservationSource:
         """Copy the selected source once for its queries and target packing."""
         ...
-    def pack_prepared(self, source: PreparedObservationSource, *, complete: bool = False,
-                      topology_policy: str = "observed_connectivity", protein_only: bool = False,
-                      complete_tokens: bool = False, expected_keys: str | None = None,
-                      validate: bool = False, with_keys: bool = True, chem_data: str | None = None,
-                      target_uncertainties: str | None = None, product_targets: str | None = None
-                      ) -> tuple[dict[str, tuple[str, list[int], bytearray]], list[list[str]]]:
+    def pack_prepared(
+        self,
+        source: PreparedObservationSource,
+        *,
+        complete: bool = False,
+        topology_policy: str = "observed_connectivity",
+        protein_only: bool = False,
+        complete_tokens: bool = False,
+        expected_keys: str | None = None,
+        validate: bool = False,
+        with_keys: bool = True,
+        chem_data: str | None = None,
+        target_uncertainties: str | None = None,
+        product_targets: str | None = None,
+    ) -> tuple[dict[str, tuple[str, list[int], bytearray]], list[list[str]]]:
         """Pack a frozen source with the packer's current feature tables."""
         ...
-    def protein_document(self, positions: bytes, masks: bytes, identities: bytes,
-                         identifier: str) -> tuple[CifDocument, int, str]: ...
-    def pack(self, document: CifDocument, *, model: int = 1, complete: bool = False,
-             topology_policy: str = "observed_connectivity", protein_only: bool = False,
-             complete_tokens: bool = False, expected_keys: str | None = None,
-             validate: bool = False, with_keys: bool = True, chem_data: str | None = None,
-             target_uncertainties: str | None = None, product_targets: str | None = None
-             ) -> tuple[dict[str, tuple[str, list[int], bytearray]], list[list[str]]]: ...
+    def protein_document(
+        self, positions: bytes, masks: bytes, identities: bytes, identifier: str
+    ) -> tuple[CifDocument, int, str]: ...
+    def pack(
+        self,
+        document: CifDocument,
+        *,
+        model: int = 1,
+        complete: bool = False,
+        topology_policy: str = "observed_connectivity",
+        protein_only: bool = False,
+        complete_tokens: bool = False,
+        expected_keys: str | None = None,
+        validate: bool = False,
+        with_keys: bool = True,
+        chem_data: str | None = None,
+        target_uncertainties: str | None = None,
+        product_targets: str | None = None,
+    ) -> tuple[dict[str, tuple[str, list[int], bytearray]], list[list[str]]]: ...
