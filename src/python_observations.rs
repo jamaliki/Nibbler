@@ -276,7 +276,6 @@ impl ObservationPacker {
             .detach(|| {
                 // A document that Reduce3 wrote from the document of `base` reads its view from
                 // the model of that document, without a model of its own.
-                #[cfg(feature = "reduce3")]
                 let copied = base.and_then(|base| {
                     source.source_copies(|copied, rows, made| {
                         observations::molecular::View::read_copied(
@@ -291,8 +290,6 @@ impl ObservationPacker {
                         )
                     })?
                 });
-                #[cfg(not(feature = "reduce3"))]
-                let copied = None;
                 match copied {
                     Some(view) => Ok(view),
                     None => observations::molecular::View::read_with_model(

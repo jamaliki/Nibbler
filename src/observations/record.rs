@@ -5,6 +5,7 @@ use super::{Schema, TokenTable, residue};
 use crate::pdbx::ShortText;
 use std::collections::{BTreeSet, HashMap};
 
+#[cfg_attr(not(feature = "reduce3"), allow(dead_code))]
 pub(super) fn token_key(atom: &Atom, ligand: bool) -> [String; 5] {
     [
         atom.chain.as_str().to_owned(),

@@ -136,6 +136,7 @@ fn word<const N: usize>(bytes: &[u8], start: usize) -> [u8; N] {
 /// by sharing its buffer entry, or new text, which goes after the source entries.
 /// Consecutive equal new texts share one entry.
 #[derive(Debug)]
+#[cfg_attr(not(feature = "reduce3"), allow(dead_code))]
 pub(crate) struct SourceColumnBuilder<'a> {
     source_indices: &'a [u32],
     source_mask: Option<&'a [u8]>,
@@ -147,6 +148,7 @@ pub(crate) struct SourceColumnBuilder<'a> {
     last: Option<u32>,
 }
 
+#[cfg_attr(not(feature = "reduce3"), allow(dead_code))]
 impl<'a> SourceColumnBuilder<'a> {
     /// Start from a copy of `source`'s text, with room for `rows` rows and `entries` new
     /// entries of `text` bytes in all; `None` when the source entries do not start at 0

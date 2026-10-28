@@ -11,6 +11,7 @@ use crate::python::PyCifDocument;
 use crate::validation::{Options, load_with_dictionaries, run};
 
 #[pyfunction]
+#[allow(clippy::too_many_arguments)]
 #[pyo3(signature = (document, chem_data, nuclear=false, use_cdl=true, sigma_cutoff=5.0, include_graph=false, restraint_dictionaries=None, restraint_links=None))]
 fn validate_geometry_document(
     py: Python<'_>,

@@ -1,6 +1,7 @@
 //! Explicit linked-product preparation. Ordinary model construction stays lossless.
 
 mod input;
+#[cfg_attr(not(feature = "python"), allow(dead_code))]
 pub(crate) mod library;
 mod links;
 mod product;
@@ -351,6 +352,7 @@ pub(crate) fn prepare_product(
 /// Sites of one residue may come in another order when that order cannot change the
 /// product (see [`order_free`]). Returns the row of `other` that holds each product atom,
 /// or `None` when `other` may give another product.
+#[cfg_attr(not(all(feature = "python", feature = "reduce3")), allow(dead_code))]
 pub(crate) fn product_rows_in(
     product: &PreparedChemistry,
     model: &PdbxModel,
@@ -385,6 +387,7 @@ pub(crate) fn product_rows_in(
 /// of `model_number` in order; `identity` gives a site that holds the values of a row in
 /// every field the product reads apart from coordinates, and `position` gives the row's
 /// coordinates.
+#[cfg_attr(not(all(feature = "python", feature = "reduce3")), allow(dead_code))]
 pub(crate) fn product_rows_with<'a>(
     product: &PreparedChemistry,
     model: &PdbxModel,
@@ -469,6 +472,7 @@ pub(crate) fn product_rows_with<'a>(
 
 /// The row of `rows` that holds each product atom, when every source row of the product has
 /// one and the sites of the `CA`, `C`, `N`, `O3'` and `P` atoms keep their coordinates.
+#[cfg_attr(not(all(feature = "python", feature = "reduce3")), allow(dead_code))]
 fn mapped_rows(
     product: &PreparedChemistry,
     model: &PdbxModel,
@@ -502,6 +506,7 @@ fn mapped_rows(
 
 /// Whether `element` names hydrogen, as [`input::is_hydrogen_element`] decides, without
 /// checking the text as UTF-8.
+#[cfg_attr(not(all(feature = "python", feature = "reduce3")), allow(dead_code))]
 pub(crate) fn hydrogen(element: &ShortText) -> bool {
     ["H", "D", "T", "h", "d", "t"]
         .iter()
@@ -509,6 +514,7 @@ pub(crate) fn hydrogen(element: &ShortText) -> bool {
 }
 
 /// The fields that group atom sites into residues, as [`input::build`] reads them.
+#[cfg_attr(not(all(feature = "python", feature = "reduce3")), allow(dead_code))]
 fn residue_key(
     site: &super::model::AtomSite,
 ) -> (&ShortText, Option<i64>, &ShortText, Option<&ShortText>) {
@@ -526,6 +532,7 @@ fn residue_key(
 /// and its first site gives the residue fields. So the order cannot matter when every site
 /// was paired with a template atom, none names an alternate, whose occupancies are summed in
 /// order, and all share the residue fields.
+#[cfg_attr(not(all(feature = "python", feature = "reduce3")), allow(dead_code))]
 fn order_free(sites: &[super::model::AtomSite], run: &[usize], templated: &[bool]) -> bool {
     let Some(first) = run.first().map(|&row| &sites[row]) else {
         return true;
@@ -542,6 +549,7 @@ fn order_free(sites: &[super::model::AtomSite], run: &[usize], templated: &[bool
 }
 
 /// The block entries that hold `struct_conn` items, and any save frame.
+#[cfg_attr(not(all(feature = "python", feature = "reduce3")), allow(dead_code))]
 fn connection_entries(model: &PdbxModel) -> Vec<&crate::cif::CifEntry> {
     use crate::cif::{CifEntry, in_category};
     model
@@ -565,6 +573,7 @@ fn connection_entries(model: &PdbxModel) -> Vec<&crate::cif::CifEntry> {
 }
 
 /// Whether two atom sites agree in every field the product reads except coordinates.
+#[cfg_attr(not(all(feature = "python", feature = "reduce3")), allow(dead_code))]
 fn same_identity(site: &super::model::AtomSite, other: &super::model::AtomSite) -> bool {
     std::ptr::eq(site, other)
         || site.model_number == other.model_number

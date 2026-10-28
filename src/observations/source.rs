@@ -1347,5 +1347,6 @@ fn finish(
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)]
 #[path = "source_tests.rs"]
 mod tests;

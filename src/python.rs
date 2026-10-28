@@ -194,6 +194,7 @@ impl PyCifDocument {
         &self.document
     }
 
+    #[cfg_attr(not(feature = "reduce3"), allow(dead_code))]
     pub(crate) fn schema_name(&self) -> Option<&str> {
         self.schema.as_deref()
     }

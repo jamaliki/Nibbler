@@ -1,5 +1,7 @@
 //! Tests for explicit chemical-restraint evaluation.
 
+#![allow(clippy::expect_used)]
+
 use _core::geometry::RestraintGraph;
 
 fn graph(

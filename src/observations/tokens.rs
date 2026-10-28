@@ -761,6 +761,7 @@ fn distinct_keys(keys: &[[ShortText; 5]]) -> bool {
     true
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn pack(
     source: &Source,
     schema: &Schema,

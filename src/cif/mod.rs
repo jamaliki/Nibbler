@@ -51,12 +51,14 @@ pub use dictionary::{
 };
 pub use dictionary_compiler::compile_dictionary;
 pub(crate) use dictionary_source::{CategoryColumn, CategoryOccurrence, CategoryView, split_tag};
+#[cfg(feature = "reduce3")]
+pub(crate) use document::LoopColumn;
+pub(crate) use document::TextColumn;
 pub use document::{
     BlockKind, CifBlock, CifDocument, CifEntry, CifFrame, CifItem, CifLoop, CifRow, CifValue,
     CifValueRef, CifValues, OriginalLexeme, QuoteStyle, StandardUncertainty, TextValue,
     TextValueRef,
 };
-pub(crate) use document::{LoopColumn, TextColumn};
 pub use error::{ParseError, ParseErrorCode, SourceSpan, WriteError, WriteErrorCode};
 pub(crate) use fast_hash::FastMap;
 pub use input::{InputError, InputErrorCode, InputLimits, decode_source, read_source_file};
@@ -73,7 +75,9 @@ pub use schema::{SchemaError, SchemaName};
 pub use schema_artifact::encode_dictionary;
 pub use source::SourceBuffer;
 pub use table::{CifCell, CifCellRef, CifColumn, CifTable, ColumnType, MissingKind, RowProvenance};
-pub(crate) use text_column::{SourceColumnBuilder, TextCell, TextColumnBuilder};
+#[cfg(feature = "reduce3")]
+pub(crate) use text_column::SourceColumnBuilder;
+pub(crate) use text_column::{TextCell, TextColumnBuilder};
 pub use validation::{Diagnostic, Severity, ValidationReport, validate_document};
 pub use writer::{format_text, write_canonical, write_preserving};
 

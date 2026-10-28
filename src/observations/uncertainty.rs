@@ -1,11 +1,17 @@
 //! Apply source-row diagnostics to only the affected training targets.
 
-use super::{Schema, Tokens, record, source};
+use super::{Schema, Tokens};
+#[cfg(feature = "reduce3")]
+use super::{record, source};
+#[cfg(feature = "reduce3")]
 use crate::cif::{CifBlock, CifDocument};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+#[cfg(feature = "reduce3")]
+use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests;
 
 /// A stable heavy-atom key and the targets that lack source support.

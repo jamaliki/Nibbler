@@ -93,4 +93,5 @@ pub(super) fn retained_proteins(tokens: &mut Tokens) {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)]
 mod tests;

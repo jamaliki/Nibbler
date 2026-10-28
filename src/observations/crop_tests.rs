@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::useless_vec)]
 
 use super::{
     Cells, CropPlans, LIGAND_LIMITS, SWEEP_MIN_TOKENS, Tally, View, compare, finish, permutation,

@@ -330,6 +330,7 @@ fn source_model_index(structure: &Structure, model_id: usize) -> Result<usize, R
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod source_model_tests {
     use super::{ReduceErrorCode, source_model_index, source_model_number};
     use reduce3::model::{Model, Structure};
@@ -408,6 +409,7 @@ mod source_model_tests {
 }
 
 #[cfg(all(test, feature = "python"))]
+#[allow(clippy::expect_used, clippy::useless_vec)]
 mod copy_tests {
     use super::{Params, SourceCopies, load_monomer_library, run_recording};
 
@@ -426,7 +428,7 @@ mod copy_tests {
             let copies = copies.expect("The sink must rewrite the source _atom_site loop");
             assert!(copies.rows.iter().any(|row| *row != SourceCopies::NONE));
             assert!(
-                copies.rows.iter().any(|row| *row == SourceCopies::NONE)
+                copies.rows.contains(&SourceCopies::NONE)
                     || copies.made.iter().any(|made| *made != 0)
             );
             let full = crate::pdbx::build_model(reduction.document())

@@ -352,5 +352,6 @@ pub(super) fn for_source(library: &MonLib, source: &Source) -> Result<Vec<Site>,
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::panic)]
 #[path = "bridges_tests.rs"]
 mod tests;
