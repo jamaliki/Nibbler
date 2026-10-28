@@ -9,7 +9,8 @@ use std::collections::{BTreeMap, HashMap};
 ///
 /// # Errors
 ///
-/// Returns the same errors as [`select_atom_conformers`], or an absent model error.
+/// Returns the same errors as [`select_atom_conformers`](super::select_atom_conformers), or an
+/// absent model error.
 pub fn select_conformer(
     model: &PdbxModel,
     number: Option<i64>,
