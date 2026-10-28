@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
+from chem_data_gate import skip_without_chem_data
 
 import nibbler
 
@@ -46,7 +47,7 @@ def run(document, **options):
         return nibbler.reduce.run(document, **options)
     except nibbler.ChemistryError as error:
         if "REDUCE_MONOMER_LIBRARY_NOT_FOUND" in str(error):
-            pytest.skip("chem_data not found (set REDUCE3_CHEM_DATA)")
+            skip_without_chem_data("chem_data not found (set REDUCE3_CHEM_DATA)")
         raise
 
 

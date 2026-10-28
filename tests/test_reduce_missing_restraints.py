@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from chem_data_gate import skip_without_chem_data
 from token_tables import token_table
 
 import nibbler
@@ -42,7 +43,7 @@ def run(source, **options):
         return nibbler.reduce.run(source, **options)
     except nibbler.ChemistryError as error:
         if error.code == "REDUCE_MONOMER_LIBRARY_NOT_FOUND":
-            pytest.skip("chem_data not found (set REDUCE3_CHEM_DATA)")
+            skip_without_chem_data("chem_data not found (set REDUCE3_CHEM_DATA)")
         raise
 
 

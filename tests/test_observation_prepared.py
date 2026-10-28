@@ -7,6 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from chem_data_gate import needs_reduce3_chem_data
 from test_observation_ligand_hydrogens import (
     ULW_PARENTS,
     ULW_ROWS,
@@ -164,9 +165,7 @@ def test_source_and_model_errors_precede_dictionary_loading():
     assert str(actual.value) == str(expected.value)
 
 
-@pytest.mark.skipif(
-    not os.environ.get("REDUCE3_CHEM_DATA"), reason="Set REDUCE3_CHEM_DATA"
-)
+@needs_reduce3_chem_data
 def test_dictionary_queries_match_each_heavy_atom_snapshot():
     native = ulw_packer()
     chem = os.environ["REDUCE3_CHEM_DATA"]
@@ -190,9 +189,7 @@ class PathLike:
         return self.value
 
 
-@pytest.mark.skipif(
-    not os.environ.get("REDUCE3_CHEM_DATA"), reason="Set REDUCE3_CHEM_DATA"
-)
+@needs_reduce3_chem_data
 @pytest.mark.parametrize("convert", [str, Path, PathLike])
 def test_supported_chem_paths_keep_queries_and_invalid_model_errors(convert):
     native = ulw_packer()

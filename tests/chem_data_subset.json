@@ -1,0 +1,810 @@
+{
+  "schema": "nibbler.chem-data-subset.v1",
+  "sources": {
+    "chemical_components": "https://files.rcsb.org/ligands/download/",
+    "geostd": "https://raw.githubusercontent.com/phenix-project/geostd/f4d21cc5f4dbf84f55cc972fb6b287354300ab2d/",
+    "mon_lib": "https://raw.githubusercontent.com/MonomerLibrary/monomers/1c97ea23a7df06373ed01cd7c3156a1f8e9b27e3/"
+  },
+  "files": {
+    "chemical_components/a/data_A.cif": {
+      "bytes": 11501,
+      "sha256": "46db841d33a8147dcd5a3802123e362d708c875f9ba7db457525f094ab55179a"
+    },
+    "chemical_components/a/data_ACE.cif": {
+      "bytes": 8656,
+      "sha256": "463cfab0e3ed37e0c6308546855d30c14408b2031fe9c0996acd67185c314074"
+    },
+    "chemical_components/a/data_ALA.cif": {
+      "bytes": 6071,
+      "sha256": "6d32b34d4f7b3ddf0cd3dff3f98ddaf7649bc5303ff9a8bd95ba62283f47a1ca"
+    },
+    "chemical_components/a/data_ARG.cif": {
+      "bytes": 7937,
+      "sha256": "191c437cfa501e0a87d275ca3d39974a1a9c8dc704df61bfc442a4c314e196ac"
+    },
+    "chemical_components/a/data_ASN.cif": {
+      "bytes": 6806,
+      "sha256": "81491bbdb49f96e2945192c07510324d206298d3479029b76defba2ed6ab2dc7"
+    },
+    "chemical_components/a/data_ASP.cif": {
+      "bytes": 6574,
+      "sha256": "82c4a2d0b5eda0a32c36f106f0bb00edbc5bc51172db414fdc494025b7b8c858"
+    },
+    "chemical_components/a/data_ATP.cif": {
+      "bytes": 10669,
+      "sha256": "06d876e9fe28b6981725288cd03943818ef6faf4839782c2a0a8929d65c85336"
+    },
+    "chemical_components/c/data_C.cif": {
+      "bytes": 8261,
+      "sha256": "4937647bc2142b3a67fedb3db7e4f24c0ecad844ca5330356f2e95a981e9544e"
+    },
+    "chemical_components/c/data_CYS.cif": {
+      "bytes": 6155,
+      "sha256": "b28c79381f9f41fe57a9e97468fc8101d5fd1064272a22da1eed6d05d27a24cc"
+    },
+    "chemical_components/d/data_DA.cif": {
+      "bytes": 9797,
+      "sha256": "57f7122cec3b98b35d1ab6428b6e0ed84898d37857d048079e1455804f4fa225"
+    },
+    "chemical_components/d/data_DAL.cif": {
+      "bytes": 6083,
+      "sha256": "f29d3359f7a31a3a3a0298e04ae698f06a0002642a2c73075f6511801d75a824"
+    },
+    "chemical_components/d/data_DC.cif": {
+      "bytes": 9563,
+      "sha256": "898169cacb03d9375cabe76813110e69e3892609ef3afb9f8e48576541179ea4"
+    },
+    "chemical_components/d/data_DG.cif": {
+      "bytes": 10126,
+      "sha256": "87b9c4eddf89edcbc7aba4f77ed2159bb572e9c8092409d893998be426d872f2"
+    },
+    "chemical_components/d/data_DT.cif": {
+      "bytes": 9826,
+      "sha256": "6fda70602012a9fbed3529298e850cd34fef2c3074856ee7fb5d6007fe02a4f6"
+    },
+    "chemical_components/d/data_DTY.cif": {
+      "bytes": 6751,
+      "sha256": "dc2f707ce5e6d6ea562cd99d7c35086abdf00333bc47c4c376ed675343f4a1e3"
+    },
+    "chemical_components/e/data_EJ2.cif": {
+      "bytes": 6514,
+      "sha256": "e56323dac1d3a94f45556b2ed6f2f075cf6c0d55cee9e43a1e08616fe0fc7a85"
+    },
+    "chemical_components/e/data_ENT.cif": {
+      "bytes": 9900,
+      "sha256": "9015e210510c6d4e92e00155df7688b645b28cf6c335401c2eca02477364969a"
+    },
+    "chemical_components/f/data_F3S.cif": {
+      "bytes": 6820,
+      "sha256": "587fdd7350a520ddfab415fdbd80145284a903a4404d6b27a7f2aa5408f12036"
+    },
+    "chemical_components/f/data_FES.cif": {
+      "bytes": 10579,
+      "sha256": "60189f10b282964fab77a5e4e3735156ff5ca65a21ada1537db9147396f9df2a"
+    },
+    "chemical_components/g/data_G.cif": {
+      "bytes": 9786,
+      "sha256": "4fbcf5b5222d7c7f0a761676cffa9bb997daa8f76d41fdb7657aa59e969b85fa"
+    },
+    "chemical_components/g/data_GLN.cif": {
+      "bytes": 7124,
+      "sha256": "b542ea5c013fbe0c7acee8e3f42d5dc4e392bd16c0aa545edbf6cb3c335ca30f"
+    },
+    "chemical_components/g/data_GLU.cif": {
+      "bytes": 7120,
+      "sha256": "99fa19054d31b07e7101b33ad9cc847cc6a209da60de279aed5e6a9236bb6da4"
+    },
+    "chemical_components/g/data_GLY.cif": {
+      "bytes": 5615,
+      "sha256": "c49458946b0ebc057db6ad0a4e1557a1caaed4c80a203accd458efddccbf92ff"
+    },
+    "chemical_components/h/data_HEC.cif": {
+      "bytes": 20432,
+      "sha256": "45dcc73207680e34ee82e1a3d62145f333ee6c4bfd245a7014585df596fe96bf"
+    },
+    "chemical_components/h/data_HIS.cif": {
+      "bytes": 6467,
+      "sha256": "89355e09d9c622dd514738e559d7a75ab0a1659df9a179978e88e1a44704a46f"
+    },
+    "chemical_components/h/data_HOH.cif": {
+      "bytes": 3741,
+      "sha256": "fba49260366ebecbde618cc380f3557016d6fdef5c1836337be8f89ed62750b5"
+    },
+    "chemical_components/h/data_HYP.cif": {
+      "bytes": 7165,
+      "sha256": "4150e8042bfe6d386eec2ca80ff0dfbeea3c67284d84b84c19c2aa90257d912d"
+    },
+    "chemical_components/i/data_ILE.cif": {
+      "bytes": 6487,
+      "sha256": "8166adcc6acb4661f4a167b0a4295879612dfad3f1a6b6f1b7bd0589c5bded93"
+    },
+    "chemical_components/l/data_LEU.cif": {
+      "bytes": 7251,
+      "sha256": "fc56e022bc8baa25dc6e543b2c46664e365779aa1dda9831576fdf10b30ab84b"
+    },
+    "chemical_components/l/data_LYS.cif": {
+      "bytes": 7549,
+      "sha256": "318a0f6fa8f98682b35e1793517d5b683b9045c1e6174bc564b7d43e07e4c07c"
+    },
+    "chemical_components/m/data_MAN.cif": {
+      "bytes": 9785,
+      "sha256": "79bc85094a794dfccdb827470fed9124e2dcaac2266d366d120d242d3d7aa8d5"
+    },
+    "chemical_components/m/data_MBO.cif": {
+      "bytes": 8954,
+      "sha256": "2eb8ad090e48b470fd1ce055fedbd2b138c1be29d6813829a365ccc49dbb4751"
+    },
+    "chemical_components/m/data_MET.cif": {
+      "bytes": 6961,
+      "sha256": "a89adea8738d069b0a7bb0c3efc26b362dcc624ef9abd3b3f4bfaedd785f3afd"
+    },
+    "chemical_components/m/data_MSE.cif": {
+      "bytes": 7035,
+      "sha256": "2f8373207105fd6e18aa25ec22cfb229987da61cc79a3980e64d7ee31fb4d31c"
+    },
+    "chemical_components/n/data_NAG.cif": {
+      "bytes": 11333,
+      "sha256": "eada750ebb20e7abd76ef486c0a8278e461309e1cdde415545bb1c63c09bfb0f"
+    },
+    "chemical_components/n/data_NH2.cif": {
+      "bytes": 8171,
+      "sha256": "201cd96928975d125408ecda11d69139f08280cfef91f86c8f9b4e5e464fd627"
+    },
+    "chemical_components/n/data_NMM.cif": {
+      "bytes": 8633,
+      "sha256": "168f0c20415ab33adddb45bfae531b14d403b28aefb5e899be8fd63213c7e0c4"
+    },
+    "chemical_components/n/data_NWN.cif": {
+      "bytes": 7117,
+      "sha256": "a56b286b91753dc0f6311e3345155d0f66184e097a8cec0a43345eebb1204984"
+    },
+    "chemical_components/p/data_PHE.cif": {
+      "bytes": 7335,
+      "sha256": "002c626d24aec78fd622459d4f4470c682c7c3f9f97d32414fec4313d780496e"
+    },
+    "chemical_components/p/data_PRO.cif": {
+      "bytes": 6591,
+      "sha256": "08674e4d60bc40ad5702b8de6e5e4abb66c2bbb603832c021c31194f4b4e593c"
+    },
+    "chemical_components/s/data_SER.cif": {
+      "bytes": 6234,
+      "sha256": "46db0296a07732854d2c3ca67ed0f74f4c82ddc5698d0e59f433039a5d7c88a0"
+    },
+    "chemical_components/s/data_SF4.cif": {
+      "bytes": 17228,
+      "sha256": "e9447eba0a4ef05710e4df6dc2738643722a8feaa0bf82a49bd862d1f6bdd902"
+    },
+    "chemical_components/t/data_TDA.cif": {
+      "bytes": 9368,
+      "sha256": "743708205e046b579016b3e4e652a8da2d091b048cb6c10120f0dde5c9bd3b08"
+    },
+    "chemical_components/t/data_THR.cif": {
+      "bytes": 5884,
+      "sha256": "feb75dfac5bfcc7045de7a75a31575f3bf3e5b411716a06e92712924759dd554"
+    },
+    "chemical_components/t/data_TRP.cif": {
+      "bytes": 7190,
+      "sha256": "4cea7e281ee404f3e72fc20d3ba98064373cdd9309a7f5c75479a04c4b6e36d6"
+    },
+    "chemical_components/t/data_TYR.cif": {
+      "bytes": 7493,
+      "sha256": "fa0ef32f9d623e087a527b0a146c0494a5a656037c6448d956072dd2406fa554"
+    },
+    "chemical_components/u/data_U.cif": {
+      "bytes": 8103,
+      "sha256": "de78a1e4a9860baaefc17c5e509fad96b0b25e0b62f90352976f9079cd4b051b"
+    },
+    "chemical_components/v/data_VAL.cif": {
+      "bytes": 6068,
+      "sha256": "9c3c807970c817b1e1a4b43164db91a5bf1e7bf438b3269c5649f6ce84d4c0ed"
+    },
+    "chemical_components/x/data_XAA.cif": {
+      "bytes": 6004,
+      "sha256": "d1d9c77ea847a9f9cdff0e2d27d1a9fc2a8667a57beacc4b89d81ee16b51598c"
+    },
+    "chemical_components/x/data_XBB.cif": {
+      "bytes": 5556,
+      "sha256": "f644103ea03cc841e9f8f431304ebf3ab50f6a186a3c61f1c6149e1d6070db78"
+    },
+    "chemical_components/x/data_XRU.cif": {
+      "bytes": 12526,
+      "sha256": "caa42b06390890248f6dcd7d7752eeae81af5042193a573063dd51dfbbdda81a"
+    },
+    "chemical_components/x/data_XZA.cif": {
+      "bytes": 5349,
+      "sha256": "23d8503d90aab0bb9c96543778a32e0491ffec054f46e751550fb923253a93b7"
+    },
+    "chemical_components/z/data_Z41.cif": {
+      "bytes": 17959,
+      "sha256": "8c3881bda393053b7b8a095f2a06f2c04f43d2bc57b08c9504054fc9beef8716"
+    },
+    "chemical_components/z/data_ZN.cif": {
+      "bytes": 3409,
+      "sha256": "dfd90cb88732a63f688150e3768c67b26dc9e9dfcd43037e125781a7e9cd9667"
+    },
+    "chemical_components/z/data_ZZZ.cif": {
+      "bytes": 7091,
+      "sha256": "6fb037da930c8e2d32ffa43a09da215554814541a04328f2302663a0632aaf6b"
+    },
+    "geostd/a/data_A.cif": {
+      "bytes": 7480,
+      "sha256": "5a60e43bcfc1cdcc9ebe4163cea5f76e81a5435ec7eea24ecf7ab6e3ca4de5fc"
+    },
+    "geostd/a/data_ACE.cif": {
+      "bytes": 2540,
+      "sha256": "37da97d1fc4b7049ded53dab1a019c72e97cc386f11c5b54211f541a87d71971"
+    },
+    "geostd/a/data_AD.cif": {
+      "bytes": 8180,
+      "sha256": "b72b4db48c68fea9968994f84da832222aa58435a379a821aa092d55f6411a79"
+    },
+    "geostd/a/data_ALA.cif": {
+      "bytes": 3050,
+      "sha256": "ab9df11569800dc344171d5abc52d0f0bc4c362f8e2f3ea40a8c616dc9ede825"
+    },
+    "geostd/a/data_AR.cif": {
+      "bytes": 986,
+      "sha256": "84a20e62183e9538e92ef00a597153081c76956c8a70b5e7873fbfc6ab1b6a8c"
+    },
+    "geostd/a/data_ARG.cif": {
+      "bytes": 12424,
+      "sha256": "ec3c29547bbf6dbb1cd180d5c136e65c98f1fc6b3fd0ea5afb888e0a20ae3061"
+    },
+    "geostd/a/data_ASN.cif": {
+      "bytes": 4820,
+      "sha256": "04ba6499c4fa124ec2fbbded1d81a441d686fe5a41b2cffeac3a843f23f9b708"
+    },
+    "geostd/a/data_ASP.cif": {
+      "bytes": 4138,
+      "sha256": "2657292d7d3442870c41446868500f1a3fce2b95f325d9bddfa9010105c4f523"
+    },
+    "geostd/a/data_ATP.cif": {
+      "bytes": 13772,
+      "sha256": "2fb9e8cf7d790f634393dbccbb67e12f611285a86bf5a3706b7c693df2ff266f"
+    },
+    "geostd/a/data_ATP_pH_low.cif": {
+      "bytes": 14982,
+      "sha256": "5fbf898282dbd24299aea0de44d6f81b307c3a87940aafe1f06db81faae1ebaf"
+    },
+    "geostd/c/data_C.cif": {
+      "bytes": 7050,
+      "sha256": "0d10c7872d838ce3183d933d95b6cf279971b5cb04e52df6be8f9348cbf01d4f"
+    },
+    "geostd/c/data_CD.cif": {
+      "bytes": 6809,
+      "sha256": "d1aaa8a8fde01e51d3ce99a8a1ffd6ba53e31ab231bc714349d73807f115171f"
+    },
+    "geostd/c/data_CYS.cif": {
+      "bytes": 3549,
+      "sha256": "4eb107ec4dd22ce923832d2401e144125f92e444d25a9eb279123ed656d8e007"
+    },
+    "geostd/d/data_DA.cif": {
+      "bytes": 11331,
+      "sha256": "5d5cace25cfb28f470ae83dd8820687abdda278267cfaf6e69d191036f8eebd4"
+    },
+    "geostd/d/data_DAL.cif": {
+      "bytes": 4191,
+      "sha256": "a3908b59cefc8ba59cc67ee2aeeb1e47f52c651fefb2dc1bfd9223dd6209ae55"
+    },
+    "geostd/d/data_DAL_pH_low.cif": {
+      "bytes": 4208,
+      "sha256": "de461af4b9c7f7f95027a9b65bd800735e283b9d58ae61f911cfd4bf72944b9a"
+    },
+    "geostd/d/data_DC.cif": {
+      "bytes": 9902,
+      "sha256": "5595542f7c4109c90d5cacd17a6e0edcb56ab0f9ee29032f99cbed755bd647e0"
+    },
+    "geostd/d/data_DG.cif": {
+      "bytes": 11119,
+      "sha256": "93b619563eb595addaa175491c70c40bd90a9d32b229f7b3b3f72742cd5c39d6"
+    },
+    "geostd/d/data_DPR.cif": {
+      "bytes": 5067,
+      "sha256": "13203ff5f410c6fa777c14c094b1a8282b2a847190267d3d622ca90401ef22be"
+    },
+    "geostd/d/data_DPR_pH_low.cif": {
+      "bytes": 5331,
+      "sha256": "017277a178c0f3dabe96c3329df5868eafd039250353d0e7b37d5338e01f1537"
+    },
+    "geostd/d/data_DT.cif": {
+      "bytes": 10429,
+      "sha256": "a29bf27c2fc1d88c110ba8084f54bc7585d1b1488a1b4550b0fb501ee8d0ce91"
+    },
+    "geostd/d/data_DTH.cif": {
+      "bytes": 5533,
+      "sha256": "7517034727b5297a185ae2ce561dfd20134b03ed3a4e24dd8c2439c63a4dc105"
+    },
+    "geostd/d/data_DTH_pH_low.cif": {
+      "bytes": 5377,
+      "sha256": "e4e862df37480db5b27a9c9bbda1c2ce39819a7c08cb0906fce610fdf021e6d1"
+    },
+    "geostd/d/data_DTY.cif": {
+      "bytes": 6919,
+      "sha256": "be0a6fd102c1c21114b72cfea43470e8e54a9483eaa6cd99f7eaf8444de1075d"
+    },
+    "geostd/d/data_DTY_pH_low.cif": {
+      "bytes": 7118,
+      "sha256": "80697b9cabfb7efbc4228bded91764e665cd106a2e227bc0ddb4820c64a4879f"
+    },
+    "geostd/e/data_ENT.cif": {
+      "bytes": 13325,
+      "sha256": "0a9b9315c327a4841fd928ec8165021aae9a5a30f5efdf2080bc6abd4af5d2de"
+    },
+    "geostd/e/data_ENT_pH_low.cif": {
+      "bytes": 13407,
+      "sha256": "0823633da62372e15b740b651e82af683929b0b725ff5426acc299cfcfc395cb"
+    },
+    "geostd/ener_lib.cif": {
+      "bytes": 105989,
+      "sha256": "33c526d188364c7ae34bd3cb4d7b1d683548bf911a6e16a07f52e2120676e091"
+    },
+    "geostd/f/data_F3S.cif": {
+      "bytes": 3270,
+      "sha256": "f03910295e4dd2195b177498cb12120d14c765dc446544410540a0ec111e0b56"
+    },
+    "geostd/f/data_FES.cif": {
+      "bytes": 2427,
+      "sha256": "9fb6aae493ed60a1e058c0ff589bb691fbc21e644a5e7f16fc07437c464df8c4"
+    },
+    "geostd/g/data_G.cif": {
+      "bytes": 7872,
+      "sha256": "8248593923f0864caaaec97d24d03cccfa3d352fcb4d05e276fa3b4c21ac24ba"
+    },
+    "geostd/g/data_GD.cif": {
+      "bytes": 7544,
+      "sha256": "c23bd77ec2a8e4515b152633429a139a727dce181d712a08f8d4553e077d0985"
+    },
+    "geostd/g/data_GLN.cif": {
+      "bytes": 6044,
+      "sha256": "285947cc0260fbef7e063a1f37d4b09dd806066ec8cabe9fde0c90629ddc9aed"
+    },
+    "geostd/g/data_GLU.cif": {
+      "bytes": 5062,
+      "sha256": "298f2e8d9f921748c2acc8dee999ba03709c790da92265262d2e7195f9310438"
+    },
+    "geostd/g/data_GLY.cif": {
+      "bytes": 2320,
+      "sha256": "6a694bc1883dcc0dd864931bcb3e2b360418c16144e6533010f1651e3257c114"
+    },
+    "geostd/geostd_ener_lib.cif": {
+      "bytes": 1689,
+      "sha256": "113e59b3bdd0b4602c46238bae05b3bf8877355081fe64b0e037dee8f328e37c"
+    },
+    "geostd/h/data_HIS.cif": {
+      "bytes": 6131,
+      "sha256": "f9b7403c87f68555e31c2aead341ced77842ea3392824f0045a199b7674c4901"
+    },
+    "geostd/h/data_HOH.cif": {
+      "bytes": 1651,
+      "sha256": "b1341980ef96c14b222714330066e2f79ae70d7baf1e72c68122ab2b079718fb"
+    },
+    "geostd/h/data_HYP.cif": {
+      "bytes": 5482,
+      "sha256": "fdd1e5f64618e12aae88e5865a2c72d905e93e3edf7b715dae10b3f536f7f2fd"
+    },
+    "geostd/i/data_ILE.cif": {
+      "bytes": 5650,
+      "sha256": "c7ed87a543f3dbbae8b6db4592f495c861d9126cfb7b8a877465cec34097b0a3"
+    },
+    "geostd/l/data_LEU.cif": {
+      "bytes": 5815,
+      "sha256": "90d64a7299ec81b565539e4cd2288f1880ea8fbb2a8baadc60c2918b8224afeb"
+    },
+    "geostd/l/data_LYS.cif": {
+      "bytes": 10185,
+      "sha256": "01d732d607a878a6a7c7e59edde66821fb1ac5139e9ba5f1b3aec0476c978617"
+    },
+    "geostd/list/geostd_list.cif": {
+      "bytes": 44141,
+      "sha256": "517e554cae815a83644306b5e52b2a7a81e5cca0fce8720dd78b56dd584e16fe"
+    },
+    "geostd/list/mon_lib_list.cif": {
+      "bytes": 309525,
+      "sha256": "00e63e4ec2d7231681679b9123158e2621a040930799a74f39483e79ef7fe91a"
+    },
+    "geostd/m/data_MAN.cif": {
+      "bytes": 7596,
+      "sha256": "8132bc232e9953fd80992ae64f48c1c749ad1549e9df8da9f26a2f116878f171"
+    },
+    "geostd/m/data_MBO.cif": {
+      "bytes": 5093,
+      "sha256": "9fab45f7746c8278219b1ac37365e50f08061585ed5e1b02763aaa571a1d89f2"
+    },
+    "geostd/m/data_MET.cif": {
+      "bytes": 6448,
+      "sha256": "c4d50874e947dd3bccb72a8725b180a3ca5d48613eac0a396737d127abdab4cf"
+    },
+    "geostd/m/data_MSE.cif": {
+      "bytes": 5284,
+      "sha256": "8c9eece51d5a60be21264c3b60f93c31c4eb20e61178b58d8ee829fa3161fe5e"
+    },
+    "geostd/n/data_NAG.cif": {
+      "bytes": 9184,
+      "sha256": "a00c323e25a85719541712e610cfac7d0e07ca9087e87159d51a67281484d491"
+    },
+    "geostd/n/data_NH2.cif": {
+      "bytes": 1646,
+      "sha256": "1fc9d842b3efcc208d295e3ab40fd87d4e15e5dd65c5ab47344d62885f9e4da4"
+    },
+    "geostd/n/data_NMM.cif": {
+      "bytes": 7435,
+      "sha256": "f6a105114695e7724fe5fd8bb06518b562cce4d387ae6075fc863e5feea240c8"
+    },
+    "geostd/p/data_PHE.cif": {
+      "bytes": 6354,
+      "sha256": "95ab6340a2bbe5ab1d8ff10bf3c0ca24ff49e14bf9acca232942dc57ff8bb913"
+    },
+    "geostd/p/data_PRO.cif": {
+      "bytes": 4711,
+      "sha256": "94eafcb83704828fad07a89e40c692644e8a3c2331744c130ed33003dadcb537"
+    },
+    "geostd/rna_dna/chain_link_rna2p.cif": {
+      "bytes": 1363,
+      "sha256": "b880c201ac15ff3e5d31e69671de215507bd9d26df367f5c40186b15a5ca13b5"
+    },
+    "geostd/rna_dna/chain_link_rna3p.cif": {
+      "bytes": 1363,
+      "sha256": "8544dbe0c2f5faa8340c7005737c62e4f39bbe8efc6f57f5219e22e83a197f69"
+    },
+    "geostd/rna_dna/mod_rna2p.cif": {
+      "bytes": 2278,
+      "sha256": "6430554f0eba2ac3177ff87fa425a8e9d596a50b5794d974e53653d797f92cf6"
+    },
+    "geostd/rna_dna/mod_rna2p_pur.cif": {
+      "bytes": 3002,
+      "sha256": "a4cfab10bee0043057fc4b5729449adb6d744a1d709f0d3916cb690d9761ba24"
+    },
+    "geostd/rna_dna/mod_rna2p_pyr.cif": {
+      "bytes": 2886,
+      "sha256": "1a8a52bc40b38800be6f4be2d3a6c0abccd3872419721d27a2607a5528a295c4"
+    },
+    "geostd/rna_dna/mod_rna3p.cif": {
+      "bytes": 2319,
+      "sha256": "9ee18478aa8b52ed81e558e38297674d6354acf9e7722f892cf9f6f1c061c02f"
+    },
+    "geostd/rna_dna/mod_rna3p_pur.cif": {
+      "bytes": 3038,
+      "sha256": "22516033dbe8c4206530864c79c5a15e41d3827b247fd15a65aa338640f797a2"
+    },
+    "geostd/rna_dna/mod_rna3p_pyr.cif": {
+      "bytes": 2922,
+      "sha256": "30fd079d1cecbd1b741315108227c3af239a8a22882347530479a2c6cec67394"
+    },
+    "geostd/s/data_SER.cif": {
+      "bytes": 3547,
+      "sha256": "bd2c436d124c8c111d90f4df3940c42f791a60e7ba1f1ee4a1517d967b2c0f76"
+    },
+    "geostd/s/data_SF4.cif": {
+      "bytes": 3682,
+      "sha256": "38db3cca92d5cba9810bb04ee1bbaff1a7f98ce8d46b3e4976ebdb15031a7ff5"
+    },
+    "geostd/t/data_TD.cif": {
+      "bytes": 7052,
+      "sha256": "592937266abb84eb3d083172a045dbbfa1173a77cbbd6e36094e93094b09c473"
+    },
+    "geostd/t/data_TDA.cif": {
+      "bytes": 9367,
+      "sha256": "e919f598b09db8bd70d30f235ae106b6b9cfc2c0ccfcb3f63471f0689821cfc4"
+    },
+    "geostd/t/data_TDA_pH_low.cif": {
+      "bytes": 9568,
+      "sha256": "6527e8b6d307f2404cd683c6013dda1cce32d49489876bdc6f4aa8c23f16c16c"
+    },
+    "geostd/t/data_THR.cif": {
+      "bytes": 4298,
+      "sha256": "444c0a967214c2c57ae86b1d8e636c831f2542aa08bb03e9da47c27fed7b9efa"
+    },
+    "geostd/t/data_TRP.cif": {
+      "bytes": 7093,
+      "sha256": "0a9638e50e18875c0d3b55878cce4daec0acb6c11bc8804c54da8977123c73f6"
+    },
+    "geostd/t/data_TRY.cif": {
+      "bytes": 8091,
+      "sha256": "abc29f80be30f43fbdb658e5fdf274adfaceb1c35e16960e4ed2653b9ba02419"
+    },
+    "geostd/t/data_TRY_pH_low.cif": {
+      "bytes": 8287,
+      "sha256": "d83c171c8a2e01398ad74870f4ebcf8c2a01b391b55d4f8a956ea2adcc1e02f7"
+    },
+    "geostd/t/data_TYR.cif": {
+      "bytes": 6569,
+      "sha256": "997a4efd886bbe2785fd5bb3a1ae31e640fe7397822d36815e7f8bf85c9bc0a4"
+    },
+    "geostd/u/data_U.cif": {
+      "bytes": 6818,
+      "sha256": "26c0626bcca03724d7c61beb055b1a75c1ab28d55b1bf92915679ec870e31670"
+    },
+    "geostd/v/data_VAL.cif": {
+      "bytes": 4678,
+      "sha256": "2fd819b0e2355c03a85204c245730b7e46abbbbf0c4fe0a8e65e47ba77697d32"
+    },
+    "geostd/x/data_XAA.cif": {
+      "bytes": 6945,
+      "sha256": "23f1d58b2bbac608a7e6c5d58e07d6ad82473c210656043c63bfe75824a1ca6a"
+    },
+    "geostd/x/data_XBB.cif": {
+      "bytes": 5316,
+      "sha256": "ea4b6c7cd9130ac0035306cb9010d5ac21d2554dcb810054e6865ff8945c30e8"
+    },
+    "geostd/x/data_XRU.cif": {
+      "bytes": 19319,
+      "sha256": "9432ff38e0708c97ef73dc05bf06f3a94ab3c6a7b2a8940febbabf2839e3eb61"
+    },
+    "geostd/x/data_XZA.cif": {
+      "bytes": 3009,
+      "sha256": "aa7d7f29f38a7e9b6a0abe616ae61ff6ce22207bbc0ee118fe20b361130649ad"
+    },
+    "geostd/x/data_XZA_pH_low.cif": {
+      "bytes": 3233,
+      "sha256": "d36995ef74cabd4619418fe573368a3ac46f69ce871d86b8d5c2efceaba0155a"
+    },
+    "geostd/z/data_Z41.cif": {
+      "bytes": 23449,
+      "sha256": "0a07312de94312c2b5c8c731597bb0c682affdbffef82f784ea1632ed2d97019"
+    },
+    "geostd/z/data_ZZZ.cif": {
+      "bytes": 7908,
+      "sha256": "3520e0ee086879e9d981c122271b5a55f17ccc67ee5e0bd82ec15f0ea4e9204b"
+    },
+    "mon_lib/a/A.cif": {
+      "bytes": 16272,
+      "sha256": "58558c0f6aab4e9e24bede0040875e241d5029e6dcb4ad0d8105c4b8fe144951"
+    },
+    "mon_lib/a/ACE.cif": {
+      "bytes": 4296,
+      "sha256": "fef81986e265fa55a9460d55a6a16a69dd88691a78b77a5642ab78d3d2bcb856"
+    },
+    "mon_lib/a/ALA.cif": {
+      "bytes": 4675,
+      "sha256": "5ebdeb4b6dc8c3b24af5a2cecc106066c2306913623c3b2ff275aca5c77a9500"
+    },
+    "mon_lib/a/AR.cif": {
+      "bytes": 637,
+      "sha256": "82a08f26614545c545f0c3173ac6621339696c2b557cdd50cb6f4a50bf98d03a"
+    },
+    "mon_lib/a/ARG.cif": {
+      "bytes": 7627,
+      "sha256": "695c912702f54f4c1c70e77d19a856fe8efb5c1324c4d920fe7db2e2b4c93214"
+    },
+    "mon_lib/a/ASN.cif": {
+      "bytes": 5623,
+      "sha256": "65fe58e5c9235c2d849c45d36ff9a14c3e5c0641c54a09aeea55327d1cf58a8f"
+    },
+    "mon_lib/a/ASP.cif": {
+      "bytes": 5177,
+      "sha256": "417bcbfba108064da72e35dfffef1761c1a88d763d1326cda78db0d60eb5c258"
+    },
+    "mon_lib/a/ATP.cif": {
+      "bytes": 19232,
+      "sha256": "f221b1e59a46e694793d59584dfaa0690a8be00b48814abe5442353ebcf79a21"
+    },
+    "mon_lib/c/C.cif": {
+      "bytes": 15061,
+      "sha256": "ba8d35fa8b2bb650c41b679fcb2a0b4128c6bd92bea99c463252d3ceb75d4fdd"
+    },
+    "mon_lib/c/CD.cif": {
+      "bytes": 637,
+      "sha256": "55bc2f1fea808b289f60a82e024c02313cc11e038a1fea74385bb8fd448e2b1b"
+    },
+    "mon_lib/c/CR.cif": {
+      "bytes": 637,
+      "sha256": "b13115803c96c0daf8a519f4944d232c1e50243a42168579a0f889891660a141"
+    },
+    "mon_lib/c/CYS.cif": {
+      "bytes": 4873,
+      "sha256": "b3fd383a1a9cb284ab7258ef5f90d84b9180189a5b8b7ecdc5ebac318bab82c8"
+    },
+    "mon_lib/d/DA.cif": {
+      "bytes": 16063,
+      "sha256": "afba58c5b968c88acda95faf0b3631f026a621ba50ef076c0a7aba61dcb89653"
+    },
+    "mon_lib/d/DAL.cif": {
+      "bytes": 4061,
+      "sha256": "38fcfcf73eef1b7ceba00e115f86a9c7fc74436058688a5a687a7a712f8c4fc4"
+    },
+    "mon_lib/d/DC.cif": {
+      "bytes": 14891,
+      "sha256": "9876acb2ec43138a1eece75ab7736d9b7b865917dbccd419533f51709f9721b6"
+    },
+    "mon_lib/d/DG.cif": {
+      "bytes": 16419,
+      "sha256": "a9ebaaabd40310c8f34b4c7bec30c8eb56c166cb63ed56e88d77e965ad1e6de8"
+    },
+    "mon_lib/d/DPR.cif": {
+      "bytes": 5960,
+      "sha256": "b32bdc3a7028fe9ede6a401dfc4b5cb933b5a7e3ff31a45d23f420196bd8c924"
+    },
+    "mon_lib/d/DT.cif": {
+      "bytes": 15417,
+      "sha256": "c24976988c284dc6244add52cccb2383e6cda4509fff11b5912c1df2b8a2796b"
+    },
+    "mon_lib/d/DTH.cif": {
+      "bytes": 5317,
+      "sha256": "c55590298078517ca70834ace3741fe46a6ce48c74897e5f5693119096847650"
+    },
+    "mon_lib/d/DTY.cif": {
+      "bytes": 6147,
+      "sha256": "934adbedac03f1a887608937e9e2d54208a4d421144ee16dbe9a7df1a973d879"
+    },
+    "mon_lib/e/ENT.cif": {
+      "bytes": 20464,
+      "sha256": "deb0f445801edd10f3929255534bc339e980e24cc44ce79b9ff728764ff0891a"
+    },
+    "mon_lib/ener_lib.cif": {
+      "bytes": 110141,
+      "sha256": "397e8d734cfacd75affcb6d29e0b2aec0fbfadf4c29d958d8f40ec3991138b47"
+    },
+    "mon_lib/f/F3S.cif": {
+      "bytes": 2144,
+      "sha256": "bcf239730429c33baef284e6721cd20c0b4d04b6977319bb8e6e248fc440cd41"
+    },
+    "mon_lib/f/FES.cif": {
+      "bytes": 1676,
+      "sha256": "a391cf17b8e0594fb40dbb0cc42c55de2bbfcfa9c6feca0354705518af03b3dd"
+    },
+    "mon_lib/g/G.cif": {
+      "bytes": 16599,
+      "sha256": "1f166448b1ece1693b13e7ea29b1c857af3e41d703ff44e472431e11453c138e"
+    },
+    "mon_lib/g/GD.cif": {
+      "bytes": 637,
+      "sha256": "429392693d67ac81130b4b3c89bc79a54b27208302885960ef41e54511fd8ed5"
+    },
+    "mon_lib/g/GLN.cif": {
+      "bytes": 6217,
+      "sha256": "395bb28f4946135c195817c6b567d9360bb2ee7cf40ed4528d2f39fe6bdfd66f"
+    },
+    "mon_lib/g/GLU.cif": {
+      "bytes": 5747,
+      "sha256": "bcb6406f28bfa3bd6b43e40ada7b3f0985173bff8b4347093a2039745bb6bac5"
+    },
+    "mon_lib/g/GLY.cif": {
+      "bytes": 3898,
+      "sha256": "f58787369bcdfef451870724f8a60734d8a6f7fa115d07f6905a82f8de8e56b9"
+    },
+    "mon_lib/h/HEC.cif": {
+      "bytes": 22349,
+      "sha256": "94f14626b1199b5fd71018690111e2a69f8bd13e5c7513423044179428db7698"
+    },
+    "mon_lib/h/HIS.cif": {
+      "bytes": 6889,
+      "sha256": "4a278d233619716c970678b313cb6c10edf252044128cac0e3106fee78de4b3b"
+    },
+    "mon_lib/h/HOH.cif": {
+      "bytes": 2199,
+      "sha256": "ef2afc06000385404c6d80e9f4d0e30403099f5cd3ff7bdb907e85e92d87ec73"
+    },
+    "mon_lib/h/HYP.cif": {
+      "bytes": 6446,
+      "sha256": "0f649ecfd52832a8650d647365482de96ec00fcefffe41b79b7317e692966181"
+    },
+    "mon_lib/i/ILE.cif": {
+      "bytes": 6523,
+      "sha256": "0b69876d4631eddb1f82b478e8865165e88dbcca9bdf1b277ff3aa3e3da200d6"
+    },
+    "mon_lib/l/LEU.cif": {
+      "bytes": 6458,
+      "sha256": "f030253b830dd6e9391933e271369bb21f29fb6d3b96a473e1fc899efa269597"
+    },
+    "mon_lib/l/LYS.cif": {
+      "bytes": 6921,
+      "sha256": "ecd69367cf7219405ea550a19bd806a370fb4e8fefe0b7f29ee9b899af2d18f3"
+    },
+    "mon_lib/list/additional_restraints.txt": {
+      "bytes": 1561,
+      "sha256": "fa93572a4061e3e8a1ad93ca5089fb19f6aaa51615ea8d423bd28b5a25c0971c"
+    },
+    "mon_lib/list/mon_lib_ind.cif": {
+      "bytes": 1372146,
+      "sha256": "9017832a8237156f84320ecbf4c370b23e323159ea07dd6a9cc19760eeb11067"
+    },
+    "mon_lib/list/mon_lib_list.cif": {
+      "bytes": 4037176,
+      "sha256": "9356cc9becb093a0c2d638922f8359522ed9e57e33782418a24a623f40a85c0d"
+    },
+    "mon_lib/list/mon_lib_one_list.cif": {
+      "bytes": 280512,
+      "sha256": "5050c8c25f7b8be2be3bf83795c267e76ed8d30205b4d1eae00d106c0b33b855"
+    },
+    "mon_lib/m/MAN.cif": {
+      "bytes": 6927,
+      "sha256": "4006a4a025b453e43c83d98b6c3f9d388d8ec50c043a9ef01da7fcc2903cbd37"
+    },
+    "mon_lib/m/MBO.cif": {
+      "bytes": 5561,
+      "sha256": "8f1acabc684aba5d412b8cb6278860c6b16ed2685649c4e56732d1090afeb384"
+    },
+    "mon_lib/m/MET.cif": {
+      "bytes": 5976,
+      "sha256": "12ce4fff0331eb186bf679c5f875b929d329689bc19f7b214111c8e56ba91b4f"
+    },
+    "mon_lib/m/MSE.cif": {
+      "bytes": 5600,
+      "sha256": "64866c96912c0947c53d4e481f724df628c4885ca441d4a4a89e26fb515e643f"
+    },
+    "mon_lib/n/NAG.cif": {
+      "bytes": 8525,
+      "sha256": "15acda7b1d50bbae5d9ec63f20a470523a9344c56446d3920b90165be54c7b07"
+    },
+    "mon_lib/n/NH2.cif": {
+      "bytes": 2391,
+      "sha256": "a1e2adc0c6cc009af512e4922fc487798f7776922e33b3eec29bd5a0887a7075"
+    },
+    "mon_lib/n/NMM.cif": {
+      "bytes": 8552,
+      "sha256": "e252ec937082b0db739263b9fda6feb17a4b74c3e3fc485ddce779e6a95dbdd3"
+    },
+    "mon_lib/p/PHE.cif": {
+      "bytes": 7227,
+      "sha256": "d3bd81c6d2a5bfa420f2b5bd6adbb9011ba5bc29d1c07dbeff3b436c879826c1"
+    },
+    "mon_lib/p/PRO.cif": {
+      "bytes": 6439,
+      "sha256": "1f25a8aad297357274cbd1dda5a756499d647773f54923abb06d7faa78ead689"
+    },
+    "mon_lib/s/SER.cif": {
+      "bytes": 4878,
+      "sha256": "a40023a7688f853c033bb10a082ea56735d37a15f2e8e65d6134f8ffc93f2d7f"
+    },
+    "mon_lib/s/SF4.cif": {
+      "bytes": 2383,
+      "sha256": "9719f3886940a26cf1177b828f9439ec941f49bae4529e5013062562df71ea3a"
+    },
+    "mon_lib/t/TDA.cif": {
+      "bytes": 15006,
+      "sha256": "0b7e46778dcba3db03a5eaf359b328794773987f2891ba87070badbe1c97a0ad"
+    },
+    "mon_lib/t/THR.cif": {
+      "bytes": 5534,
+      "sha256": "e5aaedccbca2b2679ac7a66c4ec96a34894760fbf46cccb01b2ced772bf59c35"
+    },
+    "mon_lib/t/TRP.cif": {
+      "bytes": 8839,
+      "sha256": "27f3f385e7773758f23444a2e695d90584661af121f4373aea219fc98102826a"
+    },
+    "mon_lib/t/TRY.cif": {
+      "bytes": 11724,
+      "sha256": "e4fd3799e96ea6adee82df18e71e2375400b42000fb2a2faeb5fb19625d0398c"
+    },
+    "mon_lib/t/TYR.cif": {
+      "bytes": 7503,
+      "sha256": "ec7cb41e1c7af58305816cf45ec3bd1fb414b93f09b6f38aca727b8300218196"
+    },
+    "mon_lib/u/U.cif": {
+      "bytes": 14653,
+      "sha256": "6528f659a88fdb51c1eb5b334452c2ac913f7fbdf63d992ac51650dcbfac07e5"
+    },
+    "mon_lib/v/VAL.cif": {
+      "bytes": 5876,
+      "sha256": "f18cd73d2a8c4be073e6c7bf93a4a787987ee633ecd793427a42dc4dc9291a75"
+    },
+    "mon_lib/x/XAA.cif": {
+      "bytes": 9565,
+      "sha256": "25e353915dfe144f57e89366ea5fce8a0b76b6b7964f1c7cadf61b948dd11499"
+    },
+    "mon_lib/x/XBB.cif": {
+      "bytes": 8381,
+      "sha256": "39bbfeb640ee70f586c1d139f6539eb23451e8963721c554abf98c653345b0d7"
+    },
+    "mon_lib/x/XZA.cif": {
+      "bytes": 3541,
+      "sha256": "3c3e5792ccde4118a31c1eccc009334de14299b848cdd3b253a625710a81a1e6"
+    },
+    "mon_lib/z/Z41.cif": {
+      "bytes": 37373,
+      "sha256": "133d6fff2db3c972f300c2be49aa5c382be06bec56517e2fb1cb4f65b6c22926"
+    },
+    "mon_lib/z/ZN.cif": {
+      "bytes": 637,
+      "sha256": "eff612cc0f23d324e284b76b913ec83d8e52dc7d8655ad01d0d08cd264e16c8d"
+    },
+    "mon_lib/z/ZN1.cif": {
+      "bytes": 66501,
+      "sha256": "025a67d057ac27bdc533055be048d0604abc9522a525487156eaa3f1ff95196e"
+    },
+    "mon_lib/z/ZZZ.cif": {
+      "bytes": 11600,
+      "sha256": "abe3e12db3d108cf74f21f7287ba39ab436648b77e32afecc41865c1e61eef1a"
+    }
+  }
+}

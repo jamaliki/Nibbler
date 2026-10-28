@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 
 import pytest
+from chem_data_gate import skip_without_chem_data
 
 import nibbler
 from nibbler import ChemistryError, CifDocument
@@ -29,7 +30,7 @@ def _chem_data_or_skip() -> None:
         nibbler.reduce.run(CRAMBIN, approach="remove")
     except ChemistryError as error:
         if error.code == "REDUCE_MONOMER_LIBRARY_NOT_FOUND":
-            pytest.skip("chem_data not found (set REDUCE3_CHEM_DATA)")
+            skip_without_chem_data("chem_data not found (set REDUCE3_CHEM_DATA)")
         raise
 
 
@@ -215,7 +216,7 @@ def test_explicit_chem_data_directory(
 ) -> None:
     chem_data = os.environ.get("REDUCE3_CHEM_DATA")
     if chem_data is None:
-        pytest.skip("REDUCE3_CHEM_DATA is not set")
+        skip_without_chem_data("REDUCE3_CHEM_DATA is not set")
     monkeypatch.delenv("REDUCE3_CHEM_DATA")
 
     result = nibbler.reduce.run(CRAMBIN, chem_data=Path(chem_data))

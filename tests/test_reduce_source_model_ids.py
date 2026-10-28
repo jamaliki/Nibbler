@@ -6,6 +6,7 @@ from hashlib import sha256
 from pathlib import Path
 
 import pytest
+from chem_data_gate import skip_without_chem_data
 
 import nibbler
 
@@ -60,7 +61,9 @@ def reduce(document, **options):
         return nibbler.reduce.run(document, **options)
     except nibbler.ChemistryError as error:
         if error.code == "REDUCE_MONOMER_LIBRARY_NOT_FOUND":
-            pytest.skip("Set REDUCE3_CHEM_DATA to test native model selection")
+            skip_without_chem_data(
+                "Set REDUCE3_CHEM_DATA to test native model selection"
+            )
         raise
 
 

@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+from chem_data_gate import skip_without_chem_data
 
 import nibbler
 
@@ -83,7 +84,7 @@ def test_reduce3_result_projects_without_serializing_for_export():
         result = nibbler.reduce.run(fixture, add_flip_movers=True)
     except nibbler.ChemistryError as error:
         if error.code == "REDUCE_MONOMER_LIBRARY_NOT_FOUND":
-            pytest.skip("chem_data not found")
+            skip_without_chem_data("chem_data not found")
         raise
     columns = ["label_atom_id", "type_symbol", "Cartn_x", "Cartn_y", "Cartn_z"]
     actual = arrow(result.document.project("atom_site", columns=columns, schema="pdbx"))

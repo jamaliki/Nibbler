@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
+from chem_data_gate import skip_without_chem_data
 
 from nibbler import cif
 from nibbler.geometry import validate
@@ -16,7 +17,9 @@ CASES = Path(__file__).with_name("native_validation_reference_cases")
 def chemistry():
     configured = os.environ.get("NIBBLER_VALIDATION_CHEM_DATA")
     if not configured:
-        pytest.skip("set NIBBLER_VALIDATION_CHEM_DATA to the pinned chemistry tree")
+        skip_without_chem_data(
+            "set NIBBLER_VALIDATION_CHEM_DATA to the pinned chemistry tree"
+        )
     return Path(configured)
 
 

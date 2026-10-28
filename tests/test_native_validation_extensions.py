@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
+from chem_data_gate import skip_without_chem_data
 
 from nibbler import cif
 from nibbler.geometry import validate
@@ -27,7 +28,7 @@ MANIFEST = (
 def chemistry():
     configured = os.environ.get("NIBBLER_VALIDATION_CHEM_DATA")
     if not configured:
-        pytest.skip(
+        skip_without_chem_data(
             "Set NIBBLER_VALIDATION_CHEM_DATA to the declared extension chemistry tree"
         )
     return Path(configured)

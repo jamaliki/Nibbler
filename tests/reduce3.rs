@@ -8,7 +8,8 @@ use std::path::Path;
 
 use _core::cif::{CifDocument, CifEntry, decode_binary, encode_binary, parse, write_canonical};
 use _core::reduce::{
-    BlockSource, OptParams, Params, ReduceErrorCode, load_monomer_library, run, structure_document,
+    BlockSource, OptParams, Params, ReduceError, ReduceErrorCode, load_monomer_library, run,
+    structure_document,
 };
 
 /// The first five residues of PDB entry 1CRN (crambin), heavy atoms only.
@@ -63,10 +64,21 @@ fn binary_cif_documents_build_the_same_model() {
     );
 }
 
+/// Skip a test that needs chem_data, or fail it when `NIBBLER_REQUIRE_CHEM_DATA=1` says
+/// the run provides chem_data.
+fn skip_without_chem_data(error: &ReduceError) {
+    assert!(
+        std::env::var("NIBBLER_REQUIRE_CHEM_DATA").as_deref() != Ok("1"),
+        "NIBBLER_REQUIRE_CHEM_DATA=1, but chem_data was not found: {error}"
+    );
+    eprintln!("skipped: chem_data not found (set REDUCE3_CHEM_DATA)");
+}
+
 #[test]
 fn linked_states_agree_through_file_and_document_interfaces() {
-    let Ok(monomers) = load_monomer_library(None) else {
-        return;
+    let monomers = match load_monomer_library(None) {
+        Ok(monomers) => monomers,
+        Err(error) => return skip_without_chem_data(&error),
     };
     for text in [LINKED_PEPTIDE, LINKED_ADDUCT] {
         let document = parse(text.as_bytes()).expect("linked fixture must parse");
@@ -130,9 +142,9 @@ fn without_timings(report: &str) -> String {
 
 #[test]
 fn hydrogens_are_added_in_memory() {
-    let Ok(monomers) = load_monomer_library(None) else {
-        eprintln!("skipped: chem_data not found (set REDUCE3_CHEM_DATA)");
-        return;
+    let monomers = match load_monomer_library(None) {
+        Ok(monomers) => monomers,
+        Err(error) => return skip_without_chem_data(&error),
     };
     let document = parse(CRAMBIN.as_bytes()).expect("fixture must parse");
     for (compat, flips) in [(false, false), (false, true), (true, false), (true, true)] {
@@ -195,9 +207,9 @@ fn hydrogens_are_added_in_memory() {
 
 #[test]
 fn the_source_metadata_is_kept() {
-    let Ok(monomers) = load_monomer_library(None) else {
-        eprintln!("skipped: chem_data not found (set REDUCE3_CHEM_DATA)");
-        return;
+    let monomers = match load_monomer_library(None) {
+        Ok(monomers) => monomers,
+        Err(error) => return skip_without_chem_data(&error),
     };
     let document = parse(CRAMBIN_ENTRY.as_bytes()).expect("entry must parse");
     let reduction = run(&document, &monomers, &Params::default()).expect("Reduce3 must succeed");
