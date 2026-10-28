@@ -47,10 +47,11 @@ pub(super) fn apply(source: &Source, mapping: &[usize], tokens: &mut Tokens) {
         let mut previous: Option<(i64, usize)> = None;
         let mut segment = 0;
         for (&number, &group) in groups {
-            if let Some((before, left)) = previous {
-                if number == before + 1 && distant(source, left, group, false) {
-                    segment += 1;
-                }
+            if let Some((before, left)) = previous
+                && number == before + 1
+                && distant(source, left, group, false)
+            {
+                segment += 1;
             }
             for &row in &source.groups[group] {
                 let token = mapping[row];
