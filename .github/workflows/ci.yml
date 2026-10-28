@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -47,6 +48,12 @@ jobs:
         with:
           path: .cache/structure-preparation-v1
           key: preparation-corpus-${{ hashFiles('tests/preparation_corpus.json') }}
+
+      - name: Restore Reduce3 chem_data test data
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .cache/chem-data-v1
+          key: chem-data-${{ hashFiles('tests/chem_data_subset.json') }}
 
       - name: Run the complete local gate
         run: make check RUN=

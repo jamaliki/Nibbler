@@ -1,9 +1,16 @@
 DEV_PREFIX := $(CURDIR)/.mamba/nibbler-dev
 RUN := micromamba run -p $(DEV_PREFIX)
 
-.PHONY: bootstrap develop develop-release format lint typecheck test robustness docs check corpus benchmarks pdb-corpus pdb-stress schemas compile-schemas validate-fixtures release-metadata release-artifacts clean
+.PHONY: bootstrap develop develop-release format lint typecheck test chem-data validation-data robustness docs check corpus benchmarks pdb-corpus pdb-stress schemas compile-schemas validate-fixtures release-metadata release-artifacts clean
 
 RELEASE_DIR ?= dist
+CHEM_DATA := $(CURDIR)/.cache/chem-data-v1
+VALIDATION_DATA := $(CURDIR)/.cache/native-validation-v1
+# The tests read the pinned data and fail, rather than skip, without chem_data.
+TEST_DATA := env REDUCE3_CHEM_DATA=$(CHEM_DATA) NIBBLER_VALIDATION_CHEM_DATA=$(CHEM_DATA) \
+	NIBBLER_VALIDATION_DATA=$(VALIDATION_DATA) NIBBLER_REQUIRE_CHEM_DATA=1
+# Rust tests of the python feature link libpython.
+PYTHON_LIBDIR = $(shell $(RUN) python -c "import sysconfig; print(sysconfig.get_config_var('LIBDIR'))")
 
 bootstrap:
 	micromamba create -y -p $(DEV_PREFIX) -f environment-dev.yml
@@ -22,6 +29,8 @@ lint:
 	$(RUN) cargo fmt --all --check
 	$(RUN) cargo clippy --all-targets --no-default-features -- -D warnings
 	$(RUN) cargo clippy --all-targets --features robustness -- -D warnings
+	$(RUN) cargo clippy --all-targets --features reduce3 -- -D warnings
+	$(RUN) cargo clippy --all-targets --features python -- -D warnings
 	$(RUN) cargo clippy --all-targets --features python,reduce3 -- -D warnings
 	$(RUN) ruff format --check .
 	$(RUN) ruff check .
@@ -29,10 +38,18 @@ lint:
 typecheck:
 	$(RUN) mypy --strict python benchmarks tools
 
-test: develop
+test: develop chem-data validation-data
 	$(RUN) cargo test --no-default-features
-	$(RUN) cargo test --features reduce3
-	$(RUN) pytest
+	$(RUN) $(TEST_DATA) cargo test --features reduce3
+	$(RUN) $(TEST_DATA) LD_LIBRARY_PATH=$(PYTHON_LIBDIR) \
+		DYLD_FALLBACK_LIBRARY_PATH=$(PYTHON_LIBDIR) cargo test --features python,reduce3
+	$(RUN) $(TEST_DATA) pytest
+
+chem-data:
+	$(RUN) python -m tools.fetch_chem_data --destination $(CHEM_DATA)
+
+validation-data:
+	$(RUN) python -m tools.fetch_validation_data --destination $(VALIDATION_DATA)
 
 robustness:
 	$(RUN) cargo test --release --features robustness --test robustness
