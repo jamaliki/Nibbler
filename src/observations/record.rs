@@ -139,6 +139,8 @@ impl Tokens {
         self.state.push(packed.state);
         self.state_known.push(u8::from(packed.state_known));
         self.topology.extend_from_slice(&packed.topology);
+        // A residue is cropped from its backbone N (slot 0), not CA: AlphaProtein Novo
+        // measures crop distances from the backbone nitrogen (supplement section 4.5.7).
         self.crop_positions.extend_from_slice(&packed.position[0]);
         self.push_atom(atom, identity, ligand, features);
     }

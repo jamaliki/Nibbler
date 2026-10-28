@@ -72,6 +72,8 @@ def test_molecular_crop_keeps_the_ligand_center(tmp_path, index):
     packer.set_molecular_schema(frozen("molecular_schema.json.gz"))
     doc = complex_document()
     legacy, _ = packer.pack(doc)
+    # Residues are cropped from their backbone N, as AlphaProtein Novo specifies, and
+    # ligand atoms from themselves.
     expected = arrays(legacy)["pos"][:, 0]
     assert expected.shape == (62, 3) and np.all(expected != 0)
     assert "ligand_bridge_index" not in legacy
