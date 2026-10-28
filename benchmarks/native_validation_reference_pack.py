@@ -1,15 +1,18 @@
 """Replace repeated CCTBX atom metadata with immutable atom-table indices."""
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import json
 from pathlib import Path
+from typing import Any
 
 from native_validation_reference_atoms import atom_key
 
 
-def pack(report):
-    result = json.loads(json.dumps(report))
+def pack(report: dict[str, Any]) -> dict[str, Any]:
+    result: dict[str, Any] = json.loads(json.dumps(report))
     indices = {atom_key(atom): atom["index"] for atom in report.get("atoms", [])}
     if len(indices) != len(report.get("atoms", [])):
         raise ValueError("The processed reference atom IDs are not unique")

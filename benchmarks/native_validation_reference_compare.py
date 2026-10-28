@@ -1,15 +1,21 @@
 """Compare independently built native targets with processed CCTBX targets."""
 
+from __future__ import annotations
+
 import argparse
 import gzip
 import json
 import math
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from native_validation_reference_atoms import atom_key
 
 
-def canonical_chirality(keys, values):
+def canonical_chirality(
+    keys: Sequence[tuple[str, ...]], values: Sequence[Any]
+) -> tuple[tuple[tuple[str, ...], ...], list[Any]]:
     keys, values = list(keys), list(values)
     for i in range(1, 4):
         for j in range(i + 1, 4):
@@ -21,17 +27,19 @@ def canonical_chirality(keys, values):
     return tuple(keys), values
 
 
-def load_report(file):
+def load_report(file: Path) -> Any:
     opener = gzip.open if file.suffix == ".gz" else Path.open
     with opener(file, "rt") as stream:
         return json.load(stream)
 
 
-def graph_rows(report, reference):
+def graph_rows(
+    report: dict[str, Any], reference: bool
+) -> dict[str, list[tuple[tuple[tuple[str, ...], ...], list[Any]]]]:
     atoms = [atom_key(row) for row in report["atoms"]]
     graph, result = report["graph"], {}
     for category in ("bonds", "angles", "chiralities", "planes"):
-        rows = []
+        rows: list[tuple[tuple[tuple[str, ...], ...], list[Any]]] = []
         for proxy in graph.get(
             "planarities" if reference and category == "planes" else category, []
         ):
@@ -86,8 +94,8 @@ def graph_rows(report, reference):
     return result
 
 
-def compare_graph(reference, native):
-    result = dict(
+def compare_graph(reference: dict[str, Any], native: dict[str, Any]) -> dict[str, Any]:
+    result: dict[str, Any] = dict(
         reference_complete=reference.get("complete"),
         native_complete=native.get("complete"),
     )
@@ -198,8 +206,10 @@ def compare_graph(reference, native):
     return result
 
 
-def compare_asu_bonds(reference, native):
-    def rows(report):
+def compare_asu_bonds(
+    reference: dict[str, Any], native: dict[str, Any]
+) -> dict[str, Any]:
+    def rows(report: dict[str, Any]) -> list[tuple[Any, ...]]:
         atoms = [atom_key(atom) for atom in report["atoms"]]
         result = []
         for row in report["graph"].get("bonds_asu", []):
@@ -243,8 +253,8 @@ def compare_asu_bonds(reference, native):
     )
 
 
-def compare_typing(reference, native):
-    result = {}
+def compare_typing(reference: dict[str, Any], native: dict[str, Any]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
     initial = reference.get("probe2", {}).get("initial_atom_info_calls", [])
     contact = native.get("contacts") or {}
     if initial and "initial_atom_info" in contact:
@@ -289,7 +299,10 @@ def compare_typing(reference, native):
     return result
 
 
-def compare_contacts(reference, native):
+def compare_contacts(
+    reference: dict[str, Any], native: dict[str, Any]
+) -> dict[str, Any]:
+    result: dict[str, Any]
     result, probe, contact = {}, reference.get("probe2"), native.get("contacts") or {}
     if not probe:
         return dict(clash_pair_parity=False, clash_pairs=dict(unavailable=True))
@@ -339,7 +352,7 @@ def compare_contacts(reference, native):
     return result
 
 
-def compare(reference, native):
+def compare(reference: dict[str, Any], native: dict[str, Any]) -> dict[str, Any]:
     result = compare_graph(reference, native)
     if not result["comparable"]:
         return result

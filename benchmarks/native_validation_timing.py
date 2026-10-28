@@ -1,5 +1,7 @@
 """Time complete native and reference validation in persistent workers."""
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import importlib.util
@@ -8,21 +10,25 @@ import os
 import platform
 import statistics
 import time
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import psutil
 
 from nibbler.geometry import validate
 
 
-def load_reference(script):
+def load_reference(script: Path) -> Any:
     spec = importlib.util.spec_from_file_location("geometry_reference", script)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load the reference validator from {script}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module.validate
 
 
-def checked_result(result):
+def checked_result(result: dict[str, Any]) -> dict[str, Any]:
     required = ("bonds", "angles", "chiralities", "planarities", "hydrogens", "clashes")
     if any(
         result.get("checks", {}).get(name, {}).get("status") != "checked"
@@ -34,7 +40,7 @@ def checked_result(result):
     return {name: result["checks"][name].get("count") for name in required}
 
 
-def timed(function):
+def timed(function: Callable[[], dict[str, Any]]) -> dict[str, Any]:
     process = psutil.Process()
     load = os.getloadavg()
     cpu_start = time.process_time()
@@ -54,7 +60,7 @@ def timed(function):
     )
 
 
-def summaries(records):
+def summaries(records: list[dict[str, Any]]) -> dict[str, dict[str, dict[str, float]]]:
     result = {}
     for name in ("reference", "native"):
         rows = [row for row in records if row["backend"] == name]
@@ -69,12 +75,12 @@ def summaries(records):
     return result
 
 
-def benchmark(args):
+def benchmark(args: argparse.Namespace) -> dict[str, Any]:
     if args.output.exists():
         raise FileExistsError(args.output)
     os.environ["KAVEH_CHEM_DATA"] = str(args.chem_data.resolve())
     reference = load_reference(args.reference_script)
-    functions = {
+    functions: dict[str, Callable[[], dict[str, Any]]] = {
         "reference": lambda: reference(args.input, nuclear=args.nuclear, sigma=5.0),
         "native": lambda: validate(
             args.input, chem_data=args.chem_data, nuclear=args.nuclear

@@ -1,12 +1,18 @@
 """Compare whole-entry restraint decisions and reported scalar values."""
 
+from __future__ import annotations
+
 import math
 from collections import Counter
+from collections.abc import Iterable
+from typing import Any
 
 from native_validation_reference_atoms import atom_key
 
 
-def failure_key(check, atoms):
+def failure_key(
+    check: str, atoms: Iterable[dict[str, Any]]
+) -> tuple[str, tuple[tuple[str, ...], ...]]:
     keys = tuple(atom_key(atom) for atom in atoms)
     if check in ("bonds", "angles"):
         keys = min(keys, tuple(reversed(keys)))
@@ -15,7 +21,9 @@ def failure_key(check, atoms):
     return check, keys
 
 
-def expected_rows(reference, cutoff):
+def expected_rows(
+    reference: dict[str, Any], cutoff: float
+) -> dict[tuple[str, tuple[tuple[str, ...], ...]], dict[str, Any]]:
     flags = {
         tuple(proxy["i_seqs"]): proxy.get("pseudochiral")
         for proxy in reference["graph"].get("chiralities", [])
@@ -48,7 +56,9 @@ def expected_rows(reference, cutoff):
     return rows
 
 
-def compare_decisions(reference, native, cutoff=5.0):
+def compare_decisions(
+    reference: dict[str, Any], native: dict[str, Any], cutoff: float = 5.0
+) -> dict[str, Any]:
     if "restraint_results" not in reference or "failures" not in native:
         return dict(decision_scalar_parity=False, unavailable=True)
     old = expected_rows(reference, cutoff)
@@ -64,6 +74,7 @@ def compare_decisions(reference, native, cutoff=5.0):
     )
     if len(new) != native_count:
         raise ValueError("Native report contains duplicate restraint findings")
+    maximum_errors: Counter[str]
     mismatches, maximum_errors = [], Counter()
     for key in old.keys() & new.keys():
         fields = {

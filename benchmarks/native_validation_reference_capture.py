@@ -1,5 +1,7 @@
 """Capture processed CCTBX restraints and Probe2 results for native parity."""
 
+from __future__ import annotations
+
 import argparse
 import contextlib
 import hashlib
@@ -9,14 +11,16 @@ import json
 import os
 import sys
 import time
+from collections.abc import Iterable, Sequence
 from pathlib import Path
+from typing import Any
 
 
-def digest(file):
+def digest(file: str | Path) -> str:
     return hashlib.sha256(Path(file).read_bytes()).hexdigest()
 
 
-def chemistry(root):
+def chemistry(root: Path) -> dict[str, dict[str, str]]:
     import libtbx.load_env
     from libtbx.env_config import get_installed_env
     from libtbx.path import absolute_path
@@ -47,7 +51,7 @@ def chemistry(root):
     return result
 
 
-def atom_rows(atoms):
+def atom_rows(atoms: Iterable[Any]) -> list[dict[str, Any]]:
     rows = []
     for i, atom in enumerate(atoms):
         labels = atom.fetch_labels()
@@ -74,7 +78,9 @@ def atom_rows(atoms):
     return rows
 
 
-def proxy_rows(proxies, attributes):
+def proxy_rows(
+    proxies: Iterable[Any], attributes: Iterable[str]
+) -> list[dict[str, Any]]:
     result = []
     for proxy in proxies:
         row = {}
@@ -93,7 +99,7 @@ def proxy_rows(proxies, attributes):
     return result
 
 
-def restraint_graph(model):
+def restraint_graph(model: Any) -> dict[str, Any]:
     from types import SimpleNamespace
 
     from mmtbx.validation.restraints import chirality
@@ -101,7 +107,7 @@ def restraint_graph(model):
     geometry = model.get_restraints_manager().geometry
     pairs = geometry.pair_proxies(sites_cart=model.get_sites_cart())
     common = ("i_seqs", "weight", "origin_id")
-    result = dict(
+    result: dict[str, Any] = dict(
         bonds=proxy_rows(
             pairs.bond_proxies.simple,
             (*common, "distance_ideal", "slack", "limit", "top_out"),
@@ -162,7 +168,9 @@ def restraint_graph(model):
     return result
 
 
-def apply_links(params, hierarchy, links):
+def apply_links(
+    params: Any, hierarchy: Any, links: Sequence[tuple[str, int, int]]
+) -> None:
     import copy
 
     if not links:
@@ -185,7 +193,12 @@ def apply_links(params, hierarchy, links):
     params.pdb_interpretation.apply_cif_link = result
 
 
-def probe_capture(file, nuclear, dictionaries=(), links=()):
+def probe_capture(
+    file: Path,
+    nuclear: bool,
+    dictionaries: Sequence[Path] = (),
+    links: Sequence[tuple[str, int, int]] = (),
+) -> dict[str, Any]:
     from iotbx.cli_parser import CCTBXParser
     from mmtbx.programs import probe2
     from mmtbx.programs.clashscore2 import Program
@@ -218,7 +231,7 @@ def probe_capture(file, nuclear, dictionaries=(), links=()):
     original_run = probe2.Program.run
     original_params = probe2.getPdbInterpretationParams
 
-    def linked_params(*args, **kwargs):
+    def linked_params(*args: Any, **kwargs: Any) -> Any:
         value = original_params(*args, **kwargs)
         apply_links(value, parser.data_manager.get_model().get_hierarchy(), links)
         return value
@@ -233,7 +246,7 @@ def probe_capture(file, nuclear, dictionaries=(), links=()):
         alt="altLoc",
     )
 
-    def capture_info(*args, **kwargs):
+    def capture_info(*args: Any, **kwargs: Any) -> Any:
         result = original_info(*args, **kwargs)
         atoms = kwargs["model"].get_hierarchy().atoms()
         indices = {atom: index for index, atom in enumerate(atoms)}
@@ -277,7 +290,7 @@ def probe_capture(file, nuclear, dictionaries=(), links=()):
         )
         return result
 
-    def capture_run(program):
+    def capture_run(program: Any) -> Any:
         value = original_run(program)
         selected = sorted(
             set(program._source_atoms_sorted) | set(program._target_atoms_sorted),
@@ -345,9 +358,16 @@ def probe_capture(file, nuclear, dictionaries=(), links=()):
     )
 
 
-def capture(file, chem_data, nuclear=False, use_cdl=True, dictionaries=(), links=()):
+def capture(
+    file: Path,
+    chem_data: Path,
+    nuclear: bool = False,
+    use_cdl: bool = True,
+    dictionaries: Sequence[Path] = (),
+    links: Sequence[tuple[str, int, int]] = (),
+) -> dict[str, Any]:
     started, log = time.perf_counter(), io.StringIO()
-    result = dict(
+    result: dict[str, Any] = dict(
         schema="nibbler.native-validation.reference.v1",
         input=dict(file=str(file.resolve()), sha256=digest(file)),
         nuclear=nuclear,

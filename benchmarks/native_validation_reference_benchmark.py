@@ -1,14 +1,17 @@
 """Measure fresh-process native and CCTBX capture in alternating order."""
 
+from __future__ import annotations
+
 import argparse
 import json
 import statistics
 import subprocess
 import time
 from pathlib import Path
+from typing import Any
 
 
-def run(command, output, timeout):
+def run(command: list[str | Path], output: Path, timeout: int) -> dict[str, Any]:
     started = time.perf_counter()
     result = subprocess.run(
         list(map(str, command)), capture_output=True, text=True, timeout=timeout
@@ -27,7 +30,7 @@ def run(command, output, timeout):
     )
 
 
-def benchmark(args):
+def benchmark(args: argparse.Namespace) -> dict[str, Any]:
     args.output.mkdir(parents=True, exist_ok=False)
     reference = Path(__file__).with_name("native_validation_reference_capture.py")
     records = []

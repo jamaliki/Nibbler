@@ -1,12 +1,15 @@
 """Freeze CCTBX-processed sites while retaining all original CIF categories."""
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import json
 from pathlib import Path
+from typing import Any
 
 
-def prepare(source, reference, output):
+def prepare(source: Path, reference: dict[str, Any], output: Path) -> dict[str, Any]:
     import iotbx.cif
     from scitbx.array_family import flex
 
@@ -16,7 +19,7 @@ def prepare(source, reference, output):
     document = iotbx.cif.reader(file_path=str(source)).model()
     block = next(block for block in document.values() if "_atom_site.Cartn_x" in block)
 
-    def normalize(value):
+    def normalize(value: object) -> str:
         return "" if str(value).strip() in ("", ".", "?") else str(value).strip()
 
     keys = (

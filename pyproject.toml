@@ -58,3 +58,17 @@ known-first-party = ["benchmarks", "nibbler", "tools"]
 [tool.mypy]
 python_version = "3.10"
 warn_unused_configs = true
+
+# The validation reference scripts run in a CCTBX environment and import their siblings
+# as top-level modules; neither CCTBX nor psutil ships type information.
+[[tool.mypy.overrides]]
+module = [
+    "iotbx.*",
+    "libtbx.*",
+    "mmtbx.*",
+    "native_validation_reference_atoms",
+    "native_validation_reference_decisions",
+    "psutil",
+    "scitbx.*",
+]
+ignore_missing_imports = true

@@ -1,17 +1,20 @@
 """Convert reference PDB inputs to mmCIF without chemical preparation."""
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import json
 from pathlib import Path
+from typing import Any
 
 
-def convert(source, output):
+def convert(source: Path, output: Path) -> dict[str, Any]:
     import iotbx.pdb
 
     hierarchy = iotbx.pdb.input(file_name=str(source)).construct_hierarchy()
 
-    def identity(atom):
+    def identity(atom: Any) -> tuple[str, ...]:
         labels = atom.fetch_labels()
         return tuple(
             str(value).strip()

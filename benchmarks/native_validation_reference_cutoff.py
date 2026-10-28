@@ -1,12 +1,15 @@
 """Create explicit CB-HB1 bond cutoff controls without coordinate rounding."""
 
+from __future__ import annotations
+
 import argparse
 import json
 import math
 from pathlib import Path
+from typing import Any
 
 
-def build(source, folder):
+def build(source: Path, folder: Path) -> list[dict[str, Any]]:
     import iotbx.pdb
     from scitbx.array_family import flex
 

@@ -1,5 +1,7 @@
 """Capture the independently built native graph for the reference harness."""
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import json
