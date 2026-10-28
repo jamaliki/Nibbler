@@ -262,8 +262,13 @@ def validate_mmcif_document(
 ) -> ValidationFields: ...
 def validate_mmcif_model(model: MmcifModel) -> ValidationFields: ...
 def reduce_document(
-    document: CifDocument, options: Mapping[str, object]
+    document: CifDocument,
+    options: Mapping[str, object],
+    parents_view: object | None = None,
 ) -> tuple[CifDocument, str, str]: ...
+def reduce_hydrogen_parents(
+    document: CifDocument, *, chem_data: str | None = None, model: int = 1
+) -> dict[str, dict[str, str]]: ...
 def reduce_required_parent_sources(
     document: CifDocument,
     expected_keys: str,
@@ -294,7 +299,10 @@ class PreparedObservationSource:
     def missing_hydrogen_dictionaries(self, *, chem_data: str) -> list[str]: ...
 
 class LigandTokenTable(TypedDict):
-    """The caller's ligand tokens: one per element symbol, one for other elements, one for H."""
+    """The caller's ligand tokens.
+
+    One per element symbol, one for other elements, and one for H.
+    """
 
     elements: Mapping[str, int]
     other: int

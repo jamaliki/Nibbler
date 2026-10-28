@@ -1,15 +1,16 @@
 """Record the packer outputs that the explicit ligand token table must reproduce.
 
-Run once with the Nibbler 9b8041e wheel, which derived ligand tokens from an element list,
-and with REDUCE3_CHEM_DATA set to chem_data 2026.9:
+Run once with the Nibbler 9b8041e wheel, which derived ligand tokens from an element
+list, and with REDUCE3_CHEM_DATA set to chem_data 2026.9:
 
     python tests/record_token_parity.py
 
-That packer took the 43 ligand elements and hydrogen as kaveh-data passed them, so element
-``i`` carried token ``21 + i``, other elements 64 and a bridging hydride 65. The frozen Atom32
-and Atom84 schemas beside the digests are the kaveh-data contracts it read.
-Only molecular crop_positions digests were subsequently corrected for the no-bridge bug;
-rerunning this historical recorder restores the affected zero-coordinate digests.
+That packer took the 43 ligand elements and hydrogen as kaveh-data passed them, so
+element ``i`` carried token ``21 + i``, other elements 64 and a bridging hydride 65.
+The frozen Atom32 and Atom84 schemas beside the digests are the kaveh-data contracts
+it read. Only molecular crop_positions digests were subsequently corrected for the
+no-bridge bug; rerunning this historical recorder restores the affected
+zero-coordinate digests.
 """
 
 import gzip
@@ -17,9 +18,9 @@ import json
 import os
 from pathlib import Path
 
-from nibbler.observations import ObservationPacker
-
 from token_tables import FIXTURES, frozen, packed
+
+from nibbler.observations import ObservationPacker
 
 ROOT = Path(__file__).parent
 SKIPPED = {"fixtures/syntax"}

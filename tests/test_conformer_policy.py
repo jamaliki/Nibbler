@@ -1,11 +1,16 @@
 """Seeded random selection keeps source identity, models and qualified links."""
 
-import nibbler
 import pytest
+
+import nibbler
 
 
 def document(rows, links="", *, insertion=False):
-    names = "group_PDB id type_symbol label_atom_id label_alt_id label_comp_id label_asym_id label_entity_id label_seq_id Cartn_x Cartn_y Cartn_z occupancy auth_seq_id auth_comp_id auth_asym_id auth_atom_id pdbx_PDB_model_num".split()
+    names = (
+        "group_PDB id type_symbol label_atom_id label_alt_id label_comp_id "
+        "label_asym_id label_entity_id label_seq_id Cartn_x Cartn_y Cartn_z occupancy "
+        "auth_seq_id auth_comp_id auth_asym_id auth_atom_id pdbx_PDB_model_num"
+    ).split()
     header = "data_choices\nloop_\n" + "\n".join("_atom_site." + name for name in names)
     if insertion:
         header += "\n_atom_site.pdbx_PDB_ins_code"
@@ -40,7 +45,10 @@ def test_random_policy_varies_unequal_occupancies_without_changing_source():
 
 
 def test_random_policy_keeps_explicit_link_alternatives_together():
-    names = "id conn_type_id ptnr1_label_asym_id ptnr1_label_atom_id ptnr2_label_asym_id ptnr2_label_atom_id pdbx_ptnr1_label_alt_id pdbx_ptnr2_label_alt_id".split()
+    names = (
+        "id conn_type_id ptnr1_label_asym_id ptnr1_label_atom_id ptnr2_label_asym_id "
+        "ptnr2_label_atom_id pdbx_ptnr1_label_alt_id pdbx_ptnr2_label_alt_id"
+    ).split()
     links = "loop_\n" + "\n".join("_struct_conn." + name for name in names)
     source = document(
         [
@@ -69,7 +77,11 @@ def test_unknown_policy_fails():
 
 
 def test_link_endpoint_insertion_codes_do_not_correlate_another_residue():
-    names = "id conn_type_id ptnr1_label_asym_id ptnr1_label_atom_id ptnr2_label_asym_id ptnr2_label_atom_id pdbx_ptnr1_label_alt_id pdbx_ptnr2_label_alt_id pdbx_ptnr1_PDB_ins_code".split()
+    names = (
+        "id conn_type_id ptnr1_label_asym_id ptnr1_label_atom_id ptnr2_label_asym_id "
+        "ptnr2_label_atom_id pdbx_ptnr1_label_alt_id pdbx_ptnr2_label_alt_id "
+        "pdbx_ptnr1_PDB_ins_code"
+    ).split()
     links = "loop_\n" + "\n".join("_struct_conn." + name for name in names)
     source = document(
         [

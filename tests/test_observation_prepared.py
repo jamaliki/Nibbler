@@ -7,9 +7,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-
-import nibbler
-from nibbler.observations import PreparedObservationSource
 from test_observation_ligand_hydrogens import (
     ULW_PARENTS,
     ULW_ROWS,
@@ -20,6 +17,8 @@ from test_observation_ligand_hydrogens import (
     ulw_packer,
 )
 from test_observation_protein_parents import document as protein_document
+
+from nibbler.observations import PreparedObservationSource
 
 
 def assert_equal(first, second):

@@ -2,9 +2,7 @@
 
 import numpy as np
 import pytest
-
-import nibbler
-from test_observation_ligand_hydrogens import ligand_packer, document, covalent_link
+from test_observation_ligand_hydrogens import covalent_link, document, ligand_packer
 
 
 def unpack(source):

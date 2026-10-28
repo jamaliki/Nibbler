@@ -1,13 +1,13 @@
 """Compare native observations with the established training target contract."""
 
-from unittest.mock import patch
 import json
+from unittest.mock import patch
 
 import numpy as np
 import pytest
+from token_tables import token_table
 
 import nibbler
-from token_tables import token_table
 
 schema = pytest.importorskip("kaveh_data.atom32_schema")
 atom32 = pytest.importorskip("kaveh_data.atom32")
@@ -174,7 +174,8 @@ def state_document(aa, state, *, declared_termini=None, **changes):
     length = index if c_terminal else index + 1
     names, elements, xyz = state_observation(aa, state, **changes)
     header = (
-        f"data_state\nloop_\n_entity_poly.entity_id\n_entity_poly.type\n1 'polypeptide(L)'\n"
+        "data_state\nloop_\n_entity_poly.entity_id\n_entity_poly.type\n"
+        "1 'polypeptide(L)'\n"
         f"loop_\n_entity_poly_seq.entity_id\n_entity_poly_seq.num\n1 {length}\n"
         "loop_\n_atom_site.label_entity_id\n_atom_site.label_asym_id\n_atom_site.label_seq_id\n"
         "_atom_site.auth_seq_id\n_atom_site.label_comp_id\n_atom_site.label_atom_id\n"
@@ -436,13 +437,16 @@ def test_suppressing_returned_keys_keeps_arrays_identical():
 def reference_afdb_fixture(pos, mask):
     """Match the pre-native AFDB constructor for this three-residue fixture."""
     fields = (
-        "group_PDB id type_symbol label_atom_id label_alt_id label_comp_id label_asym_id "
-        "label_entity_id label_seq_id auth_atom_id auth_comp_id auth_asym_id auth_seq_id "
-        "pdbx_PDB_ins_code Cartn_x Cartn_y Cartn_z occupancy B_iso_or_equiv pdbx_PDB_model_num"
+        "group_PDB id type_symbol label_atom_id label_alt_id label_comp_id "
+        "label_asym_id label_entity_id label_seq_id auth_atom_id auth_comp_id "
+        "auth_asym_id auth_seq_id pdbx_PDB_ins_code Cartn_x Cartn_y Cartn_z occupancy "
+        "B_iso_or_equiv pdbx_PDB_model_num"
     ).split()
     header = (
-        "data_AF-test\n_entry.id AF-test\nloop_\n_entity.id\n_entity.type\n1 polymer\n2 polymer\n"
-        "loop_\n_entity_poly.entity_id\n_entity_poly.type\n_entity_poly.pdbx_seq_one_letter_code_can\n"
+        "data_AF-test\n_entry.id AF-test\nloop_\n_entity.id\n_entity.type\n"
+        "1 polymer\n2 polymer\n"
+        "loop_\n_entity_poly.entity_id\n_entity_poly.type\n"
+        "_entity_poly.pdbx_seq_one_letter_code_can\n"
         "1 'polypeptide(L)' AA\n2 'polypeptide(L)' A\n"
         "loop_\n_struct_asym.id\n_struct_asym.entity_id\nA1 1\nA2 2\nloop_\n"
         + "".join(f"_atom_site.{field}\n" for field in fields)
@@ -453,7 +457,8 @@ def reference_afdb_fixture(pos, mask):
             name = schema.SPEC["residues"][0]["names"][slot]
             x, y, z = map(float, pos[row, slot])
             rows.append(
-                f"ATOM {len(rows) + 1} {name[0]} {name} . ALA A{chain} {chain} {sequence} "
+                f"ATOM {len(rows) + 1} {name[0]} {name} . "
+                f"ALA A{chain} {chain} {sequence} "
                 f"{name} ALA A{chain} {sequence} . {x} {y} {z} 1 0 1\n"
             )
     return nibbler.cif.read((header + "".join(rows)).encode())

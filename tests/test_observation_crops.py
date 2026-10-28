@@ -2,9 +2,9 @@
 
 import numpy as np
 import pytest
+from token_tables import token_table
 
 from nibbler.observations import ObservationPacker
-from token_tables import token_table
 
 tokens_module = pytest.importorskip("kaveh_data.pdb_tokens")
 native = pytest.importorskip("kaveh_data.native_observations")
@@ -101,10 +101,12 @@ def test_uncapped_plans_reproduce_capped_plans(kind, size, limits):
     assert len(uncapped["centre_ligand_tokens"]) == np.count_nonzero(
         tokens["is_ligand"]
     )
-    over = lambda prefix: (
-        (uncapped[prefix + "_tokens"] > limits[0])
-        | (uncapped[prefix + "_chains"] > limits[1])
-    )
+
+    def over(prefix):
+        return (uncapped[prefix + "_tokens"] > limits[0]) | (
+            uncapped[prefix + "_chains"] > limits[1]
+        )
+
     keep = ~over("crop_ligand")
     words = int(uncapped["crop_chain_words"][0])
     for name in (

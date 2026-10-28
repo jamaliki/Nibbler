@@ -5,9 +5,9 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from token_tables import token_table
 
 import nibbler
-from token_tables import token_table
 
 CRAMBIN = Path(__file__).parent / "reduce3/crambin_1-5.cif"
 ADDUCT = Path(__file__).parent / "reduce3/linked_9hj3.cif"

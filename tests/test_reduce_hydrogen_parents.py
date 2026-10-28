@@ -3,9 +3,9 @@
 import json
 from pathlib import Path
 
-import nibbler
 import pytest
 
+import nibbler
 
 HEADER = (
     "data_parents\nloop_\n_atom_site.group_PDB\n_atom_site.label_entity_id\n"
@@ -42,7 +42,10 @@ def row(
     x=0,
     occupancy=1,
 ):
-    return f"{group} {entity} {chain} {seq} {auth} {component} {atom} {element} ? {x} 0 0 {occupancy} {model}\n"
+    return (
+        f"{group} {entity} {chain} {seq} {auth} {component} {atom} {element} ? "
+        f"{x} 0 0 {occupancy} {model}\n"
+    )
 
 
 @pytest.fixture
@@ -62,8 +65,10 @@ def library(tmp_path):
         "data_KHP\n_chem_comp.id KHP\n_chem_comp.type NON-POLYMER\nloop_\n"
         "_chem_comp_atom.atom_id\n_chem_comp_atom.type_symbol\n_chem_comp_atom.charge\n"
         "_chem_comp_atom.pdbx_model_Cartn_x_ideal\n_chem_comp_atom.pdbx_model_Cartn_y_ideal\n"
-        "_chem_comp_atom.pdbx_model_Cartn_z_ideal\nC2 C 0 0 0 0\nH1 H 0 1.09 0 0\nloop_\n"
-        "_chem_comp_bond.atom_id_1\n_chem_comp_bond.atom_id_2\n_chem_comp_bond.value_order\nC2 H1 SING\n"
+        "_chem_comp_atom.pdbx_model_Cartn_z_ideal\n"
+        "C2 C 0 0 0 0\nH1 H 0 1.09 0 0\nloop_\n"
+        "_chem_comp_bond.atom_id_1\n_chem_comp_bond.atom_id_2\n"
+        "_chem_comp_bond.value_order\nC2 H1 SING\n"
     )
     (tmp_path / "chemical_components/k/data_KHP.cif").write_text(ccd)
     return tmp_path
@@ -143,7 +148,8 @@ def test_generated_terminal_names_use_the_producer_parent(library, invalid):
         "_chem_comp_atom.atom_id\n_chem_comp_atom.type_symbol\n_chem_comp_atom.type_energy\n"
         "N N NH1\nCA C CH2\nC C C\nO O O\nC3 C CH1\nH H HNH1\nH3 H HCH1\n"
         "loop_\n_chem_comp_bond.atom_id_1\n_chem_comp_bond.atom_id_2\n"
-        "_chem_comp_bond.type\n_chem_comp_bond.value_dist\nN H single .97\nC3 H3 single .97\n"
+        "_chem_comp_bond.type\n_chem_comp_bond.value_dist\n"
+        "N H single .97\nC3 H3 single .97\n"
         "N CA single 1.46\nCA C single 1.53\nC O double 1.23\n"
     )
     native, _ = packer()

@@ -1,12 +1,11 @@
 """Source rows keep every retained target strict while preserving context."""
 
-from pathlib import Path
 import json
+from pathlib import Path
 
 import pytest
 
 import nibbler
-
 
 ADDUCT = Path(__file__).parent / "reduce3" / "linked_9hj3.cif"
 

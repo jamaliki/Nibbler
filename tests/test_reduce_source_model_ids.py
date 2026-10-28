@@ -1,14 +1,13 @@
 """Fixed-mode selection uses deposited model IDs and keeps source identity."""
 
-from hashlib import sha256
 import json
 import os
+from hashlib import sha256
 from pathlib import Path
 
 import pytest
 
 import nibbler
-
 
 FIXTURE = Path(__file__).parent / "reduce3/crambin_1-5.cif"
 
@@ -32,7 +31,7 @@ def document(model_ids):
     table.erase()
     loop = source.sole_block().init_loop("", names)
     for model in model_ids:
-        for index, atom in enumerate(original):
+        for atom in original:
             copied = list(atom)
             copied[model_column] = str(model)
             copied[identifier_column] = str(loop.length() + 1)

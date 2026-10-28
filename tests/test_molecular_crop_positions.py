@@ -2,10 +2,10 @@
 
 import numpy as np
 import pytest
+from token_tables import frozen, token_table
 
 import nibbler
 from nibbler.observations import ObservationPacker
-from token_tables import frozen, token_table
 
 
 def complex_document():

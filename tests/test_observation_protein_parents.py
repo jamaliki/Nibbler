@@ -4,12 +4,12 @@ import json
 import os
 from pathlib import Path
 
-import nibbler
 import numpy as np
 import pytest
-from nibbler.observations import ObservationPacker
 from token_tables import token_table
 
+import nibbler
+from nibbler.observations import ObservationPacker
 
 CYS_7F52 = [
     ("N", "N", (-4.965, 33.169, -45.688)),
@@ -55,7 +55,8 @@ def packer():
 
 def document(child="HG", element="H", linked=False):
     header = (
-        "data_parent\nloop_\n_entity_poly.entity_id\n_entity_poly.type\n1 'polypeptide(L)'\n"
+        "data_parent\nloop_\n_entity_poly.entity_id\n_entity_poly.type\n"
+        "1 'polypeptide(L)'\n"
         "loop_\n_entity_poly_seq.entity_id\n_entity_poly_seq.num\n1 570\nloop_\n"
         "_atom_site.group_PDB\n_atom_site.label_entity_id\n_atom_site.label_asym_id\n"
         "_atom_site.label_seq_id\n_atom_site.auth_seq_id\n_atom_site.label_comp_id\n"

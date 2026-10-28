@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-import json
 from os import PathLike, fspath
-from typing import Literal
+from typing import Any, Literal
 
 from . import _core, cif
 from ._core import CifDocument, MmcifModel
@@ -47,7 +47,7 @@ class Reduction:
 
     document: CifDocument
     report: str
-    target_uncertainties: tuple[dict, ...] = ()
+    target_uncertainties: tuple[dict[str, Any], ...] = ()
 
 
 def _require_number(name: str, value: object) -> float:
@@ -195,11 +195,13 @@ def run(
     training targets. Ordinary protein H placement remains strict.
 
     ``report=False`` skips the scores and warning text that only the report shows. The
-    output document and ``target_uncertainties`` are the same, but the report is incomplete.
+    output document and ``target_uncertainties`` are the same, but the report is
+    incomplete.
 
-    ``parents_view`` is an optional molecular view (from ``ObservationPacker.molecular_view``)
-    of this same document and model. Native code then resolves the retained keys among the
-    view's source atoms instead of reading the document again.
+    ``parents_view`` is an optional molecular view (from
+    ``ObservationPacker.molecular_view``) of this same document and model. Native code
+    then resolves the retained keys among the view's source atoms instead of reading the
+    document again.
     """
     if not available():
         raise RuntimeError(
@@ -305,11 +307,9 @@ def run(
         "ignored_target_key_components": list(ignored_target_key_components),
     }
     try:
-        output, report, statuses = _core.reduce_document(
-            document, options, parents_view
-        )
+        output, text, statuses = _core.reduce_document(document, options, parents_view)
     except ValueError as error:
         raise_chemistry_error(error)
     return Reduction(
-        document=output, report=report, target_uncertainties=tuple(json.loads(statuses))
+        document=output, report=text, target_uncertainties=tuple(json.loads(statuses))
     )

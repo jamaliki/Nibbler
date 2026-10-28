@@ -3,13 +3,13 @@
 import json
 
 import gemmi
-import nibbler
 import pytest
-
-from test_reduce_hydrogen_parents import document as parent_document, row
+from test_reduce_hydrogen_parents import document as parent_document
+from test_reduce_hydrogen_parents import row
 from test_reduce_source_model_ids import document, heavy_coordinates, target_keys
 from test_reduce_target_masks import bridge_source
 
+import nibbler
 
 FLAGS = [(False, False), (False, True), (True, False), (True, True)]
 

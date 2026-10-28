@@ -2,8 +2,8 @@
 
 import json
 import os
-from pathlib import Path
 import struct
+from pathlib import Path
 
 import numpy as np
 import pyarrow as pa
@@ -103,7 +103,7 @@ def reference(raw):
         )
     }
     for index, (start, end) in enumerate(
-        zip(decoded["sample_offsets"][:-1], decoded["sample_offsets"][1:])
+        zip(decoded["sample_offsets"][:-1], decoded["sample_offsets"][1:], strict=True)
     ):
         document, chains, _ = worker.protein_document(
             decoded["pos"][start:end].tobytes(),

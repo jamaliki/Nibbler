@@ -3,12 +3,12 @@
 import os
 from pathlib import Path
 
-import nibbler
 import numpy as np
 import pytest
-from nibbler.observations import ObservationPacker
 from token_tables import token_table
 
+import nibbler
+from nibbler.observations import ObservationPacker
 
 HEADER = (
     "data_nucleotide\nloop_\n_atom_site.group_PDB\n_atom_site.label_atom_id\n"

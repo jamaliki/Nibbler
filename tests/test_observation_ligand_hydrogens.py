@@ -4,9 +4,9 @@ import json
 
 import numpy as np
 import pytest
+from token_tables import token_table
 
 import nibbler
-from token_tables import token_table
 
 observations = pytest.importorskip("nibbler.observations")
 schema = pytest.importorskip("kaveh_data.atom32_schema")
@@ -194,7 +194,10 @@ def test_absent_declared_parent_fails_instead_of_using_nearest_atom(source):
         native.add_hydrogen_parents("LIG", {"H1": "ABSENT"})
         doc = ligand_document(1)
     else:
-        rows = "HETATM C4 C G LIG 1 . 101 . 0 0 0 1\nHETATM H1 H G LIG 1 . 101 . .97 0 0 1\n"
+        rows = (
+            "HETATM C4 C G LIG 1 . 101 . 0 0 0 1\n"
+            "HETATM H1 H G LIG 1 . 101 . .97 0 0 1\n"
+        )
         doc = document(rows, covalent_link("ABSENT"))
     with pytest.raises(ValueError, match="Invalid ligand hydrogen parent") as caught:
         native.pack(doc, complete=True, validate=True)

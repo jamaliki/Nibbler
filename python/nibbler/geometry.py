@@ -18,23 +18,33 @@ within ``1e-8 * max(1, sigma_cutoff)`` on either side; callers that need the
 reference decision must run the reference validator for those graphs.
 """
 
+from __future__ import annotations
+
+from collections.abc import Sequence
+from os import PathLike
+from typing import TYPE_CHECKING, Any
+
 from ._core import RestraintGraph
 from ._core import atom_sasa as sasa
+
+if TYPE_CHECKING:
+    from ._core import CifDocument, MmcifModel
+    from ._input import Source
 
 __all__ = ["RestraintGraph", "sasa", "validate"]
 
 
 def validate(
-    source,
+    source: Source | CifDocument | MmcifModel,
     *,
-    chem_data,
-    nuclear=False,
-    use_cdl=True,
-    sigma_cutoff=5.0,
-    include_graph=False,
-    restraint_dictionaries=(),
-    restraint_links=(),
-):
+    chem_data: str | PathLike[str],
+    nuclear: bool = False,
+    use_cdl: bool = True,
+    sigma_cutoff: float = 5.0,
+    include_graph: bool = False,
+    restraint_dictionaries: Sequence[Source | CifDocument] = (),
+    restraint_links: Sequence[tuple[str, int, int]] = (),
+) -> dict[str, Any]:
     """Check existing coordinates with native restraints and Probe contacts.
 
     ``complete`` requires full chemical coverage. Missing targets and scores near
@@ -92,7 +102,7 @@ def validate(
         document = source
     else:
         document = cif.read(source)
-    return json.loads(
+    result: dict[str, Any] = json.loads(
         _core.validate_geometry_document(
             document,
             fspath(chem_data),
@@ -104,3 +114,4 @@ def validate(
             [tuple(link) for link in restraint_links],
         )
     )
+    return result

@@ -11,7 +11,9 @@ import nibbler
 
 
 def token_table(*elements, start=21, other=64, hydrogen=65):
-    """Give the elements consecutive tokens from ``start``, as the 66-token contract does."""
+    """Give the elements consecutive tokens from ``start``, as the 66-token contract
+    does.
+    """
     return dict(
         elements={element: start + index for index, element in enumerate(elements)},
         other=other,
@@ -20,7 +22,9 @@ def token_table(*elements, start=21, other=64, hydrogen=65):
 
 
 def digest(value):
-    """Packer output with each buffer, and each long list, replaced by its SHA-256 digest."""
+    """Packer output with each buffer, and each long list, replaced by its SHA-256
+    digest.
+    """
     if isinstance(value, dict):
         return {str(name): digest(item) for name, item in value.items()}
     if (
@@ -49,13 +53,17 @@ FIXTURES = Path(__file__).parent / "fixtures" / "observations"
 
 
 def frozen(name):
-    """A frozen kaveh-data contract or the recorded digests, from the observation fixtures."""
+    """A frozen kaveh-data contract or the recorded digests, from the observation
+    fixtures.
+    """
     with gzip.open(FIXTURES / name, "rt") as file:
         return file.read()
 
 
 def with_entry(raw):
-    """The document with an ``_entry.id``, which the molecular view requires, after its data line."""
+    """The document with an ``_entry.id``, which the molecular view requires, after
+    its data line.
+    """
     if b"\n_entry.id" in raw:
         return raw
     start = raw.index(b"data_")
@@ -85,7 +93,9 @@ def without_chem_data():
 
 
 def packed(packer, raw, chem_data):
-    """Digests of the legacy and molecular packs of one document, or the error each raised."""
+    """Digests of the legacy and molecular packs of one document, or the error each
+    raised.
+    """
     document = nibbler.cif.read(raw)
 
     def outcome(run):
@@ -103,7 +113,8 @@ def packed(packer, raw, chem_data):
         ]
         return packer.finish_molecular(view, perceived, complete=True)
 
-    # Given no chem_data, the packer finds one from the environment; these two run without it.
+    # Given no chem_data, the packer finds one from the environment; these two run
+    # without it.
     with without_chem_data():
         result = dict(
             plain=outcome(lambda: packer.pack(document)),
