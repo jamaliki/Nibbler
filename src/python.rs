@@ -817,6 +817,27 @@ fn _model_document(
     ))
 }
 
+/// Remove a document's H, D and T atom sites and their anisotropic rows.
+///
+/// A document that loses no row is returned itself, with any model it has built.
+#[pyfunction]
+fn hydrogen_free_document(
+    py: Python<'_>,
+    document: Py<PyCifDocument>,
+) -> PyResult<Py<PyCifDocument>> {
+    let (source, schema) = {
+        let borrowed = document.borrow(py);
+        (Arc::clone(&borrowed.document), borrowed.schema.clone())
+    };
+    let result = py
+        .detach(|| crate::pdbx::hydrogen_free_document(&source))
+        .map_err(model_error_to_python)?;
+    if std::ptr::eq(result.blocks(), source.blocks()) {
+        return Ok(document);
+    }
+    Py::new(py, PyCifDocument::new(Arc::new(result), schema))
+}
+
 /// Write out every copy of one biological assembly of a model's coordinates.
 #[pyfunction]
 #[pyo3(signature = (model, assembly_id=None))]
@@ -1366,6 +1387,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(_model_document, module)?)?;
     module.add_function(wrap_pyfunction!(build_assembly_document, module)?)?;
     module.add_function(wrap_pyfunction!(build_assembly_with_mapping, module)?)?;
+    module.add_function(wrap_pyfunction!(hydrogen_free_document, module)?)?;
     module.add_function(wrap_pyfunction!(build_component_registry, module)?)?;
     module.add_function(wrap_pyfunction!(validate_mmcif_document, module)?)?;
     module.add_function(wrap_pyfunction!(validate_mmcif_model, module)?)?;

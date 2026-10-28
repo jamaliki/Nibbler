@@ -125,6 +125,16 @@ pub fn selected_atom_document(
 }
 
 pub(super) fn check_tables(entries: &[CifEntry]) -> Result<(), SemanticError> {
+    check_tables_for(entries, "Selection", error)
+}
+
+/// Require one `atom_site` table and unmixed coordinate tables; `subject` names the operation
+/// in the message of the error that `error` builds.
+pub(super) fn check_tables_for(
+    entries: &[CifEntry],
+    subject: &str,
+    error: fn(&str) -> SemanticError,
+) -> Result<(), SemanticError> {
     let mut atom_loops = 0;
     let mut scalar = [false; 3];
     let mut loops = [0; 3];
@@ -141,9 +151,9 @@ pub(super) fn check_tables(entries: &[CifEntry]) -> Result<(), SemanticError> {
                     if values.tags().iter().any(|tag| in_category(tag, category)) =>
                 {
                     if !values.tags().iter().all(|tag| in_category(tag, category)) {
-                        return Err(error(
-                            "Selection cannot filter a mixed-category coordinate loop",
-                        ));
+                        return Err(error(&format!(
+                            "{subject} cannot filter a mixed-category coordinate loop"
+                        )));
                     }
                     if category == "atom_site" {
                         atom_loops += 1;
@@ -159,12 +169,12 @@ pub(super) fn check_tables(entries: &[CifEntry]) -> Result<(), SemanticError> {
         .zip(loops)
         .any(|(&items, count)| items && count > 0)
     {
-        return Err(error(
-            "Selection cannot mix scalar and loop rows in one coordinate category",
-        ));
+        return Err(error(&format!(
+            "{subject} cannot mix scalar and loop rows in one coordinate category"
+        )));
     }
     if atom_loops + usize::from(scalar[0]) != 1 {
-        return Err(error("Selection requires one atom_site table"));
+        return Err(error(&format!("{subject} requires one atom_site table")));
     }
     Ok(())
 }

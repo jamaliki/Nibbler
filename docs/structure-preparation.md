@@ -97,6 +97,17 @@ component identities into one residue choice and check selected identity coheren
 Its required `clash_mask` excludes hydrogens from contact constraints without
 changing their occupancy scores.
 
+## Hydrogen removal
+
+`mmcif.without_hydrogens` copies a one-block document without its deposited
+hydrogen sites. A site is a hydrogen when its `type_symbol` is H, D or T in any
+case; a site without a symbol stays. `atom_site_anisotrop` keeps the rows whose
+`id` names a retained site, so tensors of removed or absent sites go too. A table
+that keeps rows keeps its loop or single-row form, an emptied table is dropped,
+and `struct_conn` and every other category are copied as authored. A document
+without such rows is returned itself. Mixed-category coordinate loops and missing
+`atom_site` or `type_symbol` raise `PDBX_HYDROGEN_REMOVAL`.
+
 ## Assembly overlap
 
 Assembly expansion removes whole copies of the same free non-polymer unit when

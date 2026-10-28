@@ -192,6 +192,22 @@ def select_atom_conformers(
         raise_chemistry_error(error)
 
 
+def without_hydrogens(source: Source | CifDocument) -> CifDocument:
+    """Remove the H, D, and T atom sites and their anisotropic rows from a document.
+
+    A site is a hydrogen when its ``type_symbol`` is H, D, or T in any case; a missing
+    symbol keeps the site. ``_atom_site_anisotrop`` keeps the rows whose ``id`` names a
+    retained site. A table left with no rows is dropped, and one that keeps rows keeps
+    its loop or single-row form. Every other category, ``_struct_conn`` included, is
+    copied as authored. A document without such rows is returned unchanged.
+    """
+    document = source if isinstance(source, CifDocument) else cif.read(source)
+    try:
+        return _core.hydrogen_free_document(document)
+    except ValueError as error:
+        raise_chemistry_error(error)
+
+
 def deduplicate_assembly_copies(
     positions: list[list[float]],
     source_atoms: list[int],

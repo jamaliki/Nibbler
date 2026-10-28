@@ -362,7 +362,7 @@ pub(crate) fn product_rows_in(product: &PreparedChemistry, model: &PdbxModel, ot
 /// every field the product reads apart from coordinates, and `position` gives the row's
 /// coordinates.
 pub(crate) fn product_rows_with<'a>(product: &PreparedChemistry, model: &PdbxModel, model_number: i64,
-    theirs: &[usize], identity: impl Fn(usize) -> &'a super::AtomSite, position: impl Fn(usize) -> [f64; 3],
+    theirs: &[usize], identity: impl Fn(usize) -> &'a super::model::AtomSite, position: impl Fn(usize) -> [f64; 3],
 ) -> Option<Vec<Option<usize>>> {
     let own: Vec<usize> = model.atom_sites.iter().enumerate()
         .filter(|(_, site)| site.model_number == model_number && !hydrogen(&site.element))
@@ -399,7 +399,7 @@ pub(crate) fn product_rows_with<'a>(product: &PreparedChemistry, model: &PdbxMod
             if !order_free(&model.atom_sites, mine, &templated) {
                 return None;
             }
-            fn sorted<'s>(run: &[usize], site: impl Fn(usize) -> &'s super::AtomSite) -> Vec<usize> {
+            fn sorted<'s>(run: &[usize], site: impl Fn(usize) -> &'s super::model::AtomSite) -> Vec<usize> {
                 let mut run = run.to_vec();
                 run.sort_by(|&left, &right| site(left).label_atom_id.cmp(&site(right).label_atom_id));
                 run
@@ -447,7 +447,7 @@ pub(crate) fn hydrogen(element: &ShortText) -> bool {
 }
 
 /// The fields that group atom sites into residues, as [`input::build`] reads them.
-fn residue_key(site: &super::AtomSite) -> (&ShortText, Option<i64>, &ShortText, Option<&ShortText>) {
+fn residue_key(site: &super::model::AtomSite) -> (&ShortText, Option<i64>, &ShortText, Option<&ShortText>) {
     (&site.label_asym_id, site.label_seq_id, &site.auth_seq_id, site.insertion_code.as_ref())
 }
 
@@ -457,7 +457,7 @@ fn residue_key(site: &super::AtomSite) -> (&ShortText, Option<i64>, &ShortText, 
 /// and its first site gives the residue fields. So the order cannot matter when every site
 /// was paired with a template atom, none names an alternate, whose occupancies are summed in
 /// order, and all share the residue fields.
-fn order_free(sites: &[super::AtomSite], run: &[usize], templated: &[bool]) -> bool {
+fn order_free(sites: &[super::model::AtomSite], run: &[usize], templated: &[bool]) -> bool {
     let Some(first) = run.first().map(|&row| &sites[row]) else {
         return true;
     };
@@ -485,7 +485,7 @@ fn connection_entries(model: &PdbxModel) -> Vec<&crate::cif::CifEntry> {
 }
 
 /// Whether two atom sites agree in every field the product reads except coordinates.
-fn same_identity(site: &super::AtomSite, other: &super::AtomSite) -> bool {
+fn same_identity(site: &super::model::AtomSite, other: &super::model::AtomSite) -> bool {
     std::ptr::eq(site, other) || site.model_number == other.model_number
         && site.element == other.element
         && site.label_atom_id == other.label_atom_id

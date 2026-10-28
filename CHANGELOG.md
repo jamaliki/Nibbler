@@ -6,6 +6,13 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
 
 ### Added
 
+- `mmcif.without_hydrogens` removes the H, D and T `atom_site` rows, case-insensitive on
+  `type_symbol`, and the `atom_site_anisotrop` rows whose `id` names no retained site.
+  Every other category, `struct_conn` included, is copied as authored; a table left empty
+  is dropped, and a document that loses no row is returned unchanged. It replaces
+  kaveh-data's gemmi round trip, whose canonical text it reproduces on 111 conformer
+  states of 29 PDB entries with deposited H, D and anisotropic rows.
+
 - `ObservationPacker` takes the caller's ligand token table,
   `{"elements": {symbol: token}, "other": token, "hydrogen": token}`, in place of
   an element list. Nibbler derives no ligand token: before, element `i` of the

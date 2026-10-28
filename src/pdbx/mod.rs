@@ -7,6 +7,7 @@ mod component_source;
 mod conformer;
 mod error;
 pub(crate) mod fields;
+mod hydrogen_free;
 mod model;
 mod registry;
 mod sasa;
@@ -39,6 +40,7 @@ pub use conformer::{
     select_conformer_document_with_policy, select_conformer_with_policy,
 };
 pub use error::SemanticError;
+pub use hydrogen_free::hydrogen_free_document;
 pub use model::PdbxModel;
 pub use registry::ComponentRegistry;
 pub use sasa::{ligand_sasa, model_ligand_sasa};
