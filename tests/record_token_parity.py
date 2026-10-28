@@ -8,6 +8,8 @@ and with REDUCE3_CHEM_DATA set to chem_data 2026.9:
 That packer took the 43 ligand elements and hydrogen as kaveh-data passed them, so element
 ``i`` carried token ``21 + i``, other elements 64 and a bridging hydride 65. The frozen Atom32
 and Atom84 schemas beside the digests are the kaveh-data contracts it read.
+Only molecular crop_positions digests were subsequently corrected for the no-bridge bug;
+rerunning this historical recorder restores the affected zero-coordinate digests.
 """
 
 import gzip
