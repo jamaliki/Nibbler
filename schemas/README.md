@@ -1,7 +1,9 @@
 # Schema locks and compiled dictionaries
 
 [`locks.toml`](locks.toml) pins the exact PDBx/mmCIF 5.416 and ModelCIF 1.4.9
-dictionaries used by Nibbler. The large upstream dictionary text is not vendored. Fetch
+dictionaries used by Nibbler. The large upstream dictionary text is not vendored. Each
+lock URL names a commit in the upstream dictionary repository, because the wwPDB
+`ascii/` URLs always serve the latest release and stop matching the digest. Fetch
 and verify it into the ignored local cache with:
 
 ```console
