@@ -29,6 +29,14 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
   between full-occupancy molecules, as in `2IZ9`, stay. The removed atoms appear in the
   mapping as before. Assemblies and everything built from them must be rebuilt.
 
+- Conformer selection no longer keeps a conformer that lacks heavy atoms another
+  conformer of the residue has while a complete one is free. The seeded random order,
+  and occasionally the occupancy order, kept such a conformer, and the packer dropped
+  the residue whole (`1CJX` GLU 313, whose conformer A lacks OE1; neutron `5MOO`
+  residues whose conformer B is a lone deuterium). Of the audited entries, 35 change a
+  selection under at least one of five configurations, 2 under the occupancy policy.
+  Views and everything built from them must be rebuilt.
+
 - Molecular packing preserves crop reference positions and centre eligibility for
   ordinary proteins and ligands, including the index pass. Previously, views without
   metal-hydride bridges received zero crop positions, making spatial crops select

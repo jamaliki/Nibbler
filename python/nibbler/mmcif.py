@@ -138,6 +138,8 @@ def select_conformer(
     a different letter within 1.5 A (separate ligands, chains or residues storing the
     competing conformers of a site) are alternatives, and only the letter with the
     most summed occupancy stays.
+    A residue prefers a conformer that holds every heavy atom its other conformers
+    hold over one that lacks any, under both policies.
     The native search uses sparse spatial contacts and a 100,000-choice limit;
     an unresolved conflict raises ``ChemistryError`` rather than returning clashes.
     ``atom_rows`` indexes the source table. ``document`` creates the selected view

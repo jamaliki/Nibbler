@@ -85,6 +85,17 @@ do not count as clashes. Nearby cross-chain alternatives prefer matching letters
 on occupancy ties. A bounded backtracking search finds a consistent assignment;
 it does not claim the global maximum-occupancy solution.
 
+A residue does not take an incomplete conformer while a complete one is free. A
+conformer is complete when it labels every heavy atom that any conformer of the residue
+labels; a conformer that holds only hydrogens, or lacks a side-chain atom the others
+have, is not. The search tries complete conformers first, under both policies, and falls
+back to an incomplete one only when every complete conformer clashes. Occupancy, or the
+seeded random order, ranks conformers within each class, so residues whose conformers are
+all complete, or none, select as before. Earlier, a seeded random choice, and
+occasionally the occupancy rule, kept the incomplete conformer; the packer then dropped
+the residue whole for its missing heavy atoms, as for `1CJX` GLU A313, whose conformer A
+lacks OE1, and for neutron `5MOO` residues whose conformer B is a lone deuterium.
+
 One physical site keeps one conformer. Some depositions store the competing
 conformers of a site as separate residues, ligands or chains, each carrying a single
 letter, so no residue has a choice to make. Before the residue search, such residues are

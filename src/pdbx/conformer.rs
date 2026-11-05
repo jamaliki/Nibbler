@@ -12,7 +12,7 @@ pub use source::{
     select_conformer, select_conformer_document, select_conformer_document_with_policy,
     select_conformer_with_policy,
 };
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 /// One input site. Group identifiers name residue occurrences.
 #[derive(Clone, Debug)]
@@ -57,6 +57,9 @@ struct Group {
     residue: usize,
     labels: Vec<String>,
     occupancy: Vec<f64>,
+    /// Per label: true when it holds every heavy atom any label of the residue holds.
+    /// Empty when completeness is not a criterion, as for cross-residue sites.
+    complete: Vec<bool>,
     blocked: HashSet<usize>,
     neighbors: HashSet<usize>,
 }
@@ -97,6 +100,11 @@ fn fail(message: impl Into<String>) -> SemanticError {
 /// connected site, by the same occupancy rule and seed, and the losing letters'
 /// atoms are dropped. Bonded pairs, backbone C-N links and unoccupied atoms never
 /// count as contacts.
+///
+/// A residue's conformer is complete when it labels every heavy atom any of its
+/// conformers labels. The search tries complete conformers before incomplete ones,
+/// so a residue is not left without heavy atoms while a complete conformer is free;
+/// it falls back to an incomplete one only when each complete one clashes.
 ///
 /// Bond exclusions name source-row pairs. Proximal residues on different chains
 /// prefer a shared alternate letter when their occupancy scores tie. Shared atoms
@@ -307,6 +315,7 @@ fn canonical(a: usize, b: usize) -> Pair {
 
 fn groups(atoms: &[ConformerAtom]) -> (Vec<Group>, Vec<Option<Pair>>) {
     let mut by_residue: BTreeMap<usize, BTreeMap<&str, f64>> = BTreeMap::new();
+    let mut heavy: BTreeMap<usize, BTreeMap<&str, BTreeSet<&str>>> = BTreeMap::new();
     for atom in atoms {
         if let Some(alt) = &atom.alternate {
             *by_residue
@@ -314,6 +323,14 @@ fn groups(atoms: &[ConformerAtom]) -> (Vec<Group>, Vec<Option<Pair>>) {
                 .or_default()
                 .entry(alt)
                 .or_default() += atom.occupancy;
+            let names = heavy
+                .entry(atom.residue)
+                .or_default()
+                .entry(alt)
+                .or_default();
+            if atom.clash_eligible {
+                names.insert(&atom.atom_name);
+            }
         }
     }
     let mut groups = Vec::new();
@@ -322,6 +339,12 @@ fn groups(atoms: &[ConformerAtom]) -> (Vec<Group>, Vec<Option<Pair>>) {
         if values.len() < 2 {
             continue;
         }
+        let named = &heavy[&residue];
+        let every: BTreeSet<&str> = named.values().flatten().copied().collect();
+        let complete = values
+            .keys()
+            .map(|label| named[label].len() == every.len())
+            .collect();
         let (labels, occupancy): (Vec<_>, Vec<_>) =
             values.into_iter().map(|(s, v)| (s.to_owned(), v)).unzip();
         indices.insert(residue, groups.len());
@@ -329,6 +352,7 @@ fn groups(atoms: &[ConformerAtom]) -> (Vec<Group>, Vec<Option<Pair>>) {
             residue,
             labels,
             occupancy,
+            complete,
             ..Group::default()
         });
     }
@@ -380,16 +404,20 @@ fn solve(
             })
             .count()
     };
+    let complete = |v: usize| groups[g].complete.get(v).copied().unwrap_or(true);
     options.sort_by(|&a, &b| {
+        let completeness = complete(b).cmp(&complete(a));
         if policy == ConformerPolicy::RandomClashAware {
-            return tie(seed ^ 0xa0761d6478bd642f, groups[g].residue, a).cmp(&tie(
-                seed ^ 0xa0761d6478bd642f,
-                groups[g].residue,
-                b,
-            ));
+            return completeness.then_with(|| {
+                tie(seed ^ 0xa0761d6478bd642f, groups[g].residue, a).cmp(&tie(
+                    seed ^ 0xa0761d6478bd642f,
+                    groups[g].residue,
+                    b,
+                ))
+            });
         }
-        groups[g].occupancy[b]
-            .total_cmp(&groups[g].occupancy[a])
+        completeness
+            .then_with(|| groups[g].occupancy[b].total_cmp(&groups[g].occupancy[a]))
             .then_with(|| preference(b).cmp(&preference(a)))
             .then_with(|| tie(seed, groups[g].residue, a).cmp(&tie(seed, groups[g].residue, b)))
     });
