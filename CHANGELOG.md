@@ -37,6 +37,17 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
   selection under at least one of five configurations, 2 under the occupancy policy.
   Views and everything built from them must be rebuilt.
 
+- Protein chain breaks follow the peptide bond. Residues with consecutive sequence
+  numbers get the 65-position index jump only when C of the first lies more than 2.4 Å
+  from N of the second, the link tolerance the nucleotide O3'-P test and the chemistry
+  graph's sequence links already use. Before, CA-CA beyond 4.0 Å alone set the jump, so
+  bonded pairs with a stretched CA-CA (1SFV ILE13-PRO14: C-N 1.36 Å, CA-CA 4.02 Å)
+  were split and unbonded pairs with a CA-CA under 4.0 Å were not. Where either
+  residue lacks C or N, CA-CA beyond 4.0 Å still decides. Terminal flags use the same
+  test, so a bonded pair with a stretched CA-CA now clears them. On 4,878 PDB views,
+  254 of 396 jumps go and 9 appear, changing `res_idx` in 118 views (2.4 %). Existing
+  prepared records must be rebuilt to receive the correction.
+
 - Molecular packing preserves crop reference positions and centre eligibility for
   ordinary proteins and ligands, including the index pass. Previously, views without
   metal-hydride bridges received zero crop positions, making spatial crops select
