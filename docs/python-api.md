@@ -302,7 +302,8 @@ atoms retain source identities. Hydrogen counts precede any pH assignment.
 `ConformerSelection` with `atom_rows`, `model_number`, `search_nodes`,
 `schema_version`, and a lazy `document` view. It selects the lowest model by default,
 uses occupancy preferences and clash constraints, and preserves chemical identity.
-It never substitutes a parent component. The array form accepts coordinates,
+It keeps one conformer per physical site, including conformers that a deposition
+stores as separate residues, ligands or chains. It never substitutes a parent component. The array form accepts coordinates,
 occupancies, residue/chain/sequence IDs, atom names, alternates, and bond exclusions.
 The array form also requires `clash_mask`, which excludes H, D, and T from heavy-atom
 contact tests while retaining their occupancy scores.

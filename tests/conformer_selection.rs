@@ -19,7 +19,7 @@ fn random_order_samples_unequal_occupancies_and_replays() {
         };
         let first = choose();
         assert_eq!(first.atom_rows, choose().atom_rows);
-        assert_eq!(first.schema_version, "random-clash-aware-altloc.v1");
+        assert_eq!(first.schema_version, "random-clash-aware-altloc.v2");
         choices.insert(first.atom_rows[0]);
     }
     assert_eq!(choices.len(), 2);

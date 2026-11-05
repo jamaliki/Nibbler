@@ -252,7 +252,8 @@ to copies that are already present. The result is itself a valid PDBx model.
 Explicit preparation lives above semantic reading. `mmcif.prepare_chemistry` returns
 an immutable linked-product graph with missing template sites, charges, hydrogen
 counts, and edit records. `mmcif.select_conformer` selects a model and consistent
-residue alternatives without parent substitution. Assembly expansion also removes
+residue alternatives without parent substitution, one conformer per physical site.
+Assembly expansion also removes
 whole overlapping free-ligand copies, and `assembly_with_mapping` reports those
 aliases without another expansion. The array APIs serve callers that already own
 coordinates. [Structure preparation](docs/structure-preparation.md) defines the rules,

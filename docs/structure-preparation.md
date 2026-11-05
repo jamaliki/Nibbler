@@ -76,7 +76,7 @@ The view preserves source IDs, filters anisotropic rows, and removes authored li
 whose observed endpoints belong only to discarded alternatives or models. Links
 to truly unobserved sites remain. Unsupported mixed-category coordinate loops fail.
 
-`clash-aware-altloc.v1` prefers summed occupancy within each residue, with a seeded
+`clash-aware-altloc.v2` prefers summed occupancy within each residue, with a seeded
 tie order. Sparse spatial cells identify heavy-atom clashes below 1.5 A between
 residues. Hydrogen occupancies still count, but H, D, and T do not enter contact tests.
 Authored covalent, disulfide, and coordination bonds within one crystal image and
@@ -84,6 +84,19 @@ adjacent peptide C-N bonds
 do not count as clashes. Nearby cross-chain alternatives prefer matching letters
 on occupancy ties. A bounded backtracking search finds a consistent assignment;
 it does not claim the global maximum-occupancy solution.
+
+One physical site keeps one conformer. Some depositions store the competing
+conformers of a site as separate residues, ligands or chains, each carrying a single
+letter, so no residue has a choice to make. Before the residue search, such residues are
+grouped: two single-letter residues with different letters whose heavy atoms lie below
+1.5 A of each other, outside authored bonds and peptide C-N links and ignoring unoccupied
+atoms, are alternatives of one site, and so are residues linked to them by a chain of
+such contacts. The site keeps the letter with the highest summed occupancy, with the same
+seeded tie order, and loses every atom of the other letters. The unlabelled atoms of a
+losing residue stay, and no coordinate changes. A single-letter residue that touches no
+other letter is kept, as are different letters that do not touch. `v1` kept every
+conformer of such a site, so 9KVL's two ligand enantiomers, 0.7 and 0.3, were both
+present less than 0.2 A apart. Rebuild views made with `v1` to apply the rule.
 
 No competing alternatives means no contact search. The solver stops after 100,000
 choices or a correlated component of more than 512 residues. A conflict raises

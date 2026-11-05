@@ -134,6 +134,10 @@ def select_conformer(
 
     The default prefers higher occupancy and uses the seed to order ties. Nearby
     residues on different chains prefer matching letters on equal occupancy.
+    One site keeps one conformer: residues that each carry a single letter and touch
+    a different letter within 1.5 A (separate ligands, chains or residues storing the
+    competing conformers of a site) are alternatives, and only the letter with the
+    most summed occupancy stays.
     The native search uses sparse spatial contacts and a 100,000-choice limit;
     an unresolved conflict raises ``ChemistryError`` rather than returning clashes.
     ``atom_rows`` indexes the source table. ``document`` creates the selected view

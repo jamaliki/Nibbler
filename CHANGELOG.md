@@ -6,6 +6,20 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
 
 ### Fixed
 
+- Conformer selection keeps one conformer per physical site. A deposition can store
+  the competing conformers of a site as separate ligands, residues or chains, each
+  with one alternate letter, and no residue then had a choice to make: both
+  conformers stayed in the view, a site stored twice (`9KVL`'s two ligand
+  enantiomers, 0.7 and 0.3, less than 0.2 A apart; `6S48`'s paired DNA chains). Single-letter
+  residues whose heavy atoms lie below 1.5 A of another letter's, outside authored
+  bonds and peptide C-N links, now form a site; the site keeps the letter with the
+  highest summed occupancy, by the occupancy rule and seed that decide inside a
+  residue, and loses the labelled atoms of the others. No coordinate changes. The
+  schema versions are `clash-aware-altloc.v2` and `random-clash-aware-altloc.v2`.
+  Selections, conformer views and everything built from them must be rebuilt;
+  `docs/duplicate-sites-comparison.md` lists the 49 of 4,998 audited entries whose
+  selection changes.
+
 - Molecular packing preserves crop reference positions and centre eligibility for
   ordinary proteins and ligands, including the index pass. Previously, views without
   metal-hydride bridges received zero crop positions, making spatial crops select
