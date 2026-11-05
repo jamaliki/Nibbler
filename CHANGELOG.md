@@ -20,6 +20,15 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
   `docs/duplicate-sites-comparison.md` lists the 49 of 4,998 audited entries whose
   selection changes.
 
+- Assembly expansion drops a copy of a wholly partially occupied unit that lies on an
+  earlier retained copy of the same unit, polymers included. Such copies store one
+  site twice, as when the capsid symmetry copies of an RNA stem loop of occupancy 0.5
+  overlap (`2B2E`: 34 of the 40 copies removed from 7 audited entries). The existing rule,
+  copies with at least half their atoms within 1 A of an earlier copy, still applies
+  to non-polymers and a unit of full occupancy is never removed, so deposited clashes
+  between full-occupancy molecules, as in `2IZ9`, stay. The removed atoms appear in the
+  mapping as before. Assemblies and everything built from them must be rebuilt.
+
 - Molecular packing preserves crop reference positions and centre eligibility for
   ordinary proteins and ligands, including the index pass. Previously, views without
   metal-hydride bridges received zero crop positions, making spatial crops select
@@ -27,6 +36,10 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
   and prepared records must be rebuilt to receive the correction.
 
 ### Added
+
+- `deduplicate_assembly_copies_with_occupancy` is the unit-level overlap rule with
+  per-atom occupancy, which lets a wholly partial unit be removed by an earlier copy it
+  touches. `deduplicate_assembly_copies` keeps its whole-unit rule.
 
 - `mmcif.without_hydrogens` removes the H, D and T `atom_site` rows, case-insensitive on
   `type_symbol`, and the `atom_site_anisotrop` rows whose `id` names no retained site.

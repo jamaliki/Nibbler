@@ -29,7 +29,9 @@ pub(crate) use model::only_atom_site_loop;
 pub(crate) use model::{SiteArray, atom_site_arrays};
 
 pub use assembly::{MAX_ASSEMBLY_ATOM_SITES, assembly_document, assembly_document_with_mapping};
-pub use assembly_overlap::{AssemblyDeduplication, deduplicate_assembly_copies};
+pub use assembly_overlap::{
+    AssemblyDeduplication, deduplicate_assembly_copies, deduplicate_assembly_copies_with_occupancy,
+};
 #[cfg(feature = "python")]
 pub(crate) use chemistry::library::registry as chemical_library_registry;
 #[cfg(feature = "python")]

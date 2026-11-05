@@ -310,8 +310,9 @@ contact tests while retaining their occupancy scores.
 
 `mmcif.assembly_with_mapping(source, assembly_id=None, registry=None)` returns the
 expanded document and `(source_row, removed_label_chain, retained_label_chain)`
-triples for whole-unit overlap merges. The older partial same-atom coincidence
-rule has no mapping in this result. `mmcif.deduplicate_assembly_copies` accepts
+triples for whole-unit overlap merges: copies that overlap an earlier copy by half or
+more, and copies of a partially occupied unit that touch an earlier copy. The older
+partial same-atom coincidence rule has no mapping in this result. `mmcif.deduplicate_assembly_copies` accepts
 expanded positions, source atom IDs, unit/copy IDs, eligibility, and occupied masks;
 it returns retained rows and removed-to-retained same-source-atom pairs.
 

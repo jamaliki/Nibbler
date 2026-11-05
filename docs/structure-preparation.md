@@ -123,16 +123,30 @@ without such rows is returned itself. Mixed-category coordinate loops and missin
 
 ## Assembly overlap
 
-Assembly expansion removes whole copies of the same free non-polymer unit when
-at least half its occupied atoms lie within 1 A of an earlier retained copy. Atom
-permutations in a symmetric ligand can satisfy that test. Identity transforms get
+Assembly expansion removes a whole copy of a free non-polymer unit, or of a polymer
+chain modelled only at partial occupancy, when it stores a site that an earlier retained
+copy of the same unit already holds. Atoms of the two copies are compared within 1 A,
+and either rule removes the later copy:
+
+- at least half its occupied atoms lie near an atom of the earlier copy. Atom
+  permutations in a symmetric ligand can satisfy that test; or
+- every occupied atom of the unit has occupancy below 1 and one of them lies near a
+  partially occupied atom of the earlier copy. Such a unit is one alternative of its
+  site, like an alternate location, and the two copies cannot both be present. A
+  ligand or RNA at occupancy 0.5 beside a symmetry axis, whose mate overlaps it, is
+  the typical case.
+
+A chain with any atom at full occupancy never takes part: the deposition records its
+overlaps as clashes between copies, and removing a chain would delete atoms that are
+not a duplicate. Waters and branched units stay too. Identity transforms get
 priority. Distinct source units never merge. Covalently attached units and
 multi-atom coordinated units remain separate because geometric overlap does not
 prove that their atom-specific attachments agree.
 
 The rule supplements Nibbler's existing 0.2 A same-source-atom coincidence rule.
 It keeps a complete representative ligand and remaps authored connections to the
-retained copy. `7MUB` and `1XAN` cover symmetric whole-ligand overlap.
+retained copy. `7MUB` and `1XAN` cover symmetric whole-ligand overlap, and 9CNT's
+inositol hexakisphosphate (occupancy 0.17, beside a five-fold axis) the alternatives rule.
 
 ```python
 expanded, merges = nibbler.mmcif.assembly_with_mapping(model, "1")
@@ -141,10 +155,12 @@ for source_row, removed_label_chain, retained_label_chain in merges:
 ```
 
 The mapping indexes the input atom_site table and reports whole-unit overlap
-merges. It excludes the older partial coincidence rule. It comes from the same
+merges, from both rules. It excludes the older partial coincidence rule. It comes from the same
 expansion, without a second parse or geometry pass. The array API
 `mmcif.deduplicate_assembly_copies` returns retained rows and same-source-atom aliases
-for callers that already own expanded coordinates.
+for callers that already own expanded coordinates. It applies the half-overlap rule
+only, because its caller supplies no occupancies. The Rust function
+`deduplicate_assembly_copies_with_occupancy` takes them and applies both rules.
 
 kaveh-data uses the native array check after assembly expansion, stores aliases in
 shard metadata, and remaps covalent, hydrogen-bond, and coordination edges by
