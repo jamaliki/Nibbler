@@ -40,7 +40,7 @@ pub(super) fn pdb(source: &Source) -> Vec<[i64; 3]> {
             if atom.name == sg {
                 result[atom.group][2] = 1;
             } else if atom.name == n && partner.name == c {
-                if !super::continuity::distant(source, atom.group, partner.group, true) {
+                if !super::continuity::distant(source, partner.group, atom.group, true) {
                     result[atom.group][0] = 0;
                 }
             } else if atom.name == c
@@ -107,9 +107,14 @@ pub(super) fn protein(source: &Source, policy: &str) -> Result<Vec<[i64; 3]>, St
                     && let (Some(left), Some(right)) = (here[a], neighbour[b])
                 {
                     let value = distance(left, right);
+                    let (before, after) = if step < 0 {
+                        (*other, group)
+                    } else {
+                        (group, *other)
+                    };
                     if value > 0.8
                         && value < 1.8
-                        && !super::continuity::distant(source, group, *other, true)
+                        && !super::continuity::distant(source, before, after, true)
                     {
                         result[group][end] = 0;
                     }
