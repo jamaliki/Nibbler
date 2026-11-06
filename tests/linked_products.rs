@@ -3,7 +3,10 @@
 #![allow(clippy::expect_used)]
 
 use _core::cif::parse;
-use _core::pdbx::{PreparedChemistry, build_model, prepare_chemistry};
+use _core::pdbx::{
+    PreparedChemistry, build_component_registry, build_model, build_model_with_registry,
+    prepare_chemistry,
+};
 
 fn fixture(atoms: &str, bonds: &str, observed: &str, links: &str) -> String {
     format!(
@@ -171,4 +174,62 @@ fn canonical_names_take_precedence_over_overlapping_aliases() {
     let graph = prepare(&text);
     assert_eq!(graph.atoms()[atom(&graph, "L", "C")].source_row, Some(0));
     assert_eq!(graph.atoms()[atom(&graph, "L", "C2")].source_row, None);
+}
+
+/// 7V1G links Arg23 NH1 to the phosphorus of 5GP. The file embeds the legacy definition of
+/// 5GP (O1P, O2P, O3P) and its sites use those names; the current CCD calls the same atoms
+/// OP1, OP3 and OP2 and gives the legacy names as `alt_atom_id`, with OP3 the leaving atom.
+/// The two definitions describe one phosphate, so the product is a pentavalent phosphorus
+/// with the two oxygens the structure keeps, the ester oxygen and the nitrogen of the link.
+/// The embedded atoms carry no leaving flag, so they take it from the aliased CCD atoms.
+#[test]
+fn a_legacy_embedded_definition_and_the_ccd_aliases_describe_one_atom_set() {
+    let text = fixture(
+        "L N N 0 N\nL C1 C 0 N\nL HN H 0 N\nD P P 0 .\nD O1P O 0 .\nD O2P O 0 .\nD O3P O 0 .\nD OE O 0 .",
+        "L N C1 SING\nL N HN SING\nD P O1P DOUB\nD P O2P SING\nD P O3P SING\nD P OE SING",
+        "HETATM 1 N N . L A 1 . 0 0 0 1 1 L A N 1\nHETATM 2 C C1 . L A 1 . -1.4 0 0 1 1 L A C1 1\nHETATM 3 P P . D B 2 . 1.7 0 0 1 1 D B P 1\nHETATM 4 O O1P . D B 2 . 2.2 1.2 0 1 1 D B O1P 1\nHETATM 5 O O3P . D B 2 . 2.2 -0.6 1.1 1 1 D B O3P 1\nHETATM 6 O OE . D B 2 . 2.2 -0.6 -1.1 1 1 D B OE 1",
+        "link covale A L N B D P SING",
+    );
+    let ccd = parse(
+        br"data_D
+_chem_comp.id D
+_chem_comp.type non-polymer
+loop_
+_chem_comp_atom.comp_id
+_chem_comp_atom.atom_id
+_chem_comp_atom.alt_atom_id
+_chem_comp_atom.type_symbol
+_chem_comp_atom.charge
+_chem_comp_atom.pdbx_leaving_atom_flag
+D P P P 0 N
+D OP1 O1P O 0 N
+D OP3 O2P O 0 Y
+D OP2 O3P O 0 N
+D OE OE O 0 N
+loop_
+_chem_comp_bond.comp_id
+_chem_comp_bond.atom_id_1
+_chem_comp_bond.atom_id_2
+_chem_comp_bond.value_order
+D P OP1 DOUB
+D P OP3 SING
+D P OP2 SING
+D P OE SING
+",
+    )
+    .expect("CCD fixture");
+    let registry = build_component_registry(&ccd).expect("registry");
+    let document = parse(text.as_bytes()).expect("valid fixture");
+    let model = build_model_with_registry(&document, Some(&registry)).expect("model");
+    let graph = prepare_chemistry(&model, Some(&registry), 1, None)
+        .expect("a phosphoramidate of 5GP is a valid product");
+    let names: Vec<_> = graph
+        .atoms()
+        .iter()
+        .filter(|a| a.component_id == "D")
+        .map(|a| a.atom_id.as_str())
+        .collect();
+    for name in ["OP1", "OP2", "OP3"] {
+        assert!(!names.contains(&name), "{name} duplicates a legacy name");
+    }
 }
