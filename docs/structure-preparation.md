@@ -78,7 +78,7 @@ The view preserves source IDs, filters anisotropic rows, and removes authored li
 whose observed endpoints belong only to discarded alternatives or models. Links
 to truly unobserved sites remain. Unsupported mixed-category coordinate loops fail.
 
-`clash-aware-altloc.v1` prefers summed occupancy within each residue, with a seeded
+`clash-aware-altloc.v2` prefers summed occupancy within each residue, with a seeded
 tie order. Sparse spatial cells identify heavy-atom clashes below 1.5 A between
 residues. Hydrogen occupancies still count, but H, D, and T do not enter contact tests.
 Authored covalent, disulfide, and coordination bonds within one crystal image and
@@ -86,6 +86,30 @@ adjacent peptide C-N bonds
 do not count as clashes. Nearby cross-chain alternatives prefer matching letters
 on occupancy ties. A bounded backtracking search finds a consistent assignment;
 it does not claim the global maximum-occupancy solution.
+
+A residue does not take an incomplete conformer while a complete one is free. A
+conformer is complete when it labels every heavy atom that any conformer of the residue
+labels; a conformer that holds only hydrogens, or lacks a side-chain atom the others
+have, is not. The search tries complete conformers first, under both policies, and falls
+back to an incomplete one only when every complete conformer clashes. Occupancy, or the
+seeded random order, ranks conformers within each class, so residues whose conformers are
+all complete, or none, select as before. Earlier, a seeded random choice, and
+occasionally the occupancy rule, kept the incomplete conformer; the packer then dropped
+the residue whole for its missing heavy atoms, as for `1CJX` GLU A313, whose conformer A
+lacks OE1, and for neutron `5MOO` residues whose conformer B is a lone deuterium.
+
+One physical site keeps one conformer. Some depositions store the competing
+conformers of a site as separate residues, ligands or chains, each carrying a single
+letter, so no residue has a choice to make. Before the residue search, such residues are
+grouped: two single-letter residues with different letters whose heavy atoms lie below
+1.5 A of each other, outside authored bonds and peptide C-N links and ignoring unoccupied
+atoms, are alternatives of one site, and so are residues linked to them by a chain of
+such contacts. The site keeps the letter with the highest summed occupancy, with the same
+seeded tie order, and loses every atom of the other letters. The unlabelled atoms of a
+losing residue stay, and no coordinate changes. A single-letter residue that touches no
+other letter is kept, as are different letters that do not touch. `v1` kept every
+conformer of such a site, so 9KVL's two ligand enantiomers, 0.7 and 0.3, were both
+present less than 0.2 A apart. Rebuild views made with `v1` to apply the rule.
 
 No competing alternatives means no contact search. The solver stops after 100,000
 choices or a correlated component of more than 512 residues. A conflict raises
@@ -112,16 +136,30 @@ without such rows is returned itself. Mixed-category coordinate loops and missin
 
 ## Assembly overlap
 
-Assembly expansion removes whole copies of the same free non-polymer unit when
-at least half its occupied atoms lie within 1 A of an earlier retained copy. Atom
-permutations in a symmetric ligand can satisfy that test. Identity transforms get
+Assembly expansion removes a whole copy of a free non-polymer unit, or of a polymer
+chain modelled only at partial occupancy, when it stores a site that an earlier retained
+copy of the same unit already holds. Atoms of the two copies are compared within 1 A,
+and either rule removes the later copy:
+
+- at least half its occupied atoms lie near an atom of the earlier copy. Atom
+  permutations in a symmetric ligand can satisfy that test; or
+- every occupied atom of the unit has occupancy below 1 and one of them lies near a
+  partially occupied atom of the earlier copy. Such a unit is one alternative of its
+  site, like an alternate location, and the two copies cannot both be present. A
+  ligand or RNA at occupancy 0.5 beside a symmetry axis, whose mate overlaps it, is
+  the typical case.
+
+A chain with any atom at full occupancy never takes part: the deposition records its
+overlaps as clashes between copies, and removing a chain would delete atoms that are
+not a duplicate. Waters and branched units stay too. Identity transforms get
 priority. Distinct source units never merge. Covalently attached units and
 multi-atom coordinated units remain separate because geometric overlap does not
 prove that their atom-specific attachments agree.
 
 The rule supplements Nibbler's existing 0.2 A same-source-atom coincidence rule.
 It keeps a complete representative ligand and remaps authored connections to the
-retained copy. `7MUB` and `1XAN` cover symmetric whole-ligand overlap.
+retained copy. `7MUB` and `1XAN` cover symmetric whole-ligand overlap, and 9CNT's
+inositol hexakisphosphate (occupancy 0.17, beside a five-fold axis) the alternatives rule.
 
 ```python
 expanded, merges = nibbler.mmcif.assembly_with_mapping(model, "1")
@@ -130,10 +168,12 @@ for source_row, removed_label_chain, retained_label_chain in merges:
 ```
 
 The mapping indexes the input atom_site table and reports whole-unit overlap
-merges. It excludes the older partial coincidence rule. It comes from the same
+merges, from both rules. It excludes the older partial coincidence rule. It comes from the same
 expansion, without a second parse or geometry pass. The array API
 `mmcif.deduplicate_assembly_copies` returns retained rows and same-source-atom aliases
-for callers that already own expanded coordinates.
+for callers that already own expanded coordinates. It applies the half-overlap rule
+only, because its caller supplies no occupancies. The Rust function
+`deduplicate_assembly_copies_with_occupancy` takes them and applies both rules.
 
 kaveh-data uses the native array check after assembly expansion, stores aliases in
 shard metadata, and remaps covalent, hydrogen-bond, and coordination edges by

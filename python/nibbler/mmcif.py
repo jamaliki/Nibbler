@@ -134,6 +134,12 @@ def select_conformer(
 
     The default prefers higher occupancy and uses the seed to order ties. Nearby
     residues on different chains prefer matching letters on equal occupancy.
+    One site keeps one conformer: residues that each carry a single letter and touch
+    a different letter within 1.5 A (separate ligands, chains or residues storing the
+    competing conformers of a site) are alternatives, and only the letter with the
+    most summed occupancy stays.
+    A residue prefers a conformer that holds every heavy atom its other conformers
+    hold over one that lacks any, under both policies.
     The native search uses sparse spatial contacts and a 100,000-choice limit;
     an unresolved conflict raises ``ChemistryError`` rather than returning clashes.
     ``atom_rows`` indexes the source table. ``document`` creates the selected view
@@ -223,6 +229,8 @@ def deduplicate_assembly_copies(
 ) -> tuple[list[int], list[list[int]]]:
     """Remove whole same-source copies with at least 50% overlap within 1 A.
 
+    Expansion also drops partially occupied copies that touch an earlier copy; this
+    array form has no occupancies and applies only the 50% rule.
     Lower copy IDs take precedence; rank identity operators first. Mark attached
     multi-atom units ineligible unless their mapping is exact. The result gives
     retained input rows and removed-to-retained source atom pairs. These arrays
@@ -255,8 +263,11 @@ def assembly_with_mapping(
     """Expand once and return removed-to-retained whole-unit overlap mappings.
 
     Each triple gives a row in the input atom_site table, the removed label chain,
-    and the retained label chain. This does not report the older partial same-atom
-    coincidence rule. No second expansion or CIF parse runs to obtain the mapping.
+    and the retained label chain. A copy is removed when at least half its atoms
+    overlap an earlier copy, or when its unit is wholly partially occupied and
+    touches one (alternatives of one site). This does not report the older partial
+    same-atom coincidence rule. No second expansion or CIF parse runs to obtain the
+    mapping.
     """
     if assembly_id is not None and not isinstance(assembly_id, str):
         raise TypeError("assembly_id must be a string")

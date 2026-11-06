@@ -181,8 +181,11 @@ pub fn assembly_document(
 /// Expand an assembly and return whole-unit overlap merges.
 ///
 /// Each triple gives a source atom_site row, removed copy number, and retained
-/// copy number. Copy numbers follow [`assembly_document`]. This excludes the
-/// older partial, same-atom coincidence rule.
+/// copy number. Copy numbers follow [`assembly_document`]. A copy is removed when it
+/// overlaps an earlier copy of the same unit by half or more, or when the unit is
+/// modelled only at partial occupancy and touches an earlier copy (see
+/// [`deduplicate_assembly_copies_with_occupancy`](super::deduplicate_assembly_copies_with_occupancy)).
+/// This excludes the older partial, same-atom coincidence rule.
 ///
 /// # Errors
 ///
@@ -200,7 +203,7 @@ pub fn assembly_document_with_mapping(
     let view = CategoryView::new(block.entries());
     let copies = copies(model, view, assembly_id)?;
     let mut expansion = Expansion::new(block, &copies)?;
-    let mapping = expansion.merge_overlapping_nonpolymers(model)?;
+    let mapping = expansion.merge_duplicate_copies(model)?;
     let (entries, _) = expansion.entries(None)?;
     Ok((
         CifDocument::new(vec![CifBlock::data(
@@ -246,7 +249,7 @@ pub(crate) fn assembly_with_model(
     let sources = BlockCategory::find(block.entries(), "atom_site")
         .and_then(|table| source_sites(&table, model));
     let mut expansion = Expansion::with_sites(block, &copies, sources)?;
-    let mapping = expansion.merge_overlapping_nonpolymers(model)?;
+    let mapping = expansion.merge_duplicate_copies(model)?;
     let (entries, sites) = expansion.entries(sources)?;
     let document = CifDocument::new(vec![CifBlock::data(
         block.code().unwrap_or_default().to_owned(),
@@ -542,23 +545,43 @@ struct Expansion<'a> {
 }
 
 impl<'a> Expansion<'a> {
-    fn merge_overlapping_nonpolymers(
+    /// Leave out the copies that store a site an earlier copy of the same unit holds.
+    ///
+    /// The candidates are free non-polymer units and polymer chains modelled only at
+    /// partial occupancy. [`deduplicate_assembly_copies_with_occupancy`] applies the
+    /// half-overlap rule and the alternatives rule to them, identity operator first.
+    ///
+    /// [`deduplicate_assembly_copies_with_occupancy`]: super::deduplicate_assembly_copies_with_occupancy
+    fn merge_duplicate_copies(
         &mut self,
         model: &PdbxModel,
     ) -> Result<Vec<[usize; 3]>, SemanticError> {
         if self.copies.len() < 2 {
             return Ok(Vec::new());
         }
-        let nonpolymer_entities: HashSet<_> = model
+        // A polymer chain joins only when every occupied atom is partially occupied: it is
+        // then one alternative of its site, and the deduplication reads its copies as such.
+        // Every other chain copy overlaps its neighbours as deposited, so it stays.
+        let mut partial: HashMap<&str, bool> = HashMap::new();
+        for a in model.atom_sites.iter().filter(|a| a.occupancy > 0.) {
+            let all = partial.entry(a.label_asym_id.as_str()).or_insert(true);
+            *all &= a.occupancy < 1.;
+        }
+        let kinds: HashMap<_, _> = model
             .entities
             .iter()
-            .filter(|e| e.kind == super::model::EntityKind::NonPolymer)
-            .map(|e| e.id.as_str())
+            .map(|e| (e.id.as_str(), e.kind))
             .collect();
         let candidates: HashSet<_> = model
             .asym_units
             .iter()
-            .filter(|asym| nonpolymer_entities.contains(asym.entity_id.as_str()))
+            .filter(|asym| match kinds.get(asym.entity_id.as_str()) {
+                Some(super::model::EntityKind::NonPolymer) => true,
+                Some(super::model::EntityKind::Polymer) => {
+                    partial.get(asym.id.as_str()).copied().unwrap_or(false)
+                }
+                _ => false,
+            })
             .map(|asym| asym.id.as_str())
             .collect();
         if candidates.is_empty() {
@@ -608,7 +631,7 @@ impl<'a> Expansion<'a> {
         let mut units = Vec::new();
         let mut copies = Vec::new();
         let mut rows = Vec::new();
-        let mut occupied = Vec::new();
+        let mut occupancy = Vec::new();
         for (priority, (copy_index, copy)) in order.into_iter().enumerate() {
             for &(row, a, unit) in &sites {
                 let asym = a.label_asym_id.as_str();
@@ -620,12 +643,12 @@ impl<'a> Expansion<'a> {
                 units.push(unit);
                 copies.push(priority);
                 rows.push((copy_index, row));
-                occupied.push(a.occupancy > 0.);
+                occupancy.push(a.occupancy);
             }
         }
         let eligible = vec![true; positions.len()];
-        let result = super::deduplicate_assembly_copies(
-            &positions, &sources, &units, &copies, &eligible, &occupied,
+        let result = super::deduplicate_assembly_copies_with_occupancy(
+            &positions, &sources, &units, &copies, &eligible, &occupancy,
         )?;
         for retained in result.retained_rows {
             let (copy, row) = rows[retained];

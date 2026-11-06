@@ -92,7 +92,7 @@ pub(super) fn contacts(
     (constraints, preferences)
 }
 
-fn backbone_bond(a: &ConformerAtom, b: &ConformerAtom) -> bool {
+pub(super) fn backbone_bond(a: &ConformerAtom, b: &ConformerAtom) -> bool {
     if a.chain != b.chain {
         return false;
     }

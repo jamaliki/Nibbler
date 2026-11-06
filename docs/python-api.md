@@ -302,15 +302,17 @@ atoms retain source identities. Hydrogen counts precede any pH assignment.
 `ConformerSelection` with `atom_rows`, `model_number`, `search_nodes`,
 `schema_version`, and a lazy `document` view. It selects the lowest model by default,
 uses occupancy preferences and clash constraints, and preserves chemical identity.
-It never substitutes a parent component. The array form accepts coordinates,
+It keeps one conformer per physical site, including conformers that a deposition
+stores as separate residues, ligands or chains. It never substitutes a parent component. The array form accepts coordinates,
 occupancies, residue/chain/sequence IDs, atom names, alternates, and bond exclusions.
 The array form also requires `clash_mask`, which excludes H, D, and T from heavy-atom
 contact tests while retaining their occupancy scores.
 
 `mmcif.assembly_with_mapping(source, assembly_id=None, registry=None)` returns the
 expanded document and `(source_row, removed_label_chain, retained_label_chain)`
-triples for whole-unit overlap merges. The older partial same-atom coincidence
-rule has no mapping in this result. `mmcif.deduplicate_assembly_copies` accepts
+triples for whole-unit overlap merges: copies that overlap an earlier copy by half or
+more, and copies of a partially occupied unit that touch an earlier copy. The older
+partial same-atom coincidence rule has no mapping in this result. `mmcif.deduplicate_assembly_copies` accepts
 expanded positions, source atom IDs, unit/copy IDs, eligibility, and occupied masks;
 it returns retained rows and removed-to-retained same-source-atom pairs.
 

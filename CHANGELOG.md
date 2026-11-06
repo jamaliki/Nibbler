@@ -20,6 +20,37 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
   Existing prepared products and the records built from them must be rebuilt to receive
   the correction.
 
+- Conformer selection keeps one conformer per physical site. A deposition can store
+  the competing conformers of a site as separate ligands, residues or chains, each
+  with one alternate letter, and no residue then had a choice to make: both
+  conformers stayed in the view, a site stored twice (`9KVL`'s two ligand
+  enantiomers, 0.7 and 0.3, less than 0.2 A apart; `6S48`'s paired DNA chains). Single-letter
+  residues whose heavy atoms lie below 1.5 A of another letter's, outside authored
+  bonds and peptide C-N links, now form a site; the site keeps the letter with the
+  highest summed occupancy, by the occupancy rule and seed that decide inside a
+  residue, and loses the labelled atoms of the others. No coordinate changes. The
+  schema versions are `clash-aware-altloc.v2` and `random-clash-aware-altloc.v2`.
+  Selections, conformer views and everything built from them must be rebuilt;
+  `docs/duplicate-sites-comparison.md` lists the 49 of 4,998 audited entries whose
+  selection changes.
+
+- Assembly expansion drops a copy of a wholly partially occupied unit that lies on an
+  earlier retained copy of the same unit, polymers included. Such copies store one
+  site twice, as when the capsid symmetry copies of an RNA stem loop of occupancy 0.5
+  overlap (`2B2E`: 34 of the 40 copies removed from 7 audited entries). The existing rule,
+  copies with at least half their atoms within 1 A of an earlier copy, still applies
+  to non-polymers and a unit of full occupancy is never removed, so deposited clashes
+  between full-occupancy molecules, as in `2IZ9`, stay. The removed atoms appear in the
+  mapping as before. Assemblies and everything built from them must be rebuilt.
+
+- Conformer selection no longer keeps a conformer that lacks heavy atoms another
+  conformer of the residue has while a complete one is free. The seeded random order,
+  and occasionally the occupancy order, kept such a conformer, and the packer dropped
+  the residue whole (`1CJX` GLU 313, whose conformer A lacks OE1; neutron `5MOO`
+  residues whose conformer B is a lone deuterium). Of the audited entries, 35 change a
+  selection under at least one of five configurations, 2 under the occupancy policy.
+  Views and everything built from them must be rebuilt.
+
 - Protein chain breaks follow the peptide bond. Residues with consecutive sequence
   numbers get the 65-position index jump only when C of the first lies more than 2.4 Å
   from N of the second, the link tolerance the nucleotide O3'-P test and the chemistry
@@ -38,6 +69,10 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
   and prepared records must be rebuilt to receive the correction.
 
 ### Added
+
+- `deduplicate_assembly_copies_with_occupancy` is the unit-level overlap rule with
+  per-atom occupancy, which lets a wholly partial unit be removed by an earlier copy it
+  touches. `deduplicate_assembly_copies` keeps its whole-unit rule.
 
 - `mmcif.without_hydrogens` removes the H, D and T `atom_site` rows, case-insensitive on
   `type_symbol`, and the `atom_site_anisotrop` rows whose `id` names no retained site.
