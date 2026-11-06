@@ -316,7 +316,14 @@ fn canonical(a: usize, b: usize) -> Pair {
 fn groups(atoms: &[ConformerAtom]) -> (Vec<Group>, Vec<Option<Pair>>) {
     let mut by_residue: BTreeMap<usize, BTreeMap<&str, f64>> = BTreeMap::new();
     let mut heavy: BTreeMap<usize, BTreeMap<&str, BTreeSet<&str>>> = BTreeMap::new();
+    let mut shared: BTreeMap<usize, BTreeSet<&str>> = BTreeMap::new();
     for atom in atoms {
+        if atom.alternate.is_none() && atom.clash_eligible {
+            shared
+                .entry(atom.residue)
+                .or_default()
+                .insert(&atom.atom_name);
+        }
         if let Some(alt) = &atom.alternate {
             *by_residue
                 .entry(atom.residue)
@@ -340,10 +347,28 @@ fn groups(atoms: &[ConformerAtom]) -> (Vec<Group>, Vec<Option<Pair>>) {
             continue;
         }
         let named = &heavy[&residue];
-        let every: BTreeSet<&str> = named.values().flatten().copied().collect();
+        // A label that names a heavy atom the shared rows of the residue already hold is
+        // another chemical identity written over them, as a modified residue is over its
+        // parent: it cannot be kept beside those rows, so it is never chosen while another
+        // label is free, and it does not set what a complete conformer is.
+        let held = shared.get(&residue);
+        let mut usable: Vec<bool> = values
+            .keys()
+            .map(|label| held.is_none_or(|held| named[label].is_disjoint(held)))
+            .collect();
+        if !usable.contains(&true) {
+            usable.fill(true);
+        }
+        let every: BTreeSet<&str> = values
+            .keys()
+            .zip(&usable)
+            .filter(|&(_, &usable)| usable)
+            .flat_map(|(label, _)| named[label].iter().copied())
+            .collect();
         let complete = values
             .keys()
-            .map(|label| named[label].len() == every.len())
+            .zip(&usable)
+            .map(|(label, &usable)| usable && named[label].len() == every.len())
             .collect();
         let (labels, occupancy): (Vec<_>, Vec<_>) =
             values.into_iter().map(|(s, v)| (s.to_owned(), v)).unzip();
@@ -353,6 +378,7 @@ fn groups(atoms: &[ConformerAtom]) -> (Vec<Group>, Vec<Option<Pair>>) {
             labels,
             occupancy,
             complete,
+            blocked: (0..usable.len()).filter(|&v| !usable[v]).collect(),
             ..Group::default()
         });
     }

@@ -67,6 +67,25 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
   tokens by index and potentially discard their ligand centre. Existing crop indices
   and prepared records must be rebuilt to receive the correction.
 
+- A residue with two chemical identities keeps one of them. `2BWX` CYS 249 holds a
+  shared CYS backbone (0.7), CYS A and B sulfur side chains, and CSO C (0.3), which
+  labels its own backbone over the shared one and adds OD. Because only CSO C names
+  every heavy atom any label names, the complete-conformer rule took it on every seed,
+  kept the CYS backbone beside it and failed on two component identities, so the whole
+  entry was excluded (3 of 4 seeds were ok before). A label that names a heavy atom the
+  shared rows of its residue already hold is now another identity written over them: it
+  is not chosen while another label is free and does not set what a complete conformer
+  is. The CSO state is not sampled; the selections of the other seeds are unchanged.
+
+- A component embedded in a file under an older atom-naming scheme no longer gains the
+  current names of the same atoms from the local CCD as extra atoms. `7V1G` embeds
+  `5GP` with `O1P`/`O2P`/`O3P`; the CCD calls them `OP1`/`OP3`/`OP2` and gives the old
+  names as `alt_atom_id`. The merge matched atoms by name only, so the phosphorus had
+  both sets of oxygens and the phosphoramidate link to Arg23 failed with product
+  valence 10. A CCD atom whose alternate identifier is an embedded atom's name now is
+  that atom: it adds no atom, gives it the leaving flag and charge, and its bonds map
+  onto the embedded names.
+
 ### Added
 
 - `deduplicate_assembly_copies_with_occupancy` is the unit-level overlap rule with

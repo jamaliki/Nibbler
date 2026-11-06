@@ -1,4 +1,4 @@
-use super::super::model::{AtomSite, ComponentDefinition, PdbxModel};
+use super::super::model::{AtomSite, ComponentAtom, ComponentDefinition, PdbxModel};
 use super::super::{ComponentRegistry, ShortText};
 use super::{PreparedChemistry, ProductAtom, SemanticError};
 use crate::cif::FastMap;
@@ -334,23 +334,45 @@ fn supplement(
     let mut result = embedded.clone();
     result.component_type = result.component_type.or(cached.component_type.clone());
     let original: BTreeSet<_> = embedded.atoms.iter().map(|a| a.atom_id.as_str()).collect();
+    // A cached atom is an embedded atom when it has its name or, failing that, when the
+    // embedded name is its alternate identifier: a definition written under an older naming
+    // scheme and the current one describe one atom set, not the union of two.
+    let mut renamed: BTreeMap<String, String> = BTreeMap::new();
     for a in &mut result.atoms {
-        if let Some(c) = cached.atoms.iter().find(|c| c.atom_id == a.atom_id) {
+        let same = |c: &&ComponentAtom| c.atom_id == a.atom_id;
+        let alias = |c: &&ComponentAtom| {
+            !original.contains(c.atom_id.as_str())
+                && c.alternate_id.as_deref() == Some(a.atom_id.as_str())
+                && c.element.eq_ignore_ascii_case(&a.element)
+        };
+        if let Some(c) = cached.atoms.iter().find(same) {
             if !c.element.eq_ignore_ascii_case(&a.element) {
                 return Err(fail("Component and CCD element definitions conflict"));
             }
             a.formal_charge = a.formal_charge.or(c.formal_charge);
             a.leaving = a.leaving.or(c.leaving);
             a.alternate_id = a.alternate_id.clone().or(c.alternate_id.clone());
+        } else if let Some(c) = cached.atoms.iter().find(alias) {
+            a.formal_charge = a.formal_charge.or(c.formal_charge);
+            a.leaving = a.leaving.or(c.leaving);
+            a.alternate_id = a.alternate_id.clone().or_else(|| Some(c.atom_id.clone()));
+            renamed.insert(c.atom_id.clone(), a.atom_id.clone());
         }
     }
     result.atoms.extend(
         cached
             .atoms
             .iter()
-            .filter(|a| !original.contains(a.atom_id.as_str()))
+            .filter(|a| {
+                !original.contains(a.atom_id.as_str()) && !renamed.contains_key(a.atom_id.as_str())
+            })
             .cloned(),
     );
+    let embedded_side = |name: &'_ str| -> String {
+        renamed
+            .get(name)
+            .map_or_else(|| name.to_owned(), Clone::clone)
+    };
     if result.bonds.is_empty() {
         result.bonds = cached.bonds.clone();
     } else {
@@ -359,10 +381,15 @@ fn supplement(
                 .bonds
                 .iter()
                 .filter(|b| {
-                    !original.contains(b.first_atom_id.as_str())
-                        || !original.contains(b.second_atom_id.as_str())
+                    !original.contains(embedded_side(&b.first_atom_id).as_str())
+                        || !original.contains(embedded_side(&b.second_atom_id).as_str())
                 })
-                .cloned(),
+                .cloned()
+                .map(|mut b| {
+                    b.first_atom_id = embedded_side(&b.first_atom_id);
+                    b.second_atom_id = embedded_side(&b.second_atom_id);
+                    b
+                }),
         );
     }
     Ok(result)
