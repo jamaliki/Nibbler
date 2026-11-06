@@ -853,9 +853,10 @@ metalc1 metalc A ASN 2 OD1 B ZN . ZN 2.10
     }
 
     #[test]
-    fn moved_alpha_carbon_does_not_share_the_product() {
-        // The second and third alpha carbons end up 5.1 A apart, which breaks their link.
-        not_shared(&PEPTIDE.replace("CA . GLY A 1 3 ? 7.600", "CA . GLY A 1 3 ? 8.900"));
+    fn moved_carbonyl_carbon_does_not_share_the_product() {
+        // The second residue's carbon ends up 2.7 A from the third residue's nitrogen,
+        // which breaks their link.
+        not_shared(&PEPTIDE.replace("C . ASN A 1 2 ? 4.900 0.900", "C . ASN A 1 2 ? 3.600 1.400"));
     }
 
     #[test]

@@ -36,6 +36,19 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
   residues whose conformer B is a lone deuterium). Of the audited entries, 35 change a
   selection under at least one of five configurations, 2 under the occupancy policy.
   Views and everything built from them must be rebuilt.
+- The chemistry graph keeps the peptide sequence link of a bonded pair whose CA-CA
+  distance exceeds 4.0 Å. `prepare_chemistry` read that distance as "Excluded distant CA
+  sequence link" before it measured C to N, so a bonded pair with a stretched CA-CA
+  (1SFV ILE13-PRO14: C-N 1.36 Å, CA-CA 4.02 Å) lost its C-N bond, kept a C-terminal
+  `OXT` and `HXT` on the first residue and an extra hydrogen on the N of the second, and
+  the molecular targets marked the first residue incomplete. The 2.4 Å C-N test now
+  decides, as for chain breaks above; CA-CA beyond 4.0 Å decides only where C or N is
+  unobserved. On the 3,223 of 4,878 audited PDB views that the local component data
+  resolves, 77 graphs gain a link (186 in all, C-N 0.88 to 2.34 Å, CA-CA 4.00 to 4.89 Å)
+  and none loses one; the other 3,146 graphs are unchanged. A pair left unlinked by its
+  C-N distance is now reported as "Excluded distant sequence link" whatever its CA-CA.
+  Existing prepared products and the records built from them must be rebuilt to receive
+  the correction.
 
 - Protein chain breaks follow the peptide bond. Residues with consecutive sequence
   numbers get the 65-position index jump only when C of the first lies more than 2.4 Å

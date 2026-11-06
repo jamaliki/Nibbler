@@ -277,6 +277,11 @@ fn infer_order(graph: &PreparedChemistry, a: usize, b: usize) -> Result<u8, Sema
     Ok(value)
 }
 
+/// Whether `atom` has coordinates, as opposed to being a template site no row supplies.
+fn has_site(graph: &PreparedChemistry, atom: usize) -> bool {
+    graph.atoms[atom].coordinates.is_some()
+}
+
 fn add_polymer_links(
     graph: &mut PreparedChemistry,
     polymers: &std::collections::HashSet<&str>,
@@ -327,7 +332,10 @@ fn add_polymer_links(
         ) else {
             continue;
         };
-        if kind.contains("peptide") {
+        // The distance between the linking atoms decides, below. Only where either lacks
+        // coordinates does CA-CA stand in, as in `observations::continuity`: a stretched
+        // CA-CA distance does not cut a bonded pair.
+        if kind.contains("peptide") && !(has_site(graph, a) && has_site(graph, b)) {
             let ca = |residue: usize| {
                 graph.residues[residue]
                     .atoms
@@ -381,3 +389,7 @@ fn add_polymer_links(
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+mod tests;
