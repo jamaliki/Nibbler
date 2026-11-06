@@ -51,8 +51,10 @@ table comes from RDKit 2026.03.6; `tools/gen_product_valence.py` reproduces it.
 
 Sequence links require a declared polymer and consecutive label sequence IDs.
 They do not replace an existing attachment to the next residue. Observed endpoints
-more than 2.4 A apart do not receive an inferred sequence link. Unobserved endpoints
-can connect through declared sequence evidence. Authored links keep their stated
+more than 2.4 A apart do not receive an inferred sequence link, whatever the distance
+between the alpha carbons. Unobserved endpoints can connect through declared sequence
+evidence; for a peptide, alpha carbons more than 4.0 A apart then stand in for the
+endpoints and withhold the link. Authored links keep their stated
 orders; glycosylation roles and carbohydrate links have a recorded 2.4 A distance
 exception. The exception does not apply to all covalent links.
 
