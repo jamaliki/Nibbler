@@ -2,6 +2,7 @@
 
 use super::SemanticError;
 
+mod alternates;
 mod contacts;
 mod source;
 
@@ -11,7 +12,7 @@ pub use source::{
     select_conformer, select_conformer_document, select_conformer_document_with_policy,
     select_conformer_with_policy,
 };
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 /// One input site. Group identifiers name residue occurrences.
 #[derive(Clone, Debug)]
@@ -56,6 +57,9 @@ struct Group {
     residue: usize,
     labels: Vec<String>,
     occupancy: Vec<f64>,
+    /// Per label: true when it holds every heavy atom any label of the residue holds.
+    /// Empty when completeness is not a criterion, as for cross-residue sites.
+    complete: Vec<bool>,
     blocked: HashSet<usize>,
     neighbors: HashSet<usize>,
 }
@@ -75,8 +79,8 @@ pub enum ConformerPolicy {
 impl ConformerPolicy {
     pub(super) fn schema(self) -> &'static str {
         match self {
-            Self::Occupancy => "clash-aware-altloc.v1",
-            Self::RandomClashAware => "random-clash-aware-altloc.v1",
+            Self::Occupancy => "clash-aware-altloc.v2",
+            Self::RandomClashAware => "random-clash-aware-altloc.v2",
         }
     }
 }
@@ -86,6 +90,21 @@ fn fail(message: impl Into<String>) -> SemanticError {
 }
 
 /// Select residue-level alternatives while avoiding nonbonded clashes below 1.5 A.
+///
+/// One physical site keeps one conformer. A residue with several alternate letters
+/// is a variable group, and the search picks one letter for it. A residue whose
+/// labelled atoms share a single letter is a competing conformer of the site when a
+/// heavy atom of it lies below 1.5 A from a heavy atom of another single-letter
+/// residue with a different letter, whether that residue is on the same chain, on
+/// another chain or a ligand; such residues are resolved first, one letter per
+/// connected site, by the same occupancy rule and seed, and the losing letters'
+/// atoms are dropped. Bonded pairs, backbone C-N links and unoccupied atoms never
+/// count as contacts.
+///
+/// A residue's conformer is complete when it labels every heavy atom any of its
+/// conformers labels. The search tries complete conformers before incomplete ones,
+/// so a residue is not left without heavy atoms while a complete conformer is free;
+/// it falls back to an incomplete one only when each complete one clashes.
 ///
 /// Bond exclusions name source-row pairs. Proximal residues on different chains
 /// prefer a shared alternate letter when their occupancy scores tie. Shared atoms
@@ -143,6 +162,40 @@ pub(super) fn select_with_links(
         .iter()
         .map(|&[a, b]| canonical(a, b))
         .collect();
+    let duplicates = alternates::resolve(atoms, &exclusions, seed, policy);
+    if !duplicates.dropped.contains(&true) {
+        return search(atoms, &exclusions, linked_alternatives, seed, policy);
+    }
+    let kept: Vec<usize> = (0..atoms.len())
+        .filter(|&i| !duplicates.dropped[i])
+        .collect();
+    let mut position = vec![None; atoms.len()];
+    for (new, &old) in kept.iter().enumerate() {
+        position[old] = Some(new);
+    }
+    let remaining: Vec<_> = kept.iter().map(|&i| atoms[i].clone()).collect();
+    let exclusions = exclusions
+        .iter()
+        .filter_map(|&(a, b)| Some(canonical(position[a]?, position[b]?)))
+        .collect();
+    let linked: Vec<_> = linked_alternatives
+        .iter()
+        .filter_map(|&[a, b]| Some([position[a]?, position[b]?]))
+        .collect();
+    let mut selection = search(&remaining, &exclusions, &linked, seed, policy)?;
+    selection.atom_rows = selection.atom_rows.iter().map(|&i| kept[i]).collect();
+    selection.search_nodes += duplicates.nodes;
+    Ok(selection)
+}
+
+/// Residue-level search over atoms that are not duplicates of another site.
+fn search(
+    atoms: &[ConformerAtom],
+    exclusions: &HashSet<Pair>,
+    linked_alternatives: &[[usize; 2]],
+    seed: u64,
+    policy: ConformerPolicy,
+) -> Result<ConformerSelection, SemanticError> {
     let (mut groups, memberships) = groups(atoms);
     if groups.is_empty() {
         return Ok(ConformerSelection {
@@ -154,7 +207,7 @@ pub(super) fn select_with_links(
             model_number: None,
         });
     }
-    let (mut constraints, preferences) = contacts(atoms, &memberships, &exclusions, &mut groups);
+    let (mut constraints, preferences) = contacts(atoms, &memberships, exclusions, &mut groups);
     for &[first, second] in linked_alternatives {
         if let (Some((g, v)), Some((h, w))) = (memberships[first], memberships[second]) {
             if g == h {
@@ -262,6 +315,7 @@ fn canonical(a: usize, b: usize) -> Pair {
 
 fn groups(atoms: &[ConformerAtom]) -> (Vec<Group>, Vec<Option<Pair>>) {
     let mut by_residue: BTreeMap<usize, BTreeMap<&str, f64>> = BTreeMap::new();
+    let mut heavy: BTreeMap<usize, BTreeMap<&str, BTreeSet<&str>>> = BTreeMap::new();
     for atom in atoms {
         if let Some(alt) = &atom.alternate {
             *by_residue
@@ -269,6 +323,14 @@ fn groups(atoms: &[ConformerAtom]) -> (Vec<Group>, Vec<Option<Pair>>) {
                 .or_default()
                 .entry(alt)
                 .or_default() += atom.occupancy;
+            let names = heavy
+                .entry(atom.residue)
+                .or_default()
+                .entry(alt)
+                .or_default();
+            if atom.clash_eligible {
+                names.insert(&atom.atom_name);
+            }
         }
     }
     let mut groups = Vec::new();
@@ -277,6 +339,12 @@ fn groups(atoms: &[ConformerAtom]) -> (Vec<Group>, Vec<Option<Pair>>) {
         if values.len() < 2 {
             continue;
         }
+        let named = &heavy[&residue];
+        let every: BTreeSet<&str> = named.values().flatten().copied().collect();
+        let complete = values
+            .keys()
+            .map(|label| named[label].len() == every.len())
+            .collect();
         let (labels, occupancy): (Vec<_>, Vec<_>) =
             values.into_iter().map(|(s, v)| (s.to_owned(), v)).unzip();
         indices.insert(residue, groups.len());
@@ -284,6 +352,7 @@ fn groups(atoms: &[ConformerAtom]) -> (Vec<Group>, Vec<Option<Pair>>) {
             residue,
             labels,
             occupancy,
+            complete,
             ..Group::default()
         });
     }
@@ -335,16 +404,20 @@ fn solve(
             })
             .count()
     };
+    let complete = |v: usize| groups[g].complete.get(v).copied().unwrap_or(true);
     options.sort_by(|&a, &b| {
+        let completeness = complete(b).cmp(&complete(a));
         if policy == ConformerPolicy::RandomClashAware {
-            return tie(seed ^ 0xa0761d6478bd642f, groups[g].residue, a).cmp(&tie(
-                seed ^ 0xa0761d6478bd642f,
-                groups[g].residue,
-                b,
-            ));
+            return completeness.then_with(|| {
+                tie(seed ^ 0xa0761d6478bd642f, groups[g].residue, a).cmp(&tie(
+                    seed ^ 0xa0761d6478bd642f,
+                    groups[g].residue,
+                    b,
+                ))
+            });
         }
-        groups[g].occupancy[b]
-            .total_cmp(&groups[g].occupancy[a])
+        completeness
+            .then_with(|| groups[g].occupancy[b].total_cmp(&groups[g].occupancy[a]))
             .then_with(|| preference(b).cmp(&preference(a)))
             .then_with(|| tie(seed, groups[g].residue, a).cmp(&tie(seed, groups[g].residue, b)))
     });

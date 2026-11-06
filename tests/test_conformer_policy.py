@@ -34,7 +34,7 @@ def test_random_policy_varies_unequal_occupancies_without_changing_source():
             source, seed=seed, policy="random_clash_aware"
         )
         assert first.atom_rows == replay.atom_rows
-        assert first.schema_version == "random-clash-aware-altloc.v1"
+        assert first.schema_version == "random-clash-aware-altloc.v2"
         choices.add(tuple(first.atom_rows))
         assert nibbler.mmcif.select_conformer(source, seed=seed).atom_rows == [0]
     assert choices == {(0,), (1,)}

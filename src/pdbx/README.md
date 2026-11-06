@@ -104,6 +104,25 @@ into cells of that size, so the check grows with the atoms written. Rows of the 
 categories are streamed into text columns, so a large assembly does not allocate a value
 object per cell.
 
+One site is written once. Beyond atoms on an axis, a later copy of a free non-polymer
+unit, or of a polymer chain modelled only at partial occupancy, is left out when it stores
+a site an earlier retained copy already holds (identity operator first). Atoms of the same
+unit in the two copies are compared within 1 Å (`assembly_overlap`), and either rule
+removes the copy:
+
+- at least half of the copy's occupied atoms lie near an atom of the earlier copy, whatever
+  their occupancy. This catches permuted atoms of a symmetric ligand;
+- every occupied atom of the unit has occupancy below 1 and one of them lies near a
+  partially occupied atom of the earlier copy. The two copies are alternatives, as altlocs
+  are, and cannot both be present.
+
+A polymer chain with any atom at full occupancy never takes part: its overlaps are clashes
+the deposition records, not a site stored twice.
+
+Waters, branched entities, and units with covalent links or multi-atom coordination to
+another unit are left as they are. `conformer` applies the same occupancy principle to
+alternate letters held by different residues, chains and ligands.
+
 ```mermaid
 flowchart TB
     MODEL["PdbxModel<br/>source document"]:::input --> GEN["_pdbx_struct_assembly_gen<br/>rows of the selected assembly"]:::data
