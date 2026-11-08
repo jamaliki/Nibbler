@@ -1,7 +1,7 @@
 //! Explicit row selection preserves source identifiers and matching authored links.
 
 use super::SemanticError;
-use super::fields::{category_rows, optional_integer, optional_text};
+use super::fields::{PDBX, category_rows, optional_text};
 use super::model::AtomSite;
 use crate::cif::{
     BlockCategory, CategoryView, CifBlock, CifDocument, CifEntry, CifLoop, in_category,
@@ -216,7 +216,7 @@ fn selected_connections(
         let mut keep = true;
         for offset in [0, 7] {
             let values = [0, 1, 2, 4, 5, 6].map(|i| optional_text(&row, offset + i));
-            let seq = optional_integer(&row, "struct_conn", fields[offset + 3], offset + 3)?;
+            let seq = PDBX.optional_integer(&row, "struct_conn", fields[offset + 3], offset + 3)?;
             let key = (
                 values[0].as_deref().unwrap_or_default(),
                 values[1].as_deref().unwrap_or_default(),

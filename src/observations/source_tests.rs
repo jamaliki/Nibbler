@@ -1,3 +1,5 @@
+//! Tests for reading selected atom rows and covalent links.
+
 use super::read;
 use crate::cif::parse;
 

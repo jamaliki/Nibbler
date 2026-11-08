@@ -1,3 +1,5 @@
+//! Projected CIF tables: typed columns, cells and missing-value kinds.
+
 use std::sync::Arc;
 
 use arrow_array::builder::{Float64Builder, Int64Builder, StringBuilder, UInt8Builder};

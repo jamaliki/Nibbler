@@ -1,3 +1,5 @@
+//! Assemble restraint and contact results into the validation report.
+
 use reduce3::atominfo::{bonded_lists, extra_atom_info_validation};
 use reduce3::clashcheck;
 use reduce3::interp::{

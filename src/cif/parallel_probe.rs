@@ -1,3 +1,5 @@
+//! Check whether a loop runs far enough to be worth scanning in parallel.
+
 use memchr::{memchr, memchr3};
 
 use super::lexer::is_whitespace;

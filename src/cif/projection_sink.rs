@@ -1,5 +1,8 @@
+//! A parse sink that keeps only projected columns and rows that pass the predicates.
+
 use std::thread;
 
+use super::dictionary_source::split_tag;
 use super::document::{BlockKind, CifValueRef};
 use super::error::ParseErrorCode;
 use super::lexer::Lexer;
@@ -631,10 +634,6 @@ fn cell_from_value(value: &ParsedValue<'_>) -> CifCell {
         (true, ".") => CifCell::NotApplicable,
         _ => CifCell::Text(value.as_str().to_owned()),
     }
-}
-
-fn split_tag(tag: &str) -> Option<(&str, &str)> {
-    tag.strip_prefix('_')?.split_once('.')
 }
 
 fn same_column_keys(specs: &[ColumnSpec], columns: &[ColumnBuilder]) -> bool {

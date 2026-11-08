@@ -1,100 +1,57 @@
-//! Typed field decoding at the generic-CIF to ModelCIF trust boundary.
+//! The error codes of ModelCIF item decoding at the generic-CIF trust boundary.
 
-use crate::pdbx::SemanticError;
-use crate::pdbx::fields::Row;
+use crate::pdbx::fields::Decoder;
 
-pub(super) fn required_text<const N: usize>(
-    row: &Row<'_, N>,
-    category: &str,
-    item: &str,
-    field: usize,
-) -> Result<String, SemanticError> {
-    row.text(field)
-        .ok_or_else(|| missing(category, item, row.row_index()))
-}
+/// ModelCIF items: `MODELCIF_ITEM_REQUIRED` and `MODELCIF_ITEM_TYPE`.
+pub(super) const MODELCIF: Decoder = Decoder::new("MODELCIF_ITEM_REQUIRED", "MODELCIF_ITEM_TYPE");
 
-pub(super) fn optional_text<const N: usize>(row: &Row<'_, N>, field: usize) -> Option<String> {
-    row.text(field)
-}
+#[cfg(test)]
+mod tests {
+    use crate::cif::{CategoryView, parse};
+    use crate::pdbx::fields::{PDBX, category_rows};
 
-pub(super) fn required_integer<const N: usize>(
-    row: &Row<'_, N>,
-    category: &str,
-    item: &str,
-    field: usize,
-) -> Result<i64, SemanticError> {
-    match row.integer(field) {
-        Ok(Some(value)) => Ok(value),
-        Ok(None) => Err(missing(category, item, row.row_index())),
-        Err(text) => Err(typed(category, item, row.row_index(), &text, "integer")),
+    use super::MODELCIF;
+
+    #[test]
+    fn each_profile_reports_its_own_codes_with_shared_messages() -> Result<(), String> {
+        let document = parse(b"data_demo\n_ma_demo.count x\n_ma_demo.name ?\n")
+            .map_err(|error| error.message().to_owned())?;
+        let view = CategoryView::new(document.blocks()[0].entries());
+        let row = category_rows(view, "ma_demo", ["count", "name"])
+            .next()
+            .ok_or("no row")?;
+        for (decoder, prefix) in [(PDBX, "PDBX"), (MODELCIF, "MODELCIF")] {
+            let typed = decoder
+                .required_integer(&row, "ma_demo", "count", 0)
+                .err()
+                .ok_or("integer decoded")?;
+            assert_eq!(typed.code(), format!("{prefix}_ITEM_TYPE"));
+            assert_eq!(
+                typed.message(),
+                "value \"x\" for _ma_demo.count is not a integer"
+            );
+            assert_eq!(
+                typed.context(),
+                ["category=ma_demo", "item=_ma_demo.count", "row=1"]
+            );
+            let missing = decoder
+                .required_text(&row, "ma_demo", "name", 1)
+                .err()
+                .ok_or("text decoded")?;
+            assert_eq!(missing.code(), format!("{prefix}_ITEM_REQUIRED"));
+            assert_eq!(
+                missing.message(),
+                "required item _ma_demo.name is absent or missing"
+            );
+            let float = decoder
+                .optional_float(&row, "ma_demo", "count", 0)
+                .err()
+                .ok_or("float decoded")?;
+            assert_eq!(
+                float.message(),
+                "value \"x\" for _ma_demo.count is not a finite float"
+            );
+        }
+        Ok(())
     }
-}
-
-pub(super) fn optional_integer<const N: usize>(
-    row: &Row<'_, N>,
-    category: &str,
-    item: &str,
-    field: usize,
-) -> Result<Option<i64>, SemanticError> {
-    row.integer(field)
-        .map_err(|text| typed(category, item, row.row_index(), &text, "integer"))
-}
-
-pub(super) fn required_float<const N: usize>(
-    row: &Row<'_, N>,
-    category: &str,
-    item: &str,
-    field: usize,
-) -> Result<f64, SemanticError> {
-    match row.float(field) {
-        Ok(Some(value)) => Ok(value),
-        Ok(None) => Err(missing(category, item, row.row_index())),
-        Err(text) => Err(typed(
-            category,
-            item,
-            row.row_index(),
-            &text,
-            "finite float",
-        )),
-    }
-}
-
-pub(super) fn optional_float<const N: usize>(
-    row: &Row<'_, N>,
-    category: &str,
-    item: &str,
-    field: usize,
-) -> Result<Option<f64>, SemanticError> {
-    row.float(field)
-        .map_err(|text| typed(category, item, row.row_index(), &text, "finite float"))
-}
-
-fn row_context(category: &str, item: &str, row_index: usize) -> Vec<String> {
-    vec![
-        format!("category={category}"),
-        format!("item=_{category}.{item}"),
-        format!("row={}", row_index + 1),
-    ]
-}
-
-fn typed(
-    category: &str,
-    item: &str,
-    row_index: usize,
-    text: &str,
-    expected: &str,
-) -> SemanticError {
-    SemanticError::new(
-        "MODELCIF_ITEM_TYPE",
-        format!("value {text:?} for _{category}.{item} is not a {expected}"),
-        row_context(category, item, row_index),
-    )
-}
-
-fn missing(category: &str, item: &str, row_index: usize) -> SemanticError {
-    SemanticError::new(
-        "MODELCIF_ITEM_REQUIRED",
-        format!("required item _{category}.{item} is absent or missing"),
-        row_context(category, item, row_index),
-    )
 }

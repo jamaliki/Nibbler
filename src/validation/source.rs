@@ -1,3 +1,5 @@
+//! Check the original document for inputs that Reduce3 preparation would drop.
+
 use reduce3::cifsource::{CifSource, CifTable};
 
 use crate::cif::{CifBlock, CifDocument, CifEntry};

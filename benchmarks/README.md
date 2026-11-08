@@ -133,6 +133,25 @@ allowance plus eight times the larger of the logical input and canonical documen
 sizes. Using the decoded-document size keeps the check comparable when BinaryCIF is
 substantially smaller on disk. The complete JSON report is retained for 90 days.
 
+## Native validation reference harness
+
+The `native_validation_*` scripts built the frozen CCTBX and Probe2 references in
+`tests/native_validation_reference_cases/` and the timings in
+`native-validation-results/`. [The reference notes](../tests/native_validation_reference.md)
+say what the references prove. The tests import the `_capture`, `_compare`, `_pack`,
+`_decisions` and `_atoms` scripts. The others run by hand when a reference is rebuilt,
+and none runs in `make check`. `_convert`, `_cutoff` and `_processed` import CCTBX
+(`iotbx`, `scitbx`), so they need the CCTBX 2026.9 reference environment.
+
+| Script | Use |
+| --- | --- |
+| `native_validation_reference_convert.py` | Convert a reference PDB input to mmCIF without chemical preparation (the `*-conversion.json` cases) |
+| `native_validation_reference_cutoff.py` | Write the CB-HB1 bond-cutoff controls (`bond-cutoff/` and its manifest) |
+| `native_validation_reference_processed.py` | Apply CCTBX-processed sites to the original CIF and list every site difference (`protein-2160-cctbx-sites.cif` and its manifest) |
+| `native_validation_reference_native.py` | Capture the native graph of one input for the comparator |
+| `native_validation_reference_benchmark.py` | Time fresh-process native and CCTBX capture in alternating order, each in its own interpreter |
+| `native_validation_timing.py` | Time native and reference validation in persistent workers (`native-validation-results/`) |
+
 ## Promotion rule
 
 A performance change is retained only when:

@@ -1,3 +1,5 @@
+//! Tokenize CIF source text for the parser.
+
 use memchr::memchr3;
 
 use super::document::QuoteStyle;
@@ -354,7 +356,7 @@ fn preceding_line_ending_start(bytes: &[u8], byte_offset: usize) -> usize {
     content_end
 }
 
-fn starts_ascii_case(text: &str, prefix: &str) -> bool {
+pub(super) fn starts_ascii_case(text: &str, prefix: &str) -> bool {
     text.get(..prefix.len())
         .is_some_and(|candidate| candidate.eq_ignore_ascii_case(prefix))
 }

@@ -4,9 +4,8 @@ use crate::cif::CategoryView;
 use crate::pdbx::SemanticError;
 use crate::pdbx::fields::category_rows;
 
-use super::fields::{
-    optional_integer, optional_text, required_float, required_integer, required_text,
-};
+use super::fields::MODELCIF;
+use crate::pdbx::fields::optional_text;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct QaMetric {
@@ -85,13 +84,18 @@ pub(super) fn qa_metrics(categories: CategoryView<'_>) -> Result<Vec<QaMetric>, 
     )
     .map(|row| {
         Ok(QaMetric {
-            id: required_integer(&row, "ma_qa_metric", "id", 0)?,
-            name: required_text(&row, "ma_qa_metric", "name", 1)?,
+            id: MODELCIF.required_integer(&row, "ma_qa_metric", "id", 0)?,
+            name: MODELCIF.required_text(&row, "ma_qa_metric", "name", 1)?,
             description: optional_text(&row, 2),
-            metric_type: required_text(&row, "ma_qa_metric", "type", 3)?,
-            mode: required_text(&row, "ma_qa_metric", "mode", 4)?,
-            software_group_id: optional_integer(&row, "ma_qa_metric", "software_group_id", 5)?,
-            data_id: optional_integer(&row, "ma_qa_metric", "data_id", 6)?,
+            metric_type: MODELCIF.required_text(&row, "ma_qa_metric", "type", 3)?,
+            mode: MODELCIF.required_text(&row, "ma_qa_metric", "mode", 4)?,
+            software_group_id: MODELCIF.optional_integer(
+                &row,
+                "ma_qa_metric",
+                "software_group_id",
+                5,
+            )?,
+            data_id: MODELCIF.optional_integer(&row, "ma_qa_metric", "data_id", 6)?,
         })
     })
     .collect()
@@ -112,10 +116,10 @@ fn global_qa(categories: CategoryView<'_>) -> Result<Vec<QaValue>, SemanticError
     )
     .map(|row| {
         Ok(QaValue::Global {
-            ordinal_id: required_integer(&row, "ma_qa_metric_global", "ordinal_id", 0)?,
-            model_id: required_integer(&row, "ma_qa_metric_global", "model_id", 1)?,
-            metric_id: required_integer(&row, "ma_qa_metric_global", "metric_id", 2)?,
-            value: required_float(&row, "ma_qa_metric_global", "metric_value", 3)?,
+            ordinal_id: MODELCIF.required_integer(&row, "ma_qa_metric_global", "ordinal_id", 0)?,
+            model_id: MODELCIF.required_integer(&row, "ma_qa_metric_global", "model_id", 1)?,
+            metric_id: MODELCIF.required_integer(&row, "ma_qa_metric_global", "metric_id", 2)?,
+            value: MODELCIF.required_float(&row, "ma_qa_metric_global", "metric_value", 3)?,
         })
     })
     .collect()
@@ -138,15 +142,15 @@ fn local_qa(categories: CategoryView<'_>) -> Result<Vec<QaValue>, SemanticError>
     )
     .map(|row| {
         Ok(QaValue::Local {
-            ordinal_id: required_integer(&row, category, "ordinal_id", 0)?,
-            model_id: required_integer(&row, category, "model_id", 1)?,
+            ordinal_id: MODELCIF.required_integer(&row, category, "ordinal_id", 0)?,
+            model_id: MODELCIF.required_integer(&row, category, "model_id", 1)?,
             site: ResidueSite {
-                asym_id: required_text(&row, category, "label_asym_id", 2)?,
-                sequence_id: required_integer(&row, category, "label_seq_id", 3)?,
-                component_id: required_text(&row, category, "label_comp_id", 4)?,
+                asym_id: MODELCIF.required_text(&row, category, "label_asym_id", 2)?,
+                sequence_id: MODELCIF.required_integer(&row, category, "label_seq_id", 3)?,
+                component_id: MODELCIF.required_text(&row, category, "label_comp_id", 4)?,
             },
-            metric_id: required_integer(&row, category, "metric_id", 5)?,
-            value: required_float(&row, category, "metric_value", 6)?,
+            metric_id: MODELCIF.required_integer(&row, category, "metric_id", 5)?,
+            value: MODELCIF.required_float(&row, category, "metric_value", 6)?,
         })
     })
     .collect()
@@ -172,20 +176,20 @@ fn pairwise_qa(categories: CategoryView<'_>) -> Result<Vec<QaValue>, SemanticErr
     )
     .map(|row| {
         Ok(QaValue::Pairwise {
-            ordinal_id: required_integer(&row, category, "ordinal_id", 0)?,
-            model_id: required_integer(&row, category, "model_id", 1)?,
+            ordinal_id: MODELCIF.required_integer(&row, category, "ordinal_id", 0)?,
+            model_id: MODELCIF.required_integer(&row, category, "model_id", 1)?,
             first: ResidueSite {
-                asym_id: required_text(&row, category, "label_asym_id_1", 2)?,
-                sequence_id: required_integer(&row, category, "label_seq_id_1", 3)?,
-                component_id: required_text(&row, category, "label_comp_id_1", 4)?,
+                asym_id: MODELCIF.required_text(&row, category, "label_asym_id_1", 2)?,
+                sequence_id: MODELCIF.required_integer(&row, category, "label_seq_id_1", 3)?,
+                component_id: MODELCIF.required_text(&row, category, "label_comp_id_1", 4)?,
             },
             second: ResidueSite {
-                asym_id: required_text(&row, category, "label_asym_id_2", 5)?,
-                sequence_id: required_integer(&row, category, "label_seq_id_2", 6)?,
-                component_id: required_text(&row, category, "label_comp_id_2", 7)?,
+                asym_id: MODELCIF.required_text(&row, category, "label_asym_id_2", 5)?,
+                sequence_id: MODELCIF.required_integer(&row, category, "label_seq_id_2", 6)?,
+                component_id: MODELCIF.required_text(&row, category, "label_comp_id_2", 7)?,
             },
-            metric_id: required_integer(&row, category, "metric_id", 8)?,
-            value: required_float(&row, category, "metric_value", 9)?,
+            metric_id: MODELCIF.required_integer(&row, category, "metric_id", 8)?,
+            value: MODELCIF.required_float(&row, category, "metric_value", 9)?,
         })
     })
     .collect()

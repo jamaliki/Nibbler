@@ -7,7 +7,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
-use crate::python::PyCifDocument;
+use crate::python::document::PyCifDocument;
 use crate::validation::{Options, load_with_dictionaries, run};
 
 #[pyfunction]
@@ -48,7 +48,7 @@ fn validate_geometry_document(
     .map_err(PyValueError::new_err)
 }
 
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+pub(super) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(validate_geometry_document, module)?)?;
     Ok(())
 }

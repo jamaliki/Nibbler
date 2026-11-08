@@ -1,3 +1,5 @@
+//! Build the starting chemical graph from observed atoms and component definitions.
+
 use super::super::model::{AtomSite, ComponentDefinition, PdbxModel};
 use super::super::{ComponentRegistry, ShortText};
 use super::{PreparedChemistry, ProductAtom, SemanticError};

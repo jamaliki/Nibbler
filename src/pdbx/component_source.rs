@@ -6,8 +6,7 @@ use crate::cif::CategoryView;
 
 use super::error::SemanticError;
 use super::fields::{
-    case_key, category_rows, duplicate, optional_bool, optional_charge, optional_float,
-    optional_text, required_text,
+    PDBX, case_key, category_rows, duplicate, optional_bool, optional_charge, optional_text,
 };
 use super::model::{ComponentAtom, ComponentBond, ComponentDefinition, ComponentResolution};
 
@@ -28,13 +27,13 @@ pub(super) fn component_definitions(
             "pdbx_formal_charge",
         ],
     ) {
-        let id = required_text(&row, "chem_comp", "id", 0)?;
+        let id = PDBX.required_text(&row, "chem_comp", "id", 0)?;
         let definition = ComponentDefinition {
             id: id.clone(),
             name: optional_text(&row, 1),
             component_type: optional_text(&row, 2),
             formula: optional_text(&row, 3),
-            formula_weight: optional_float(&row, "chem_comp", "formula_weight", 4)?,
+            formula_weight: PDBX.optional_float(&row, "chem_comp", "formula_weight", 4)?,
             formal_charge: optional_charge(&row, "chem_comp", "pdbx_formal_charge", 5)?,
             atoms: Vec::new(),
             bonds: Vec::new(),
@@ -90,14 +89,14 @@ fn attach_component_atoms(
             "alt_atom_id",
         ],
     ) {
-        let component_id = required_text(&row, "chem_comp_atom", "comp_id", 0)?;
+        let component_id = PDBX.required_text(&row, "chem_comp_atom", "comp_id", 0)?;
         let definition = components
             .entry(case_key(&component_id))
             .or_insert_with(|| component_shell(component_id, resolution));
         definition.atoms.push(ComponentAtom {
-            atom_id: required_text(&row, "chem_comp_atom", "atom_id", 1)?,
+            atom_id: PDBX.required_text(&row, "chem_comp_atom", "atom_id", 1)?,
             alternate_id: optional_text(&row, 5),
-            element: required_text(&row, "chem_comp_atom", "type_symbol", 2)?,
+            element: PDBX.required_text(&row, "chem_comp_atom", "type_symbol", 2)?,
             formal_charge: optional_charge(&row, "chem_comp_atom", "charge", 3)?,
             leaving: match optional_text(&row, 4).as_deref() {
                 None => None,
@@ -136,14 +135,14 @@ fn attach_component_bonds(
             "pdbx_aromatic_flag",
         ],
     ) {
-        let component_id = required_text(&row, "chem_comp_bond", "comp_id", 0)?;
+        let component_id = PDBX.required_text(&row, "chem_comp_bond", "comp_id", 0)?;
         let definition = components
             .entry(case_key(&component_id))
             .or_insert_with(|| component_shell(component_id, resolution));
         definition.bonds.push(ComponentBond {
-            first_atom_id: required_text(&row, "chem_comp_bond", "atom_id_1", 1)?,
-            second_atom_id: required_text(&row, "chem_comp_bond", "atom_id_2", 2)?,
-            order: required_text(&row, "chem_comp_bond", "value_order", 3)?,
+            first_atom_id: PDBX.required_text(&row, "chem_comp_bond", "atom_id_1", 1)?,
+            second_atom_id: PDBX.required_text(&row, "chem_comp_bond", "atom_id_2", 2)?,
+            order: PDBX.required_text(&row, "chem_comp_bond", "value_order", 3)?,
             aromatic: optional_bool(&row, 4),
         });
     }

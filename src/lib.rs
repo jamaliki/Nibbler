@@ -12,10 +12,10 @@ static ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 pub mod cif;
 pub mod geometry;
-#[allow(dead_code)]
-mod hash;
 pub mod modelcif;
-#[cfg(feature = "python")]
+// Only the Python layer calls observation packing; the feature alone builds its tests.
+#[cfg(feature = "observations")]
+#[cfg_attr(not(feature = "python"), allow(dead_code))]
 mod observations;
 pub mod pdbx;
 #[cfg(feature = "reduce3")]
@@ -25,18 +25,6 @@ pub mod validation;
 
 #[cfg(feature = "python")]
 mod python;
-#[cfg(feature = "python")]
-mod python_geometry;
-#[cfg(feature = "python")]
-mod python_observations;
-#[cfg(all(feature = "python", feature = "reduce3"))]
-mod python_reduce;
-#[cfg(all(feature = "python", feature = "reduce3"))]
-mod python_reduce_parents;
-#[cfg(feature = "python")]
-mod python_scan;
-#[cfg(all(feature = "python", feature = "reduce3"))]
-mod python_validation;
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -76,12 +64,7 @@ fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(native_version, module)?)?;
     module.add_function(wrap_pyfunction!(contract_version, module)?)?;
     module.add_function(wrap_pyfunction!(build_profile, module)?)?;
-    python::register(module)?;
-    python_geometry::register(module)?;
-    python_observations::register(module)?;
-    #[cfg(feature = "reduce3")]
-    python_validation::register(module)?;
-    Ok(())
+    python::register(module)
 }
 
 #[cfg(test)]

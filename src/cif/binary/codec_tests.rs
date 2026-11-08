@@ -1,3 +1,5 @@
+//! Tests for the BinaryCIF encoding chains and their failures.
+
 use std::borrow::Cow;
 
 use super::codec::decode_data;

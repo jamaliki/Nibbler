@@ -1,3 +1,5 @@
+//! Tests for metal-hydride bridges under different hydrogen token assignments.
+
 use super::{library, source, token_table};
 use crate::observations::source::Source;
 use crate::observations::{self, HydrogenParents, LigandFeatures, PackOptions, Schema, TokenTable};

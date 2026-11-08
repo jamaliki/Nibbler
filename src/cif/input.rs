@@ -1,3 +1,5 @@
+//! Load CIF sources from files or bytes, with gzip detection and hard size limits.
+
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::fs;

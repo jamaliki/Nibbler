@@ -1,3 +1,5 @@
+//! Split large loops into chunks and scan them on a bounded set of worker threads.
+
 use std::ops::Range;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;

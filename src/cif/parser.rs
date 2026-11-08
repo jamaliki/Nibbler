@@ -1,3 +1,5 @@
+//! The strict CIF grammar, its resource limits and the public parse entry points.
+
 use std::collections::HashSet;
 
 use super::document::{BlockKind, CifDocument};

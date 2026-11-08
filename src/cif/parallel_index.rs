@@ -1,3 +1,5 @@
+//! Find chunk boundaries inside a loop where a value cannot start mid-token.
+
 use std::thread;
 
 use memchr::{memchr, memchr2};

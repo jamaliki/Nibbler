@@ -1,3 +1,5 @@
+//! Encode and decode compiled dictionaries as MessagePack schema artifacts.
+
 use std::collections::BTreeMap;
 use std::io::Cursor;
 

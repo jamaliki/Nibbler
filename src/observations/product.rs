@@ -2,7 +2,7 @@
 
 use super::record::same_residue as same_key_residue;
 use super::{Schema, TokenTable, Tokens};
-use crate::hash::FastMap;
+use crate::cif::FastMap;
 use crate::pdbx::ShortText;
 use serde::Deserialize;
 

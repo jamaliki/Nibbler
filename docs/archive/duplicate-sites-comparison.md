@@ -1,5 +1,8 @@
 # One site stored twice: before and after
 
+> Archived. This note checked the duplicate-site fixes during the corpus rebuild that
+> followed them; it describes those builds, not current behaviour.
+
 This note records what the duplicate-site fixes change on the 5,000 entries of the second
 data audit, so that the corpus rebuild can be checked against it. Three rules changed:
 

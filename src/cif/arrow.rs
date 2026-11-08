@@ -1,3 +1,5 @@
+//! Export projected CIF tables as Arrow record batches and streams.
+
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};

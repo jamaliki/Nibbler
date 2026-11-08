@@ -2,7 +2,7 @@
 
 use crate::observations;
 use crate::observations::parents::{Parents, dictionary as dictionary_parents};
-use crate::python::PyCifDocument;
+use crate::python::document::PyCifDocument;
 use crate::reduce::load_monomer_library;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -40,7 +40,7 @@ fn reduce_hydrogen_parents(
     }).map_err(PyValueError::new_err)
 }
 
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+pub(super) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(reduce_hydrogen_parents, module)?)?;
     module.add_function(wrap_pyfunction!(reduce_required_parent_sources, module)?)?;
     module.add_function(wrap_pyfunction!(reduce_chemical_sources, module)?)?;

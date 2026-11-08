@@ -1,3 +1,6 @@
+//! `_NativeScan`, behind `nibbler.cif.scan`: read sources on worker threads and return
+//! the results in input order.
+
 use std::collections::BTreeMap;
 use std::io;
 use std::sync::mpsc::{self, Receiver, SyncSender};
@@ -9,10 +12,11 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyModule};
 
 use crate::cif::ProjectionPlan;
-use crate::python::{
-    ErrorFields, InputSource, PredicateSpec, ReadFailure, ReadOutput, build_optional_plan,
-    error_fields, error_to_python, execute_read, output_to_python,
+use crate::python::document::read::{
+    ErrorFields, InputSource, ReadFailure, ReadOutput, error_fields, error_to_python, execute_read,
+    output_to_python,
 };
+use crate::python::table::{PredicateSpec, build_optional_plan};
 
 type Job = (usize, InputSource);
 type Completed = (usize, Result<ReadOutput, ReadFailure>);
@@ -188,7 +192,7 @@ fn lock_receiver<T>(receiver: &Arc<Mutex<Receiver<T>>>) -> MutexGuard<'_, Receiv
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+pub(super) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<NativeScan>()?;
     Ok(())
 }

@@ -1,8 +1,11 @@
+//! Canonical and source-preserving CIF text output.
+
 use super::document::{
     BlockKind, CifDocument, CifEntry, CifFrame, CifItem, CifLoop, CifValue, CifValueRef,
     QuoteStyle, TextColumn,
 };
 use super::error::{WriteError, WriteErrorCode};
+use super::lexer::starts_ascii_case;
 use super::numeric::{parse_float, parse_integer};
 use std::borrow::Cow;
 
@@ -643,11 +646,6 @@ fn contains_text_field_delimiter(text: &str) -> bool {
 
 fn is_text_field(formatted: &str) -> bool {
     formatted.starts_with(';')
-}
-
-fn starts_ascii_case(text: &str, prefix: &str) -> bool {
-    text.get(..prefix.len())
-        .is_some_and(|candidate| candidate.eq_ignore_ascii_case(prefix))
 }
 
 #[cfg(test)]

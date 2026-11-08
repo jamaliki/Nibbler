@@ -4,9 +4,8 @@ use crate::cif::CategoryView;
 use crate::pdbx::SemanticError;
 use crate::pdbx::fields::category_rows;
 
-use super::fields::{
-    optional_float, optional_integer, optional_text, required_integer, required_text,
-};
+use super::fields::MODELCIF;
+use crate::pdbx::fields::optional_text;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct Template {
@@ -91,17 +90,42 @@ pub(super) fn templates(categories: CategoryView<'_>) -> Result<Vec<Template>, S
     )
     .map(|row| {
         Ok(Template {
-            ordinal_id: required_integer(&row, "ma_template_details", "ordinal_id", 0)?,
-            id: required_integer(&row, "ma_template_details", "template_id", 1)?,
-            origin: required_text(&row, "ma_template_details", "template_origin", 2)?,
-            entity_type: required_text(&row, "ma_template_details", "template_entity_type", 3)?,
-            data_id: required_integer(&row, "ma_template_details", "template_data_id", 4)?,
-            target_asym_id: required_text(&row, "ma_template_details", "target_asym_id", 5)?,
-            auth_asym_id: required_text(&row, "ma_template_details", "template_auth_asym_id", 6)?,
+            ordinal_id: MODELCIF.required_integer(&row, "ma_template_details", "ordinal_id", 0)?,
+            id: MODELCIF.required_integer(&row, "ma_template_details", "template_id", 1)?,
+            origin: MODELCIF.required_text(&row, "ma_template_details", "template_origin", 2)?,
+            entity_type: MODELCIF.required_text(
+                &row,
+                "ma_template_details",
+                "template_entity_type",
+                3,
+            )?,
+            data_id: MODELCIF.required_integer(
+                &row,
+                "ma_template_details",
+                "template_data_id",
+                4,
+            )?,
+            target_asym_id: MODELCIF.required_text(
+                &row,
+                "ma_template_details",
+                "target_asym_id",
+                5,
+            )?,
+            auth_asym_id: MODELCIF.required_text(
+                &row,
+                "ma_template_details",
+                "template_auth_asym_id",
+                6,
+            )?,
             label_asym_id: optional_text(&row, 7),
             label_entity_id: optional_text(&row, 8),
-            model_number: required_integer(&row, "ma_template_details", "template_model_num", 9)?,
-            transform_id: required_integer(
+            model_number: MODELCIF.required_integer(
+                &row,
+                "ma_template_details",
+                "template_model_num",
+                9,
+            )?,
+            transform_id: MODELCIF.required_integer(
                 &row,
                 "ma_template_details",
                 "template_trans_matrix_id",
@@ -128,15 +152,20 @@ pub(super) fn template_segments(
     )
     .map(|row| {
         Ok(TemplateSegment {
-            id: required_integer(&row, "ma_template_poly_segment", "id", 0)?,
-            template_id: required_integer(&row, "ma_template_poly_segment", "template_id", 1)?,
-            sequence_begin: optional_integer(
+            id: MODELCIF.required_integer(&row, "ma_template_poly_segment", "id", 0)?,
+            template_id: MODELCIF.required_integer(
+                &row,
+                "ma_template_poly_segment",
+                "template_id",
+                1,
+            )?,
+            sequence_begin: MODELCIF.optional_integer(
                 &row,
                 "ma_template_poly_segment",
                 "residue_number_begin",
                 2,
             )?,
-            sequence_end: optional_integer(
+            sequence_end: MODELCIF.optional_integer(
                 &row,
                 "ma_template_poly_segment",
                 "residue_number_end",
@@ -163,26 +192,26 @@ pub(super) fn template_mappings(
     )
     .map(|row| {
         Ok(TemplateMapping {
-            id: required_integer(&row, "ma_target_template_poly_mapping", "id", 0)?,
-            template_segment_id: required_integer(
+            id: MODELCIF.required_integer(&row, "ma_target_template_poly_mapping", "id", 0)?,
+            template_segment_id: MODELCIF.required_integer(
                 &row,
                 "ma_target_template_poly_mapping",
                 "template_segment_id",
                 1,
             )?,
-            target_asym_id: required_text(
+            target_asym_id: MODELCIF.required_text(
                 &row,
                 "ma_target_template_poly_mapping",
                 "target_asym_id",
                 2,
             )?,
-            target_begin: optional_integer(
+            target_begin: MODELCIF.optional_integer(
                 &row,
                 "ma_target_template_poly_mapping",
                 "target_seq_id_begin",
                 3,
             )?,
-            target_end: optional_integer(
+            target_end: MODELCIF.optional_integer(
                 &row,
                 "ma_target_template_poly_mapping",
                 "target_seq_id_end",
@@ -208,10 +237,15 @@ pub(super) fn alignments(categories: CategoryView<'_>) -> Result<Vec<Alignment>,
     )
     .map(|row| {
         Ok(Alignment {
-            id: required_integer(&row, "ma_alignment_info", "alignment_id", 0)?,
-            data_id: required_integer(&row, "ma_alignment_info", "data_id", 1)?,
-            software_group_id: optional_integer(&row, "ma_alignment_info", "software_group_id", 2)?,
-            length: optional_integer(&row, "ma_alignment_info", "alignment_length", 3)?,
+            id: MODELCIF.required_integer(&row, "ma_alignment_info", "alignment_id", 0)?,
+            data_id: MODELCIF.required_integer(&row, "ma_alignment_info", "data_id", 1)?,
+            software_group_id: MODELCIF.optional_integer(
+                &row,
+                "ma_alignment_info",
+                "software_group_id",
+                2,
+            )?,
+            length: MODELCIF.optional_integer(&row, "ma_alignment_info", "alignment_length", 3)?,
             alignment_type: optional_text(&row, 4),
             mode: optional_text(&row, 5),
         })
@@ -237,18 +271,28 @@ pub(super) fn alignment_details(
     )
     .map(|row| {
         Ok(AlignmentDetail {
-            ordinal_id: required_integer(&row, "ma_alignment_details", "ordinal_id", 0)?,
-            alignment_id: required_integer(&row, "ma_alignment_details", "alignment_id", 1)?,
-            template_segment_id: required_integer(
+            ordinal_id: MODELCIF.required_integer(&row, "ma_alignment_details", "ordinal_id", 0)?,
+            alignment_id: MODELCIF.required_integer(
+                &row,
+                "ma_alignment_details",
+                "alignment_id",
+                1,
+            )?,
+            template_segment_id: MODELCIF.required_integer(
                 &row,
                 "ma_alignment_details",
                 "template_segment_id",
                 2,
             )?,
-            target_asym_id: required_text(&row, "ma_alignment_details", "target_asym_id", 3)?,
+            target_asym_id: MODELCIF.required_text(
+                &row,
+                "ma_alignment_details",
+                "target_asym_id",
+                3,
+            )?,
             score_type: optional_text(&row, 4),
-            score_value: optional_float(&row, "ma_alignment_details", "score_value", 5)?,
-            sequence_identity: optional_float(
+            score_value: MODELCIF.optional_float(&row, "ma_alignment_details", "score_value", 5)?,
+            sequence_identity: MODELCIF.optional_float(
                 &row,
                 "ma_alignment_details",
                 "percent_sequence_identity",
@@ -274,10 +318,15 @@ pub(super) fn alignment_sequences(
     )
     .map(|row| {
         Ok(AlignmentSequence {
-            ordinal_id: required_integer(&row, "ma_alignment", "ordinal_id", 0)?,
-            alignment_id: required_integer(&row, "ma_alignment", "alignment_id", 1)?,
-            target_template_flag: required_text(&row, "ma_alignment", "target_template_flag", 2)?,
-            sequence: required_text(&row, "ma_alignment", "sequence", 3)?,
+            ordinal_id: MODELCIF.required_integer(&row, "ma_alignment", "ordinal_id", 0)?,
+            alignment_id: MODELCIF.required_integer(&row, "ma_alignment", "alignment_id", 1)?,
+            target_template_flag: MODELCIF.required_text(
+                &row,
+                "ma_alignment",
+                "target_template_flag",
+                2,
+            )?,
+            sequence: MODELCIF.required_text(&row, "ma_alignment", "sequence", 3)?,
         })
     })
     .collect()

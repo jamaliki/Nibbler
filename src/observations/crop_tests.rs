@@ -1,3 +1,5 @@
+//! Tests for spatial-crop plans and ligand permutations.
+
 #![allow(clippy::unwrap_used, clippy::useless_vec)]
 
 use super::{

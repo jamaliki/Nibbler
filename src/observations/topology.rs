@@ -2,7 +2,7 @@
 
 use super::residue::distance;
 use super::source::Source;
-use crate::hash::FastMap;
+use crate::cif::FastMap;
 use crate::pdbx::ShortText;
 use std::collections::HashMap;
 

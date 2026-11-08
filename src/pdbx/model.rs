@@ -1,6 +1,10 @@
+//! The source-backed PDBx semantic model: entities, components, atom sites and links.
+
 use crate::cif::CifDocument;
+#[cfg(feature = "observations")]
+use crate::cif::{CifBlock, CifEntry, CifLoop, in_category};
 #[cfg(feature = "python")]
-use crate::cif::{CifBlock, CifEntry, CifLoop, CifValueRef, in_category, split_tag};
+use crate::cif::{CifValueRef, split_tag};
 
 use super::short_text::ShortText;
 
@@ -186,7 +190,8 @@ pub struct PdbxModel {
 
 /// Return the loop of `block` that holds every `_atom_site` item of the block, when it
 /// holds only `_atom_site` items.
-#[cfg(feature = "python")]
+#[cfg(feature = "observations")]
+#[cfg_attr(not(feature = "python"), allow(dead_code))]
 pub(crate) fn only_atom_site_loop(block: &CifBlock) -> Option<&CifLoop> {
     let mut holders = block.entries().iter().filter(|entry| match entry {
         CifEntry::Item(item) => in_category(item.tag(), "atom_site"),
@@ -476,7 +481,8 @@ impl PdbxModel {
     /// sites hold the loop's text: every tag of the loop is an `_atom_site` item, the block
     /// has no other `_atom_site` items, and no value is a typed number with a source
     /// spelling, whose text the decode does not keep.
-    #[cfg(feature = "python")]
+    #[cfg(feature = "observations")]
+    #[cfg_attr(not(feature = "python"), allow(dead_code))]
     pub(crate) fn loop_sites(&self) -> Option<(&CifLoop, &[AtomSite])> {
         let [block] = self.document.blocks() else {
             return None;

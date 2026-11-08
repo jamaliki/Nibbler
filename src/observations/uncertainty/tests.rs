@@ -1,3 +1,5 @@
+//! Tests for applying source-row diagnostics to training targets.
+
 use super::*;
 use crate::observations::{
     residue::Packed,

@@ -1,3 +1,5 @@
+//! Immutable source bytes with lazily computed display locations.
+
 use std::ops::Range;
 use std::sync::{Arc, OnceLock};
 

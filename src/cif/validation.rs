@@ -1,3 +1,5 @@
+//! DDL2 dictionary validation of a document and the diagnostics it reports.
+
 use super::document::CifDocument;
 use super::schema::{SchemaError, SchemaName, loaded_schema};
 use super::validation_engine::validate;

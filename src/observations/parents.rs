@@ -2,7 +2,7 @@
 
 use super::source::Source;
 use super::{ResidueParents, residue};
-use crate::hash::FastMap;
+use crate::cif::FastMap;
 use crate::pdbx::ShortText;
 use reduce3::monlib::{Comp, MonLib};
 use std::collections::{BTreeSet, HashMap};

@@ -1,3 +1,5 @@
+//! Tests for dictionary-backed metal-hydride bridges.
+
 use super::*;
 use reduce3::monlib::{CompAtom, CompBond};
 

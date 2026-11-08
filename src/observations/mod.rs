@@ -23,7 +23,7 @@ pub(crate) mod uncertainty;
 
 use crate::cif::CifDocument;
 #[cfg(feature = "reduce3")]
-use crate::hash::{FastMap, FastSet};
+use crate::cif::{FastMap, FastSet};
 pub(crate) use prepared::PreparedSource;
 pub(crate) use record::Tokens;
 pub(crate) use schema::Schema;

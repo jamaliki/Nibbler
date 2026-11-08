@@ -295,7 +295,7 @@ impl Column<'_, Option<ShortText>> {
         item: &str,
     ) -> Result<ShortText, SemanticError> {
         self.optional_short(row)
-            .ok_or_else(|| missing(category, item, logical_row))
+            .ok_or_else(|| PDBX.missing(category, item, logical_row))
     }
 }
 
@@ -309,7 +309,7 @@ impl Column<'_, Option<i64>> {
         item: &str,
     ) -> Result<Option<i64>, SemanticError> {
         self.get(row, value_integer)
-            .map_err(|text| typed(category, item, logical_row, &text, "integer"))
+            .map_err(|text| PDBX.typed(category, item, logical_row, &text, "integer"))
     }
 
     #[inline(always)]
@@ -321,7 +321,7 @@ impl Column<'_, Option<i64>> {
         item: &str,
     ) -> Result<i64, SemanticError> {
         self.optional_integer(row, logical_row, category, item)?
-            .ok_or_else(|| missing(category, item, logical_row))
+            .ok_or_else(|| PDBX.missing(category, item, logical_row))
     }
 }
 
@@ -335,7 +335,7 @@ impl Column<'_, Option<f64>> {
         item: &str,
     ) -> Result<Option<f64>, SemanticError> {
         self.get(row, value_float)
-            .map_err(|text| typed(category, item, logical_row, &text, "finite float"))
+            .map_err(|text| PDBX.typed(category, item, logical_row, &text, "finite float"))
     }
 
     #[inline(always)]
@@ -347,7 +347,7 @@ impl Column<'_, Option<f64>> {
         item: &str,
     ) -> Result<f64, SemanticError> {
         self.optional_float(row, logical_row, category, item)?
-            .ok_or_else(|| missing(category, item, logical_row))
+            .ok_or_else(|| PDBX.missing(category, item, logical_row))
     }
 }
 
@@ -366,7 +366,7 @@ impl Column<'_, Option<i32>> {
             };
             parse_charge(&text)
                 .map(Some)
-                .ok_or_else(|| typed(category, item, logical_row, &text, "formal charge"))
+                .ok_or_else(|| PDBX.typed(category, item, logical_row, &text, "formal charge"))
         })
     }
 }
@@ -378,7 +378,7 @@ pub(super) fn required_single(
 ) -> Result<String, SemanticError> {
     let mut rows = category_rows(view, category, [item]);
     match (rows.next(), rows.next()) {
-        (Some(row), None) => required_text(&row, category, item, 0),
+        (Some(row), None) => PDBX.required_text(&row, category, item, 0),
         (None, _) => Err(SemanticError::new(
             "PDBX_CATEGORY_REQUIRED",
             format!("required category {category:?} is absent"),
@@ -392,70 +392,114 @@ pub(super) fn required_single(
     }
 }
 
-pub(super) fn required_text<const N: usize>(
-    row: &Row<'_, N>,
-    category: &str,
-    item: &str,
-    field: usize,
-) -> Result<String, SemanticError> {
-    row.text(field)
-        .ok_or_else(|| missing(category, item, row.row_index()))
+/// The typed item decoders of one semantic profile, which reports a missing item and a
+/// mistyped value under its own error codes.
+#[derive(Clone, Copy)]
+pub(crate) struct Decoder {
+    required: &'static str,
+    item_type: &'static str,
 }
 
-pub(super) fn optional_text<const N: usize>(row: &Row<'_, N>, field: usize) -> Option<String> {
-    row.text(field)
-}
+/// PDBx items: `PDBX_ITEM_REQUIRED` and `PDBX_ITEM_TYPE`.
+pub(crate) const PDBX: Decoder = Decoder::new("PDBX_ITEM_REQUIRED", "PDBX_ITEM_TYPE");
 
-pub(super) fn required_integer<const N: usize>(
-    row: &Row<'_, N>,
-    category: &str,
-    item: &str,
-    field: usize,
-) -> Result<i64, SemanticError> {
-    match row.integer(field) {
-        Ok(Some(value)) => Ok(value),
-        Ok(None) => Err(missing(category, item, row.row_index())),
-        Err(text) => Err(typed(category, item, row.row_index(), &text, "integer")),
+impl Decoder {
+    /// A decoder reporting `required` for an absent or missing required item and
+    /// `item_type` for a value that does not parse.
+    pub(crate) const fn new(required: &'static str, item_type: &'static str) -> Self {
+        Self {
+            required,
+            item_type,
+        }
+    }
+
+    pub(crate) fn required_text<const N: usize>(
+        self,
+        row: &Row<'_, N>,
+        category: &str,
+        item: &str,
+        field: usize,
+    ) -> Result<String, SemanticError> {
+        row.text(field)
+            .ok_or_else(|| self.missing(category, item, row.row_index()))
+    }
+
+    pub(crate) fn required_integer<const N: usize>(
+        self,
+        row: &Row<'_, N>,
+        category: &str,
+        item: &str,
+        field: usize,
+    ) -> Result<i64, SemanticError> {
+        match row.integer(field) {
+            Ok(Some(value)) => Ok(value),
+            Ok(None) => Err(self.missing(category, item, row.row_index())),
+            Err(text) => Err(self.typed(category, item, row.row_index(), &text, "integer")),
+        }
+    }
+
+    pub(crate) fn optional_integer<const N: usize>(
+        self,
+        row: &Row<'_, N>,
+        category: &str,
+        item: &str,
+        field: usize,
+    ) -> Result<Option<i64>, SemanticError> {
+        row.integer(field)
+            .map_err(|text| self.typed(category, item, row.row_index(), &text, "integer"))
+    }
+
+    pub(crate) fn required_float<const N: usize>(
+        self,
+        row: &Row<'_, N>,
+        category: &str,
+        item: &str,
+        field: usize,
+    ) -> Result<f64, SemanticError> {
+        match row.float(field) {
+            Ok(Some(value)) => Ok(value),
+            Ok(None) => Err(self.missing(category, item, row.row_index())),
+            Err(text) => Err(self.typed(category, item, row.row_index(), &text, "finite float")),
+        }
+    }
+
+    pub(crate) fn optional_float<const N: usize>(
+        self,
+        row: &Row<'_, N>,
+        category: &str,
+        item: &str,
+        field: usize,
+    ) -> Result<Option<f64>, SemanticError> {
+        row.float(field)
+            .map_err(|text| self.typed(category, item, row.row_index(), &text, "finite float"))
+    }
+
+    fn typed(
+        self,
+        category: &str,
+        item: &str,
+        row_index: usize,
+        text: &str,
+        expected: &str,
+    ) -> SemanticError {
+        SemanticError::new(
+            self.item_type,
+            format!("value {text:?} for _{category}.{item} is not a {expected}"),
+            row_context(category, item, row_index),
+        )
+    }
+
+    fn missing(self, category: &str, item: &str, row_index: usize) -> SemanticError {
+        SemanticError::new(
+            self.required,
+            format!("required item _{category}.{item} is absent or missing"),
+            row_context(category, item, row_index),
+        )
     }
 }
 
-pub(super) fn optional_integer<const N: usize>(
-    row: &Row<'_, N>,
-    category: &str,
-    item: &str,
-    field: usize,
-) -> Result<Option<i64>, SemanticError> {
-    row.integer(field)
-        .map_err(|text| typed(category, item, row.row_index(), &text, "integer"))
-}
-
-pub(super) fn required_float<const N: usize>(
-    row: &Row<'_, N>,
-    category: &str,
-    item: &str,
-    field: usize,
-) -> Result<f64, SemanticError> {
-    match row.float(field) {
-        Ok(Some(value)) => Ok(value),
-        Ok(None) => Err(missing(category, item, row.row_index())),
-        Err(text) => Err(typed(
-            category,
-            item,
-            row.row_index(),
-            &text,
-            "finite float",
-        )),
-    }
-}
-
-pub(super) fn optional_float<const N: usize>(
-    row: &Row<'_, N>,
-    category: &str,
-    item: &str,
-    field: usize,
-) -> Result<Option<f64>, SemanticError> {
-    row.float(field)
-        .map_err(|text| typed(category, item, row.row_index(), &text, "finite float"))
+pub(crate) fn optional_text<const N: usize>(row: &Row<'_, N>, field: usize) -> Option<String> {
+    row.text(field)
 }
 
 pub(super) fn optional_charge<const N: usize>(
@@ -469,7 +513,7 @@ pub(super) fn optional_charge<const N: usize>(
     };
     parse_charge(&text)
         .map(Some)
-        .ok_or_else(|| typed(category, item, row.row_index(), &text, "formal charge"))
+        .ok_or_else(|| PDBX.typed(category, item, row.row_index(), &text, "formal charge"))
 }
 
 pub(super) fn optional_bool<const N: usize>(row: &Row<'_, N>, field: usize) -> Option<bool> {
@@ -496,7 +540,7 @@ pub(super) fn duplicate(
     )
 }
 
-pub(super) fn row_context(category: &str, item: &str, row_index: usize) -> Vec<String> {
+pub(crate) fn row_context(category: &str, item: &str, row_index: usize) -> Vec<String> {
     vec![
         format!("category={category}"),
         format!("item=_{category}.{item}"),
@@ -515,26 +559,4 @@ fn parse_charge(text: &str) -> Option<i32> {
         _ => return text.parse().ok(),
     };
     normalized.parse().ok()
-}
-
-fn typed(
-    category: &str,
-    item: &str,
-    row_index: usize,
-    text: &str,
-    expected: &str,
-) -> SemanticError {
-    SemanticError::new(
-        "PDBX_ITEM_TYPE",
-        format!("value {text:?} for _{category}.{item} is not a {expected}"),
-        row_context(category, item, row_index),
-    )
-}
-
-fn missing(category: &str, item: &str, row_index: usize) -> SemanticError {
-    SemanticError::new(
-        "PDBX_ITEM_REQUIRED",
-        format!("required item _{category}.{item} is absent or missing"),
-        row_context(category, item, row_index),
-    )
 }

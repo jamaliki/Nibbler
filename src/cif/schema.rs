@@ -1,3 +1,5 @@
+//! The built-in, lock-pinned DDL2 schemas and their compiled type expressions.
+
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::str::FromStr;

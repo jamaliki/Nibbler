@@ -1,6 +1,8 @@
+//! Add deposited covalent links and observed polymer links to the chemical graph.
+
 use super::super::{
     PdbxModel,
-    fields::{category_rows, optional_float, optional_text},
+    fields::{PDBX, category_rows, optional_text},
 };
 use super::input::order;
 use super::{PreparedChemistry, SemanticError};
@@ -90,7 +92,7 @@ pub(super) fn add(model: &PdbxModel, graph: &mut PreparedChemistry) -> Result<()
             ));
             continue;
         }
-        let distance = optional_float(&row, "struct_conn", "pdbx_dist_value", 15)?;
+        let distance = PDBX.optional_float(&row, "struct_conn", "pdbx_dist_value", 15)?;
         let glyco = values[16].as_deref().is_some_and(|r| {
             matches!(
                 r.to_ascii_lowercase().as_str(),

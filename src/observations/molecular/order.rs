@@ -3,7 +3,7 @@
 use super::Failure;
 use super::json;
 use super::pack::Packed;
-use crate::hash::{FastMap, FastSet};
+use crate::cif::{FastMap, FastSet};
 use std::collections::{HashMap, HashSet};
 
 fn listing(keys: &[&[&str]]) -> String {

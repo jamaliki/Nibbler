@@ -1,3 +1,5 @@
+//! Bond-order and charge rearrangements that restore valid valence at linked atoms.
+
 use super::{
     PreparedChemistry, SemanticError, ShortText,
     product::{displace_h, overvalent, valid},

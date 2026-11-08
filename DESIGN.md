@@ -420,8 +420,18 @@ Nibbler does not provide:
   profile checks, and canonical construction;
 - [`src/modelcif/`](src/modelcif/README.md): prediction semantics, profile checks, and
   canonical construction;
-- `src/python*.rs` and [`python/nibbler/`](python/README.md): PyO3 conversion, native
-  scan orchestration, source normalization, public dispatch, errors, and typed contracts;
+- `src/reduce.rs`: in-memory Reduce3 hydrogen placement on parsed models (`reduce3`
+  feature);
+- `src/geometry/`: evaluation of caller-supplied restraint graphs and per-atom SASA;
+- `src/validation/`: native chemical interpretation, restraint checks, and Probe
+  contacts over Reduce3 chemistry (`reduce3` feature);
+- [`src/observations/`](src/observations/README.md): dense training observations under
+  a caller-supplied schema, the packed-byte contract with kaveh-data (`observations`
+  feature, which `python` enables);
+- `src/python/` (one directory per Python facade: `document`, `table`, `mmcif`, `scan`,
+  `geometry`, `reduce`, `validation`, `observations`) and
+  [`python/nibbler/`](python/README.md): PyO3 conversion, native scan orchestration,
+  source normalization, public dispatch, errors, and typed contracts;
 - [`schemas/`](schemas/README.md): pinned dictionary locks and compiled artifacts;
 - [`benchmarks/`](benchmarks/README.md): correctness-qualified adapters, corpus
   manifest, and regression floors;

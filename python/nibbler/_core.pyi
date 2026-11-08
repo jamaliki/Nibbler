@@ -1,5 +1,5 @@
 from collections.abc import Mapping, Sequence
-from typing import Literal, TypeAlias, TypedDict
+from typing import Any, Literal, TypeAlias, TypedDict
 
 PredicateSpec: TypeAlias = tuple[str, str, list[str]]
 ErrorFields: TypeAlias = tuple[
@@ -298,6 +298,20 @@ class PreparedObservationSource:
     ) -> tuple[dict[str, tuple[str, list[int], bytearray]], dict[str, list[str]]]: ...
     def missing_hydrogen_dictionaries(self, *, chem_data: str) -> list[str]: ...
 
+class PerceptionGraph(TypedDict):
+    """One bounded ligand domain: atom records, then bond records by atom index."""
+
+    atoms: list[dict[str, Any]]
+    bonds: list[dict[str, Any]]
+
+class MolecularView:
+    """One read of a document's source table and linked product (`reduce3` builds)."""
+    def perception_graphs(self) -> list[PerceptionGraph]:
+        """Atom and bond dictionaries of each bounded ligand domain, caps last."""
+        ...
+    def ligand_components(self) -> list[str]: ...
+    def missing_hydrogen_dictionaries(self, *, chem_data: str) -> list[str]: ...
+
 class LigandTokenTable(TypedDict):
     """The caller's ligand tokens.
 
@@ -367,6 +381,48 @@ class ObservationPacker:
     def protein_document(
         self, positions: bytes, masks: bytes, identities: bytes, identifier: str
     ) -> tuple[CifDocument, int, str]: ...
+    def set_molecular_schema(self, schema: str) -> None:
+        """Store the Atom84 contract used by the single-read molecular preparation."""
+        ...
+    def molecular_view(
+        self,
+        document: CifDocument,
+        *,
+        model: int = 1,
+        chem_data: str,
+        base: MolecularView | None = None,
+    ) -> MolecularView:
+        """Read the source table and the linked product of one document once.
+
+        ``base`` is a view of the document Reduce3 read to write this one; the view
+        then shares its product when this document gives the same one.
+        """
+        ...
+    def finish_molecular(
+        self,
+        view: MolecularView,
+        perceived: Sequence[bytes],
+        *,
+        complete: bool = False,
+        sasa: bool = True,
+        target_uncertainties: str | None = None,
+        expected_keys: str | None = None,
+        keys_json: bool = False,
+        index: bool = False,
+        reference_labels: bool = False,
+    ) -> tuple[
+        dict[str, tuple[str, list[int], bytearray]],
+        str | list[list[str]],
+        str | list[list[str]],
+        dict[str, Any],
+    ]:
+        """Build legacy tokens, the source snapshot and typed Atom84 rows from one view.
+
+        Returns the typed buffers, the token keys, the retained legacy keys and audit
+        counts; keys come back as JSON text when ``keys_json`` is set. ``perceived``
+        holds one int16 feature buffer per graph of ``view.perception_graphs()``.
+        """
+        ...
     def pack(
         self,
         document: CifDocument,
