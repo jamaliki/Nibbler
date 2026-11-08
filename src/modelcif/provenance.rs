@@ -4,7 +4,8 @@ use crate::cif::CategoryView;
 use crate::pdbx::SemanticError;
 use crate::pdbx::fields::category_rows;
 
-use super::fields::{optional_integer, optional_text, required_integer, required_text};
+use super::fields::MODELCIF;
+use crate::pdbx::fields::optional_text;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct DataGroupMember {
@@ -82,9 +83,9 @@ pub(super) fn software(categories: CategoryView<'_>) -> Result<Vec<Software>, Se
     )
     .map(|row| {
         Ok(Software {
-            id: required_integer(&row, "software", "pdbx_ordinal", 0)?,
-            name: required_text(&row, "software", "name", 1)?,
-            classification: required_text(&row, "software", "classification", 2)?,
+            id: MODELCIF.required_integer(&row, "software", "pdbx_ordinal", 0)?,
+            name: MODELCIF.required_text(&row, "software", "name", 1)?,
+            classification: MODELCIF.required_text(&row, "software", "classification", 2)?,
             version: optional_text(&row, 3),
             description: optional_text(&row, 4),
             location: optional_text(&row, 5),
@@ -108,10 +109,10 @@ pub(super) fn software_groups(
     )
     .map(|row| {
         Ok(SoftwareGroupMember {
-            ordinal_id: required_integer(&row, "ma_software_group", "ordinal_id", 0)?,
-            group_id: required_integer(&row, "ma_software_group", "group_id", 1)?,
-            software_id: required_integer(&row, "ma_software_group", "software_id", 2)?,
-            parameter_group_id: optional_integer(
+            ordinal_id: MODELCIF.required_integer(&row, "ma_software_group", "ordinal_id", 0)?,
+            group_id: MODELCIF.required_integer(&row, "ma_software_group", "group_id", 1)?,
+            software_id: MODELCIF.required_integer(&row, "ma_software_group", "software_id", 2)?,
+            parameter_group_id: MODELCIF.optional_integer(
                 &row,
                 "ma_software_group",
                 "parameter_group_id",
@@ -142,20 +143,25 @@ pub(super) fn protocol_steps(
     )
     .map(|row| {
         Ok(ProtocolStep {
-            ordinal_id: required_integer(&row, "ma_protocol_step", "ordinal_id", 0)?,
-            protocol_id: required_integer(&row, "ma_protocol_step", "protocol_id", 1)?,
-            step_id: required_integer(&row, "ma_protocol_step", "step_id", 2)?,
-            method_type: required_text(&row, "ma_protocol_step", "method_type", 3)?,
+            ordinal_id: MODELCIF.required_integer(&row, "ma_protocol_step", "ordinal_id", 0)?,
+            protocol_id: MODELCIF.required_integer(&row, "ma_protocol_step", "protocol_id", 1)?,
+            step_id: MODELCIF.required_integer(&row, "ma_protocol_step", "step_id", 2)?,
+            method_type: MODELCIF.required_text(&row, "ma_protocol_step", "method_type", 3)?,
             name: optional_text(&row, 4),
             details: optional_text(&row, 5),
-            software_group_id: optional_integer(&row, "ma_protocol_step", "software_group_id", 6)?,
-            input_data_group_id: optional_integer(
+            software_group_id: MODELCIF.optional_integer(
+                &row,
+                "ma_protocol_step",
+                "software_group_id",
+                6,
+            )?,
+            input_data_group_id: MODELCIF.optional_integer(
                 &row,
                 "ma_protocol_step",
                 "input_data_group_id",
                 7,
             )?,
-            output_data_group_id: optional_integer(
+            output_data_group_id: MODELCIF.optional_integer(
                 &row,
                 "ma_protocol_step",
                 "output_data_group_id",
@@ -185,14 +191,14 @@ pub(super) fn associated_files(
     )
     .map(|row| {
         Ok(AssociatedFile {
-            id: required_integer(&row, "ma_entry_associated_files", "id", 0)?,
-            entry_id: required_text(&row, "ma_entry_associated_files", "entry_id", 1)?,
-            file_url: required_text(&row, "ma_entry_associated_files", "file_url", 2)?,
+            id: MODELCIF.required_integer(&row, "ma_entry_associated_files", "id", 0)?,
+            entry_id: MODELCIF.required_text(&row, "ma_entry_associated_files", "entry_id", 1)?,
+            file_url: MODELCIF.required_text(&row, "ma_entry_associated_files", "file_url", 2)?,
             file_type: optional_text(&row, 3),
             file_format: optional_text(&row, 4),
             file_content: optional_text(&row, 5),
             details: optional_text(&row, 6),
-            data_id: optional_integer(&row, "ma_entry_associated_files", "data_id", 7)?,
+            data_id: MODELCIF.optional_integer(&row, "ma_entry_associated_files", "data_id", 7)?,
         })
     })
     .collect()
@@ -216,18 +222,28 @@ pub(super) fn archive_members(
     )
     .map(|row| {
         Ok(ArchiveMember {
-            id: required_integer(&row, "ma_associated_archive_file_details", "id", 0)?,
-            archive_file_id: required_integer(
+            id: MODELCIF.required_integer(&row, "ma_associated_archive_file_details", "id", 0)?,
+            archive_file_id: MODELCIF.required_integer(
                 &row,
                 "ma_associated_archive_file_details",
                 "archive_file_id",
                 1,
             )?,
-            file_path: required_text(&row, "ma_associated_archive_file_details", "file_path", 2)?,
+            file_path: MODELCIF.required_text(
+                &row,
+                "ma_associated_archive_file_details",
+                "file_path",
+                2,
+            )?,
             file_format: optional_text(&row, 3),
             file_content: optional_text(&row, 4),
             description: optional_text(&row, 5),
-            data_id: optional_integer(&row, "ma_associated_archive_file_details", "data_id", 6)?,
+            data_id: MODELCIF.optional_integer(
+                &row,
+                "ma_associated_archive_file_details",
+                "data_id",
+                6,
+            )?,
         })
     })
     .collect()

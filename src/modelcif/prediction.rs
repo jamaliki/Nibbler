@@ -4,8 +4,9 @@ use crate::cif::CategoryView;
 use crate::pdbx::SemanticError;
 use crate::pdbx::fields::category_rows;
 
-use super::fields::{optional_integer, optional_text, required_integer, required_text};
+use super::fields::MODELCIF;
 use super::provenance::DataGroupMember;
+use crate::pdbx::fields::optional_text;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct Data {
@@ -59,8 +60,8 @@ pub(super) fn audit_conform(
     category_rows(categories, "audit_conform", ["dict_name", "dict_version"])
         .map(|row| {
             Ok((
-                required_text(&row, "audit_conform", "dict_name", 0)?,
-                required_text(&row, "audit_conform", "dict_version", 1)?,
+                MODELCIF.required_text(&row, "audit_conform", "dict_name", 0)?,
+                MODELCIF.required_text(&row, "audit_conform", "dict_version", 1)?,
             ))
         })
         .collect()
@@ -70,9 +71,9 @@ pub(super) fn data(categories: CategoryView<'_>) -> Result<Vec<Data>, SemanticEr
     category_rows(categories, "ma_data", ["id", "name", "content_type"])
         .map(|row| {
             Ok(Data {
-                id: required_integer(&row, "ma_data", "id", 0)?,
-                name: required_text(&row, "ma_data", "name", 1)?,
-                content_type: required_text(&row, "ma_data", "content_type", 2)?,
+                id: MODELCIF.required_integer(&row, "ma_data", "id", 0)?,
+                name: MODELCIF.required_text(&row, "ma_data", "name", 1)?,
+                content_type: MODELCIF.required_text(&row, "ma_data", "content_type", 2)?,
             })
         })
         .collect()
@@ -88,9 +89,9 @@ pub(super) fn data_groups(
     )
     .map(|row| {
         Ok(DataGroupMember {
-            ordinal_id: required_integer(&row, "ma_data_group", "ordinal_id", 0)?,
-            group_id: required_integer(&row, "ma_data_group", "group_id", 1)?,
-            data_id: required_integer(&row, "ma_data_group", "data_id", 2)?,
+            ordinal_id: MODELCIF.required_integer(&row, "ma_data_group", "ordinal_id", 0)?,
+            group_id: MODELCIF.required_integer(&row, "ma_data_group", "group_id", 1)?,
+            data_id: MODELCIF.required_integer(&row, "ma_data_group", "data_id", 2)?,
         })
     })
     .collect()
@@ -104,9 +105,9 @@ pub(super) fn targets(categories: CategoryView<'_>) -> Result<Vec<TargetEntity>,
     )
     .map(|row| {
         Ok(TargetEntity {
-            entity_id: required_text(&row, "ma_target_entity", "entity_id", 0)?,
-            data_id: required_integer(&row, "ma_target_entity", "data_id", 1)?,
-            origin: required_text(&row, "ma_target_entity", "origin", 2)?,
+            entity_id: MODELCIF.required_text(&row, "ma_target_entity", "entity_id", 0)?,
+            data_id: MODELCIF.required_integer(&row, "ma_target_entity", "data_id", 1)?,
+            origin: MODELCIF.required_text(&row, "ma_target_entity", "origin", 2)?,
         })
     })
     .collect()
@@ -122,8 +123,8 @@ pub(super) fn target_instances(
     )
     .map(|row| {
         Ok(TargetInstance {
-            asym_id: required_text(&row, "ma_target_entity_instance", "asym_id", 0)?,
-            entity_id: required_text(&row, "ma_target_entity_instance", "entity_id", 1)?,
+            asym_id: MODELCIF.required_text(&row, "ma_target_entity_instance", "asym_id", 0)?,
+            entity_id: MODELCIF.required_text(&row, "ma_target_entity_instance", "entity_id", 1)?,
             details: optional_text(&row, 2),
         })
     })
@@ -145,12 +146,12 @@ pub(super) fn models(categories: CategoryView<'_>) -> Result<Vec<PredictionModel
     )
     .map(|row| {
         Ok(PredictionModel {
-            id: required_integer(&row, "ma_model_list", "ordinal_id", 0)?,
+            id: MODELCIF.required_integer(&row, "ma_model_list", "ordinal_id", 0)?,
             name: optional_text(&row, 1),
-            assembly_id: optional_integer(&row, "ma_model_list", "assembly_id", 2)?,
-            model_type: required_text(&row, "ma_model_list", "model_type", 3)?,
+            assembly_id: MODELCIF.optional_integer(&row, "ma_model_list", "assembly_id", 2)?,
+            model_type: MODELCIF.required_text(&row, "ma_model_list", "model_type", 3)?,
             type_details: optional_text(&row, 4),
-            data_id: required_integer(&row, "ma_model_list", "data_id", 5)?,
+            data_id: MODELCIF.required_integer(&row, "ma_model_list", "data_id", 5)?,
         })
     })
     .collect()
@@ -160,7 +161,7 @@ pub(super) fn model_groups(categories: CategoryView<'_>) -> Result<Vec<ModelGrou
     category_rows(categories, "ma_model_group", ["id", "name", "details"])
         .map(|row| {
             Ok(ModelGroup {
-                id: required_integer(&row, "ma_model_group", "id", 0)?,
+                id: MODELCIF.required_integer(&row, "ma_model_group", "id", 0)?,
                 name: optional_text(&row, 1),
                 details: optional_text(&row, 2),
             })
@@ -174,8 +175,8 @@ pub(super) fn model_group_links(
     category_rows(categories, "ma_model_group_link", ["model_id", "group_id"])
         .map(|row| {
             Ok(ModelGroupLink {
-                model_id: required_integer(&row, "ma_model_group_link", "model_id", 0)?,
-                group_id: required_integer(&row, "ma_model_group_link", "group_id", 1)?,
+                model_id: MODELCIF.required_integer(&row, "ma_model_group_link", "model_id", 0)?,
+                group_id: MODELCIF.required_integer(&row, "ma_model_group_link", "group_id", 1)?,
             })
         })
         .collect()
@@ -191,10 +192,15 @@ pub(super) fn representatives(
     )
     .map(|row| {
         Ok(ModelRepresentative {
-            id: required_integer(&row, "ma_model_representative", "id", 0)?,
-            group_id: required_integer(&row, "ma_model_representative", "model_group_id", 1)?,
-            model_id: required_integer(&row, "ma_model_representative", "model_id", 2)?,
-            selection_criteria: required_text(
+            id: MODELCIF.required_integer(&row, "ma_model_representative", "id", 0)?,
+            group_id: MODELCIF.required_integer(
+                &row,
+                "ma_model_representative",
+                "model_group_id",
+                1,
+            )?,
+            model_id: MODELCIF.required_integer(&row, "ma_model_representative", "model_id", 2)?,
+            selection_criteria: MODELCIF.required_text(
                 &row,
                 "ma_model_representative",
                 "selection_criteria",

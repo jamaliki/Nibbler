@@ -12,7 +12,7 @@ use crate::cif::{
 
 use super::PdbxModel;
 use super::error::SemanticError;
-use super::fields::{category_rows, required_float, required_text, row_context};
+use super::fields::{PDBX, category_rows, row_context};
 use super::model::AtomSite;
 use super::short_text::ShortText;
 
@@ -331,8 +331,9 @@ fn copies(
         if row.text(0).as_deref() != Some(selected.as_str()) {
             continue;
         }
-        let expression = required_text(&row, "pdbx_struct_assembly_gen", "oper_expression", 1)?;
-        let asym_list = required_text(&row, "pdbx_struct_assembly_gen", "asym_id_list", 2)?;
+        let expression =
+            PDBX.required_text(&row, "pdbx_struct_assembly_gen", "oper_expression", 1)?;
+        let asym_list = PDBX.required_text(&row, "pdbx_struct_assembly_gen", "asym_id_list", 2)?;
         let asym_ids: Vec<&str> = asym_list
             .split(',')
             .map(str::trim)
@@ -444,11 +445,11 @@ fn operators(view: CategoryView<'_>) -> Result<HashMap<String, Transform>, Seman
     ];
     let mut operators = HashMap::new();
     for row in category_rows(view, CATEGORY, ITEMS) {
-        let id = required_text(&row, CATEGORY, "id", 0)?;
+        let id = PDBX.required_text(&row, CATEGORY, "id", 0)?;
         let mut values = [0.0; 12];
         for (field, value) in values.iter_mut().enumerate() {
             let item = ITEMS.get(field + 1).copied().unwrap_or_default();
-            *value = required_float(&row, CATEGORY, item, field + 1)?;
+            *value = PDBX.required_float(&row, CATEGORY, item, field + 1)?;
         }
         let [r11, r12, r13, t1, r21, r22, r23, t2, r31, r32, r33, t3] = values;
         operators.insert(

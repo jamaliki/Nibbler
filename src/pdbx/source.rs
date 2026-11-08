@@ -7,8 +7,8 @@ use crate::cif::{BlockKind, CategoryView, CifDocument, FastMap};
 use super::component_source::{component_definitions, definitions_conflict};
 use super::error::SemanticError;
 use super::fields::{
-    Table, case_key, category_rows, category_tables, duplicate, optional_bool, optional_integer,
-    optional_text, required_integer, required_single, required_text, row_context,
+    PDBX, Table, case_key, category_rows, category_tables, duplicate, optional_bool, optional_text,
+    required_single, row_context,
 };
 use super::model::{
     AsymUnit, AtomSite, BranchSchemeRow, BranchedLink, BranchedNode, ComponentResolution,
@@ -156,8 +156,8 @@ fn audit_conform(categories: CategoryView<'_>) -> Result<Option<(String, String)
         return Ok(None);
     };
     Ok(Some((
-        required_text(&row, "audit_conform", "dict_name", 0)?,
-        required_text(&row, "audit_conform", "dict_version", 1)?,
+        PDBX.required_text(&row, "audit_conform", "dict_name", 0)?,
+        PDBX.required_text(&row, "audit_conform", "dict_version", 1)?,
     )))
 }
 
@@ -171,13 +171,13 @@ fn entities(categories: CategoryView<'_>) -> Result<Vec<Entity>, SemanticError> 
         "entity_poly_seq",
         ["entity_id", "num", "mon_id", "hetero"],
     ) {
-        let entity_id = required_text(&row, "entity_poly_seq", "entity_id", 0)?;
+        let entity_id = PDBX.required_text(&row, "entity_poly_seq", "entity_id", 0)?;
         sequences
             .entry(case_key(&entity_id))
             .or_default()
             .push(PolymerMonomer {
-                number: required_integer(&row, "entity_poly_seq", "num", 1)?,
-                component_id: required_text(&row, "entity_poly_seq", "mon_id", 2)?,
+                number: PDBX.required_integer(&row, "entity_poly_seq", "num", 1)?,
+                component_id: PDBX.required_text(&row, "entity_poly_seq", "mon_id", 2)?,
                 heterogeneous: optional_bool(&row, 3).unwrap_or(false),
             });
     }
@@ -191,21 +191,21 @@ fn entities(categories: CategoryView<'_>) -> Result<Vec<Entity>, SemanticError> 
         "pdbx_entity_branch_list",
         ["entity_id", "num", "comp_id"],
     ) {
-        let entity_id = required_text(&row, "pdbx_entity_branch_list", "entity_id", 0)?;
+        let entity_id = PDBX.required_text(&row, "pdbx_entity_branch_list", "entity_id", 0)?;
         branch_nodes
             .entry(case_key(&entity_id))
             .or_default()
             .push(BranchedNode {
-                number: required_integer(&row, "pdbx_entity_branch_list", "num", 1)?,
-                component_id: required_text(&row, "pdbx_entity_branch_list", "comp_id", 2)?,
+                number: PDBX.required_integer(&row, "pdbx_entity_branch_list", "num", 1)?,
+                component_id: PDBX.required_text(&row, "pdbx_entity_branch_list", "comp_id", 2)?,
             });
     }
     let branch_links = branch_links(categories)?;
 
     category_rows(categories, "entity", ["id", "type", "pdbx_description"])
         .map(|row| {
-            let id = required_text(&row, "entity", "id", 0)?;
-            let kind_text = required_text(&row, "entity", "type", 1)?;
+            let id = PDBX.required_text(&row, "entity", "id", 0)?;
+            let kind_text = PDBX.required_text(&row, "entity", "type", 1)?;
             let kind = match case_key(&kind_text).as_str() {
                 "polymer" => EntityKind::Polymer,
                 "non-polymer" => EntityKind::NonPolymer,
@@ -242,7 +242,7 @@ fn keyed_optional_text(
 ) -> Result<BTreeMap<String, Option<String>>, SemanticError> {
     let mut output = BTreeMap::new();
     for row in category_rows(categories, category, [key_item, value_item]) {
-        let key = required_text(&row, category, key_item, 0)?;
+        let key = PDBX.required_text(&row, category, key_item, 0)?;
         if output
             .insert(case_key(&key), optional_text(&row, 1))
             .is_some()
@@ -270,15 +270,20 @@ fn branch_links(
             "value_order",
         ],
     ) {
-        let entity_id = required_text(&row, category, "entity_id", 0)?;
+        let entity_id = PDBX.required_text(&row, category, "entity_id", 0)?;
         output
             .entry(case_key(&entity_id))
             .or_default()
             .push(BranchedLink {
-                first_node: required_integer(&row, category, "entity_branch_list_num_1", 1)?,
-                second_node: required_integer(&row, category, "entity_branch_list_num_2", 2)?,
-                first_atom_id: required_text(&row, category, "atom_id_1", 3)?,
-                second_atom_id: required_text(&row, category, "atom_id_2", 4)?,
+                first_node: PDBX.required_integer(&row, category, "entity_branch_list_num_1", 1)?,
+                second_node: PDBX.required_integer(
+                    &row,
+                    category,
+                    "entity_branch_list_num_2",
+                    2,
+                )?,
+                first_atom_id: PDBX.required_text(&row, category, "atom_id_1", 3)?,
+                second_atom_id: PDBX.required_text(&row, category, "atom_id_2", 4)?,
                 order: optional_text(&row, 5),
             });
     }
@@ -289,8 +294,8 @@ fn asym_units(categories: CategoryView<'_>) -> Result<Vec<AsymUnit>, SemanticErr
     category_rows(categories, "struct_asym", ["id", "entity_id", "details"])
         .map(|row| {
             Ok(AsymUnit {
-                id: required_text(&row, "struct_asym", "id", 0)?,
-                entity_id: required_text(&row, "struct_asym", "entity_id", 1)?,
+                id: PDBX.required_text(&row, "struct_asym", "id", 0)?,
+                entity_id: PDBX.required_text(&row, "struct_asym", "entity_id", 1)?,
                 details: optional_text(&row, 2),
             })
         })
@@ -578,10 +583,10 @@ fn poly_scheme(categories: CategoryView<'_>) -> Result<Vec<PolySchemeRow>, Seman
     )
     .map(|row| {
         Ok(PolySchemeRow {
-            asym_id: required_text(&row, category, "asym_id", 0)?,
-            entity_id: required_text(&row, category, "entity_id", 1)?,
-            seq_id: required_integer(&row, category, "seq_id", 2)?,
-            component_id: required_text(&row, category, "mon_id", 3)?,
+            asym_id: PDBX.required_text(&row, category, "asym_id", 0)?,
+            entity_id: PDBX.required_text(&row, category, "entity_id", 1)?,
+            seq_id: PDBX.required_integer(&row, category, "seq_id", 2)?,
+            component_id: PDBX.required_text(&row, category, "mon_id", 3)?,
         })
     })
     .collect()
@@ -596,10 +601,10 @@ fn nonpoly_scheme(categories: CategoryView<'_>) -> Result<Vec<NonPolySchemeRow>,
     )
     .map(|row| {
         Ok(NonPolySchemeRow {
-            asym_id: required_text(&row, category, "asym_id", 0)?,
-            entity_id: required_text(&row, category, "entity_id", 1)?,
-            component_id: required_text(&row, category, "mon_id", 2)?,
-            auth_seq_id: required_text(&row, category, "auth_seq_num", 3)?,
+            asym_id: PDBX.required_text(&row, category, "asym_id", 0)?,
+            entity_id: PDBX.required_text(&row, category, "entity_id", 1)?,
+            component_id: PDBX.required_text(&row, category, "mon_id", 2)?,
+            auth_seq_id: PDBX.required_text(&row, category, "auth_seq_num", 3)?,
         })
     })
     .collect()
@@ -621,13 +626,13 @@ fn branch_scheme(categories: CategoryView<'_>) -> Result<Vec<BranchSchemeRow>, S
     )
     .map(|row| {
         Ok(BranchSchemeRow {
-            asym_id: required_text(&row, category, "asym_id", 0)?,
-            entity_id: required_text(&row, category, "entity_id", 1)?,
-            number: required_integer(&row, category, "num", 2)?,
-            component_id: required_text(&row, category, "mon_id", 3)?,
+            asym_id: PDBX.required_text(&row, category, "asym_id", 0)?,
+            entity_id: PDBX.required_text(&row, category, "entity_id", 1)?,
+            number: PDBX.required_integer(&row, category, "num", 2)?,
+            component_id: PDBX.required_text(&row, category, "mon_id", 3)?,
             auth_seq_id: match optional_text(&row, 4) {
                 Some(value) => value,
-                None => required_text(&row, category, "pdb_seq_num", 5)?,
+                None => PDBX.required_text(&row, category, "pdb_seq_num", 5)?,
             },
         })
     })
@@ -654,19 +659,19 @@ pub(super) fn connections(categories: CategoryView<'_>) -> Result<Vec<Connection
     )
     .map(|row| {
         Ok(Connection {
-            id: required_text(&row, category, "id", 0)?,
-            kind: required_text(&row, category, "conn_type_id", 1)?,
+            id: PDBX.required_text(&row, category, "id", 0)?,
+            kind: PDBX.required_text(&row, category, "conn_type_id", 1)?,
             first: ConnectionEndpoint {
-                asym_id: required_text(&row, category, "ptnr1_label_asym_id", 2)?,
+                asym_id: PDBX.required_text(&row, category, "ptnr1_label_asym_id", 2)?,
                 component_id: optional_text(&row, 3),
-                sequence_id: optional_integer(&row, category, "ptnr1_label_seq_id", 4)?,
-                atom_id: required_text(&row, category, "ptnr1_label_atom_id", 5)?,
+                sequence_id: PDBX.optional_integer(&row, category, "ptnr1_label_seq_id", 4)?,
+                atom_id: PDBX.required_text(&row, category, "ptnr1_label_atom_id", 5)?,
             },
             second: ConnectionEndpoint {
-                asym_id: required_text(&row, category, "ptnr2_label_asym_id", 6)?,
+                asym_id: PDBX.required_text(&row, category, "ptnr2_label_asym_id", 6)?,
                 component_id: optional_text(&row, 7),
-                sequence_id: optional_integer(&row, category, "ptnr2_label_seq_id", 8)?,
-                atom_id: required_text(&row, category, "ptnr2_label_atom_id", 9)?,
+                sequence_id: PDBX.optional_integer(&row, category, "ptnr2_label_seq_id", 8)?,
+                atom_id: PDBX.required_text(&row, category, "ptnr2_label_atom_id", 9)?,
             },
         })
     })
