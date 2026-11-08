@@ -13,7 +13,9 @@ static ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
 pub mod cif;
 pub mod geometry;
 pub mod modelcif;
-#[cfg(feature = "python")]
+// Only the Python layer calls observation packing; the feature alone builds its tests.
+#[cfg(feature = "observations")]
+#[cfg_attr(not(feature = "python"), allow(dead_code))]
 mod observations;
 pub mod pdbx;
 #[cfg(feature = "reduce3")]

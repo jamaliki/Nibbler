@@ -30,6 +30,8 @@ lint:
 	$(RUN) cargo clippy --all-targets --no-default-features -- -D warnings
 	$(RUN) cargo clippy --all-targets --features robustness -- -D warnings
 	$(RUN) cargo clippy --all-targets --features reduce3 -- -D warnings
+	$(RUN) cargo clippy --all-targets --features observations -- -D warnings
+	$(RUN) cargo clippy --all-targets --features observations,reduce3 -- -D warnings
 	$(RUN) cargo clippy --all-targets --features python -- -D warnings
 	$(RUN) cargo clippy --all-targets --features python,reduce3 -- -D warnings
 	$(RUN) ruff format --check .
@@ -40,7 +42,7 @@ typecheck:
 
 test: develop chem-data validation-data
 	$(RUN) cargo test --no-default-features
-	$(RUN) $(TEST_DATA) cargo test --features reduce3
+	$(RUN) $(TEST_DATA) cargo test --features observations,reduce3
 	$(RUN) $(TEST_DATA) LD_LIBRARY_PATH=$(PYTHON_LIBDIR) \
 		DYLD_FALLBACK_LIBRARY_PATH=$(PYTHON_LIBDIR) cargo test --features python,reduce3
 	$(RUN) $(TEST_DATA) pytest

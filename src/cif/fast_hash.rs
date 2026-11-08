@@ -5,7 +5,7 @@
 //! never reaches an output.
 
 use std::collections::HashMap;
-#[cfg(feature = "python")]
+#[cfg(feature = "observations")]
 use std::collections::HashSet;
 use std::hash::{BuildHasherDefault, Hasher};
 
@@ -75,5 +75,5 @@ impl Hasher for FastHasher {
 /// A `HashMap` that uses [`FastHasher`].
 pub(crate) type FastMap<K, V> = HashMap<K, V, BuildHasherDefault<FastHasher>>;
 /// A `HashSet` that uses [`FastHasher`].
-#[cfg(feature = "python")]
+#[cfg(feature = "observations")]
 pub(crate) type FastSet<K> = HashSet<K, BuildHasherDefault<FastHasher>>;

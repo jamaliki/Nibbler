@@ -21,9 +21,9 @@ pub(crate) mod writer;
 
 #[cfg(feature = "python")]
 pub(crate) use assembly::{assembly_mapping_names, assembly_with_model};
-#[cfg(feature = "python")]
+#[cfg(feature = "observations")]
 pub(crate) use model::AtomSite;
-#[cfg(all(feature = "python", feature = "reduce3"))]
+#[cfg(all(feature = "observations", feature = "reduce3"))]
 pub(crate) use model::only_atom_site_loop;
 #[cfg(feature = "python")]
 pub(crate) use model::{SiteArray, atom_site_arrays};
@@ -32,14 +32,16 @@ pub use assembly::{MAX_ASSEMBLY_ATOM_SITES, assembly_document, assembly_document
 pub use assembly_overlap::{
     AssemblyDeduplication, deduplicate_assembly_copies, deduplicate_assembly_copies_with_occupancy,
 };
-#[cfg(feature = "python")]
+#[cfg(feature = "observations")]
+#[cfg_attr(not(feature = "python"), allow(unused_imports))]
 pub(crate) use chemistry::library::registry as chemical_library_registry;
-#[cfg(feature = "python")]
+#[cfg(feature = "observations")]
+#[cfg_attr(not(feature = "python"), allow(unused_imports))]
 pub(crate) use chemistry::prepare_product;
 pub use chemistry::{
     BondSource, ChemicalEdit, PreparedChemistry, ProductAtom, ProductBond, prepare_chemistry,
 };
-#[cfg(all(feature = "python", feature = "reduce3"))]
+#[cfg(all(feature = "observations", feature = "reduce3"))]
 pub(crate) use chemistry::{hydrogen as hydrogen_element, product_rows_in, product_rows_with};
 pub use conformer::{
     ConformerAtom, ConformerPolicy, ConformerSelection, select_atom_conformers,

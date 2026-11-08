@@ -662,7 +662,8 @@ impl CifLoop {
 
     /// Whether any value is a typed number that keeps its source spelling. Parsed loops
     /// hold only text, and columnar loops hold numbers without a spelling.
-    #[cfg(feature = "python")]
+    #[cfg(feature = "observations")]
+    #[cfg_attr(not(feature = "python"), allow(dead_code))]
     pub(crate) fn holds_number_spellings(&self) -> bool {
         match &self.storage {
             LoopStorage::Owned(values) => values.iter().any(|value| {
@@ -676,7 +677,7 @@ impl CifLoop {
     }
 
     /// Whether column `column_index` holds a typed float. Parsed loops hold only text.
-    #[cfg(feature = "python")]
+    #[cfg(feature = "observations")]
     pub(crate) fn holds_floats(&self, column_index: usize) -> bool {
         match &self.storage {
             LoopStorage::Owned(values) => values

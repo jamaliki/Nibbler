@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 
 use super::dictionary_source::split_tag;
-#[cfg(feature = "python")]
+#[cfg(feature = "observations")]
 use super::document::TextColumn;
 use super::document::{CifEntry, CifItem, CifLoop, CifValueRef, RowValues};
 use super::text_column::TextCell;
@@ -86,7 +86,7 @@ impl<'a> BlockCategory<'a> {
     }
 
     /// Return direct access to a column that a columnar loop stores as text.
-    #[cfg(feature = "python")]
+    #[cfg(feature = "observations")]
     pub(crate) fn text_column(&self, column: usize) -> Option<TextColumn<'a>> {
         match self {
             Self::Loop(cif_loop) => cif_loop.text_column(column),

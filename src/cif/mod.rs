@@ -61,7 +61,7 @@ pub use document::{
 };
 pub use error::{ParseError, ParseErrorCode, SourceSpan, WriteError, WriteErrorCode};
 pub(crate) use fast_hash::FastMap;
-#[cfg(feature = "python")]
+#[cfg(feature = "observations")]
 pub(crate) use fast_hash::FastSet;
 pub use input::{InputError, InputErrorCode, InputLimits, decode_source, read_source_file};
 #[cfg(feature = "python")]
