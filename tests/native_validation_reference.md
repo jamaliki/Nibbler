@@ -40,6 +40,9 @@ all categories. Its manifest lists every site difference and both hashes.
 The common-sites comparison isolates evaluator parity; it is not a native
 coordinate repair or a change to deposited data.
 
+[The benchmark notes](../benchmarks/README.md#native-validation-reference-harness)
+list the scripts that built these references.
+
 Run portable frozen-data tests without a CCTBX installation. Live tests
 require an explicit `NIBBLER_REFERENCE_CHEM_DATA` tree and a native-validation
 build. The CCTBX unknown-component test also requires the reference toolchain.
