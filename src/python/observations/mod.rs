@@ -1,7 +1,7 @@
 //! Python receives typed buffers after native observation packing.
 
 use crate::observations::{self, HydrogenParents, LigandFeatures, Schema, TokenTable, Tokens};
-use crate::python::PyCifDocument;
+use crate::python::document::PyCifDocument;
 use pyo3::buffer::{PyBuffer, PyUntypedBuffer};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -669,7 +669,7 @@ fn buffers<'py>(
     Ok(result)
 }
 
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+pub(super) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PreparedObservationSource>()?;
     #[cfg(feature = "reduce3")]
     module.add_class::<molecular::MolecularView>()?;

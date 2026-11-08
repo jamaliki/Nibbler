@@ -1,5 +1,7 @@
 //! Private Python binding for running Reduce3 on documents.
 
+mod parents;
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -9,8 +11,8 @@ use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
 use crate::observations::{ParentKeys, RetainedParents};
-use crate::python::PyCifDocument;
-use crate::python_observations::molecular::MolecularView;
+use crate::python::document::PyCifDocument;
+use crate::python::observations::molecular::MolecularView;
 use crate::reduce::{
     Approach, NTermCharge, OptParams, Params, ProbeParams, ReduceError, SourceCopies,
     load_monomer_library, run_recording, source_loop, source_model_number,
@@ -255,7 +257,7 @@ fn reduce_document(
     Ok((output, report, statuses))
 }
 
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+pub(super) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(reduce_document, module)?)?;
-    Ok(())
+    parents::register(module)
 }

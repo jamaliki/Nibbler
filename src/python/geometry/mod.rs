@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};
 
 use crate::geometry::{Angle, Bond, Chirality, Plane, RestraintGraph};
-use crate::python::PyCifDocument;
+use crate::python::document::PyCifDocument;
 
 #[pyfunction]
 #[pyo3(signature = (coordinates, radii, atom_indices, probe_radius=1.4, point_count=256))]
@@ -145,7 +145,7 @@ impl PyRestraintGraph {
     }
 }
 
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+pub(super) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(atom_sasa, module)?)?;
     module.add_function(wrap_pyfunction!(ligand_sasa_document, module)?)?;
     module.add_class::<PyRestraintGraph>()?;

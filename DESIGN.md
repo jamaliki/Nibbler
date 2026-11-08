@@ -420,8 +420,10 @@ Nibbler does not provide:
   profile checks, and canonical construction;
 - [`src/modelcif/`](src/modelcif/README.md): prediction semantics, profile checks, and
   canonical construction;
-- `src/python*.rs` and [`python/nibbler/`](python/README.md): PyO3 conversion, native
-  scan orchestration, source normalization, public dispatch, errors, and typed contracts;
+- `src/python/` (one directory per Python facade: `document`, `table`, `mmcif`, `scan`,
+  `geometry`, `reduce`, `validation`, `observations`) and
+  [`python/nibbler/`](python/README.md): PyO3 conversion, native scan orchestration,
+  source normalization, public dispatch, errors, and typed contracts;
 - [`schemas/`](schemas/README.md): pinned dictionary locks and compiled artifacts;
 - [`benchmarks/`](benchmarks/README.md): correctness-qualified adapters, corpus
   manifest, and regression floors;
