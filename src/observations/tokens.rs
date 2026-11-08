@@ -5,7 +5,7 @@ use super::source::{Atom, Source};
 use super::{
     HydrogenParents, LigandFeatures, ResidueParents, Schema, TokenTable, residue, topology,
 };
-use crate::hash::{FastMap, FastSet};
+use crate::cif::{FastMap, FastSet};
 use crate::pdbx::ShortText;
 use std::collections::{BTreeSet, HashMap};
 

@@ -7,7 +7,7 @@ use super::arrays::{self, Array};
 use super::json;
 use super::snapshot::Snapshot;
 use super::{Failure, MolecularSchema, SLOTS};
-use crate::hash::{FastMap, FastSet};
+use crate::cif::{FastMap, FastSet};
 use crate::observations::record::same_residue;
 use crate::observations::source::Source;
 use crate::observations::{TokenTable, Tokens};

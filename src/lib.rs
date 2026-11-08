@@ -12,8 +12,6 @@ static ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 pub mod cif;
 pub mod geometry;
-#[allow(dead_code)]
-mod hash;
 pub mod modelcif;
 #[cfg(feature = "python")]
 mod observations;

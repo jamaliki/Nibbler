@@ -1,10 +1,12 @@
-//! A fast hasher for maps keyed by short identifiers that callers do not control.
+//! A fast hasher for maps keyed by short identifiers and indices that callers do not control.
 //!
 //! It mixes each word with one rotate, xor and multiply (the `FxHash` scheme). It does
 //! not resist collision attacks, so use it only for per-call maps whose iteration order
 //! never reaches an output.
 
 use std::collections::HashMap;
+#[cfg(feature = "python")]
+use std::collections::HashSet;
 use std::hash::{BuildHasherDefault, Hasher};
 
 const SEED: u64 = 0x51_7c_c1_b7_27_22_0a_95;
@@ -63,9 +65,15 @@ impl Hasher for FastHasher {
 
     #[inline]
     fn finish(&self) -> u64 {
-        self.hash
+        // The table picks buckets from the low bits, which the multiply leaves
+        // dependent on the low input bytes alone.
+        let mixed = (self.hash ^ (self.hash >> 32)).wrapping_mul(0x9e37_79b9_7f4a_7c15);
+        mixed ^ (mixed >> 29)
     }
 }
 
 /// A `HashMap` that uses [`FastHasher`].
 pub(crate) type FastMap<K, V> = HashMap<K, V, BuildHasherDefault<FastHasher>>;
+/// A `HashSet` that uses [`FastHasher`].
+#[cfg(feature = "python")]
+pub(crate) type FastSet<K> = HashSet<K, BuildHasherDefault<FastHasher>>;
