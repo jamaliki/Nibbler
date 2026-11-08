@@ -1,3 +1,5 @@
+//! Lexer token kinds and spans.
+
 use std::ops::Range;
 
 use super::document::QuoteStyle;

@@ -1,3 +1,5 @@
+//! Load and cache monomer-library overlays from dictionaries in the document.
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};

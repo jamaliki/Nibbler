@@ -1,3 +1,5 @@
+//! Small vector helpers and the least-squares plane fit for planarity restraints.
+
 // The cyclic Jacobi implementation adapts
 // cctbx_project/scitbx/matrix/eigensystem.h (CCTBX 2026.9).
 // Copyright (c) 2006 - 2026, The Regents of the University of California,

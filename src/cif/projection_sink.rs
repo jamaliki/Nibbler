@@ -1,3 +1,5 @@
+//! A parse sink that keeps only projected columns and rows that pass the predicates.
+
 use std::thread;
 
 use super::dictionary_source::split_tag;

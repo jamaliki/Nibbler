@@ -1,3 +1,6 @@
+//! `_NativeScan`, behind `nibbler.cif.scan`: read sources on worker threads and return
+//! the results in input order.
+
 use std::collections::BTreeMap;
 use std::io;
 use std::sync::mpsc::{self, Receiver, SyncSender};

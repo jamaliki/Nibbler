@@ -1,3 +1,5 @@
+//! Located parse errors and structured write errors with stable codes.
+
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 

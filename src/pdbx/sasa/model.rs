@@ -1,3 +1,5 @@
+//! Ligand surface areas from an existing semantic model.
+
 use super::{Atoms, check_alternate, radius};
 use crate::geometry::sasa;
 use std::borrow::Cow;

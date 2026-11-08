@@ -1,3 +1,5 @@
+//! The owned CIF document model: blocks, frames, items, loops and typed values.
+
 use std::fmt::{self, Debug, Formatter};
 use std::ops::Range;
 use std::sync::Arc;

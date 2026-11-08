@@ -1,3 +1,5 @@
+//! Parser events and the sink that builds a document from them.
+
 use super::document::{
     BlockKind, CifBlock, CifDocument, CifEntry, CifFrame, CifItem, CifLoop, CifValue, SourceCell,
     TextValue,

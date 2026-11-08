@@ -1,3 +1,5 @@
+//! Resolve the symmetry operators on the two ends of a connection.
+
 use reduce3::cell::{SymOp, crystal_operators};
 use reduce3::cifsource::{CifSource, CifTable};
 use reduce3::model::Structure;

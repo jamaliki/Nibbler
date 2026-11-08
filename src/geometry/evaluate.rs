@@ -1,3 +1,5 @@
+//! Evaluate a restraint graph against supplied coordinates.
+
 use super::math::{cross, dot, norm, plane_deltas, sub};
 use super::{Evaluation, Finding, RestraintGraph};
 

@@ -1,3 +1,5 @@
+//! Tokenize CIF source text for the parser.
+
 use memchr::memchr3;
 
 use super::document::QuoteStyle;

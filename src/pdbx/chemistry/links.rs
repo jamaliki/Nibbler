@@ -1,3 +1,5 @@
+//! Add deposited covalent links and observed polymer links to the chemical graph.
+
 use super::super::{
     PdbxModel,
     fields::{PDBX, category_rows, optional_text},

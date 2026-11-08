@@ -1,3 +1,5 @@
+//! The source-backed PDBx semantic model: entities, components, atom sites and links.
+
 use crate::cif::CifDocument;
 #[cfg(feature = "observations")]
 use crate::cif::{CifBlock, CifEntry, CifLoop, in_category};

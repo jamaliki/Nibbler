@@ -1,3 +1,5 @@
+//! Validated projection plans: requested columns, predicates and schema typing.
+
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};

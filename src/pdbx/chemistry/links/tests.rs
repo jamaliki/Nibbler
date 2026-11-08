@@ -1,3 +1,5 @@
+//! Tests for link inference from distances and deposited connections.
+
 use super::super::{BondSource, PreparedChemistry, prepare_product};
 use crate::cif::parse;
 use crate::pdbx::build_model;

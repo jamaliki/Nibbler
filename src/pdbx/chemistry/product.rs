@@ -1,3 +1,5 @@
+//! Resolve linked atoms to a valid product: leaving groups, bond orders and charges.
+
 use super::{PreparedChemistry, SemanticError, rearrange, valence};
 
 pub(super) fn resolve(graph: &mut PreparedChemistry) -> Result<(), SemanticError> {

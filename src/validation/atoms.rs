@@ -1,3 +1,5 @@
+//! Map Reduce3's flat atoms back to source atom identities.
+
 use reduce3::interp::FlatAtoms;
 use reduce3::model::Structure;
 use serde_json::{Value, json};

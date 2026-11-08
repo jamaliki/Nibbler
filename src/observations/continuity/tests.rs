@@ -1,3 +1,5 @@
+//! Tests for sequence gaps kept and added at polymer breaks.
+
 use super::*;
 use crate::observations::{residue::Packed, source};
 

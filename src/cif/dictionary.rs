@@ -1,3 +1,5 @@
+//! Compiled DDL2 dictionary definitions: types, items, categories and links.
+
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};

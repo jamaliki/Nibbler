@@ -1,3 +1,5 @@
+//! Keep annotated bonds that the Reduce3 preparation hierarchy does not import.
+
 use reduce3::cifsource::{CifSource, CifTable};
 use reduce3::interp::{FlatAtoms, validation::ValidationGraph};
 use reduce3::model::Structure;

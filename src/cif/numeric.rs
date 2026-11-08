@@ -1,3 +1,5 @@
+//! Parse DDL2 integers and CIF floats, including standard uncertainties.
+
 /// Parse a DDL2 integer without accepting decimal or exponent notation.
 pub(crate) fn parse_integer(text: &str) -> Option<i64> {
     text.parse().ok()

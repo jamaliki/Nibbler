@@ -1,3 +1,5 @@
+//! Canonical and source-preserving CIF text output.
+
 use super::document::{
     BlockKind, CifDocument, CifEntry, CifFrame, CifItem, CifLoop, CifValue, CifValueRef,
     QuoteStyle, TextColumn,
