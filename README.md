@@ -34,7 +34,11 @@ development environment pins Python 3.12.13 and Rust 1.97.1.
 - resolves chemical components from embedded definitions, an explicit local CCD cache,
   or a small built-in registry, without network access;
 - validates dictionary and semantic-profile invariants with stable diagnostics;
-- adds and optimizes hydrogens on parsed models in memory with Reduce3; and
+- adds and optimizes hydrogens on parsed models in memory with Reduce3;
+- checks existing coordinates against native chemical restraints and all-atom Probe
+  contacts, and evaluates restraint graphs the caller supplies;
+- packs dense coordinate observations under a slot schema the caller supplies, for
+  training-data pipelines such as kaveh-data; and
 - writes deterministic CIF or BinaryCIF transactionally.
 
 Parsing is strict: Nibbler does not silently repair malformed syntax, guess chemistry,
@@ -145,6 +149,25 @@ them. This separate native operation leaves parsing unchanged when unused.
 See [ligand SASA](docs/ligand-sasa.md) for atom selection, radii, alternate
 locations, accuracy and benchmarks.
 
+Check a model's geometry and contacts without adding hydrogens or repairing it. This
+also needs `chem_data`, and the report keeps any missing chemical coverage:
+
+```python
+report = nibbler.geometry.validate(document, chem_data="chem_data")
+print(report["complete"], report["checks"], report["failures"])
+```
+
+`nibbler.geometry.RestraintGraph` evaluates bonds, angles, chirality and planes that
+the caller assigns, and `nibbler.geometry.sasa` gives Shrake-Rupley areas for selected
+atoms from coordinates and radii. See
+[native validation](docs/native-validation.md) for the chemistry, limits and evidence.
+
+`nibbler.observations.ObservationPacker` packs observed atoms into dense arrays under
+a JSON slot schema and a ligand token table that the caller owns. It infers no missing
+coordinates and derives no ligand tokens. Its byte layout is a versioned contract with
+kaveh-data (`nibbler.contract_version()`); see
+[native coordinate observations](docs/python-api.md#native-coordinate-observations).
+
 Scan results are bounded and yielded in input order:
 
 ```python
@@ -162,8 +185,9 @@ for error in result.errors:
 
 The searchable conventional APIs are `nibbler.cif.read`, `scan`, `validate`, and
 `write`, plus `nibbler.mmcif.read`, `validate`, `write`, and `assembly`, and
-`nibbler.reduce.run`. `chomp` and `feast` are exact aliases of `cif.read` and
-`cif.scan`.
+`nibbler.reduce.run`, `nibbler.geometry.validate`, and
+`nibbler.observations.ObservationPacker`. `chomp` and `feast` are exact aliases of
+`cif.read` and `cif.scan`.
 
 The import package is `nibbler`. The distribution is named `nibbler-cif` because the
 `nibbler` distribution name is used by another project.
@@ -210,6 +234,7 @@ part of the portable release matrix.
 - [PDBx semantic algorithm diagrams](src/pdbx/README.md)
 - [ModelCIF semantic algorithm diagrams](src/modelcif/README.md)
 - [Python binding and scan diagrams](python/README.md)
+- [Observation packing](src/observations/README.md)
 - [Schema, PGO, and release workflow diagrams](tools/README.md)
 - [Python API reference](docs/python-api.md)
 - [Ligand solvent-accessible surface area](docs/ligand-sasa.md)

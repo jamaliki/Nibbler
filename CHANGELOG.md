@@ -17,7 +17,7 @@ All notable user-facing changes are recorded here. Nibbler follows Semantic Vers
   residue, and loses the labelled atoms of the others. No coordinate changes. The
   schema versions are `clash-aware-altloc.v2` and `random-clash-aware-altloc.v2`.
   Selections, conformer views and everything built from them must be rebuilt;
-  `docs/duplicate-sites-comparison.md` lists the 49 of 4,998 audited entries whose
+  `docs/archive/duplicate-sites-comparison.md` lists the 49 of 4,998 audited entries whose
   selection changes.
 
 - Assembly expansion drops a copy of a wholly partially occupied unit that lies on an
